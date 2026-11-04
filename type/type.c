@@ -1,6 +1,5 @@
 #include "type/type.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 #include <stddef.h>
 #include <string.h>
