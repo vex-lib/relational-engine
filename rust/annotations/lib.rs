@@ -6,6 +6,41 @@
 //! validates its optional argument and compiles to nothing at runtime). These
 //! are real attributes, not lookalike doc comments.
 //!
+//! # The marker set
+//!
+//! Fourteen markers, one vocabulary, two spellings.
+//!
+//! | C (`annotation/annotation.h`) | Rust | Argument |
+//! |---|---|---|
+//! | `;;CHECKER` | `#[checker]` | none |
+//! | `;;VALIDATOR` | `#[validator]` | none |
+//! | `;;DEFINITION` | `#[definition]` | none |
+//! | `;;DRAFT` | `#[draft]` | none |
+//! | `;;GETTER` | `#[getter]` | none |
+//! | `;;HOTCODE` | `#[hotcode]` | none |
+//! | `;;INCOMPLETE` | `#[incomplete]` | none |
+//! | `;;INHERITS(text)` | `#[inherits("text")]` | one string |
+//! | `;;INTENTION(text)` | `#[intention("text")]` | one string |
+//! | `;;OVERVIEW` | `#[overview]` | none |
+//! | `;;PLATFORM_EXCLUSIVE(p)` | `#[platform_exclusive("p")]` | one string |
+//! | `;;SETTER` | `#[setter]` | none |
+//! | `;;TEST` | `#[test]` | none |
+//! | `;;WHAT(text)` | `#[what("text")]` | one string |
+//!
+//! # Why `;;TEST` has no macro here
+//!
+//! `#[test]` is built into Rust and is the attribute that actually registers a
+//! test. Defining a proc macro named `test` would shadow it in any file that
+//! imports this crate, silently turning every `#[test]` into a passthrough that
+//! runs nothing. The meaning of `;;TEST` and `#[test]` is already the same — a
+//! function owned by the test suite — so the equation is spelling-only and the
+//! built-in is the correct Rust form.
+//!
+//! # Diagnostic parity
+//!
+//! Every marker reports its C identity (`@Overview`, not `overview`) so a single
+//! grep finds an annotation in either language.
+//!
 //! ```ignore
 //! use relational_annotations::{overview, intention};
 //!
@@ -57,15 +92,15 @@ macro_rules! no_arg_marker {
 }
 
 no_arg_marker! {
-    overview => "overview",
-    definition => "definition",
-    getter => "getter",
-    setter => "setter",
-    draft => "draft",
-    incomplete => "incomplete",
-    checker => "checker",
-    hotcode => "hotcode",
-    debug => "debug",
+    checker => "@Checker",
+    definition => "@Definition",
+    draft => "@Draft",
+    getter => "@Getter",
+    hotcode => "@HotCode",
+    incomplete => "@Incomplete",
+    overview => "@Overview",
+    setter => "@Setter",
+    validator => "@Validator",
 }
 
 macro_rules! string_marker {
@@ -81,8 +116,8 @@ macro_rules! string_marker {
 }
 
 string_marker! {
-    intention => "intention",
-    what => "what",
-    platform_exclusive => "platform_exclusive",
-    inherits => "inherits",
+    inherits => "@Inherits",
+    intention => "@Intention",
+    platform_exclusive => "@PlatformExclusive",
+    what => "@What",
 }

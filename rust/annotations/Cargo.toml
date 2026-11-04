@@ -7,6 +7,7 @@ license = "MIT"
 description = "Zero-dependency marker attributes shared with the C ;; annotations"
 
 [lib]
+path = "lib.rs"
 proc-macro = true
 
 [dependencies]
