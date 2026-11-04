@@ -4,10 +4,8 @@
 #include <strings.h>
 
 #include "nio/mem.h"
-#include "primitive/string.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/intention.h"
+#include "primitive/vex-string.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
