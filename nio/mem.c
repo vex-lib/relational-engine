@@ -1,9 +1,7 @@
 #include "nio/mem.h"
 // Production R2 storage owner: Relational Engine. Memory_* ABI is preserved;
 // this native allocator is not the separate Rust byte/string learning API.
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/intention.h"
+#include "annotation/annotation.h"
 #include "atomic/spin.h"
 #include "exception/throw.h"
 
@@ -87,7 +85,7 @@
  *   - Memory_freeAll(void)
  *   - Memory_length(userPtr)
  *   - Memory_type(userPtr)
- *   - Memory_similar(a, b)
+ *   - Memory_similar(a, b.sh)
  *   - Memory_findAll(typeId, outArray, maxCount)
  *
  * Arena Functions (Phase-4):
@@ -787,7 +785,7 @@ uint64_t Transient_exhaustionCount(void) {
 }
 
 #if defined(DEBUG_BORROW_CHECK)
-;;DEBUG
+;;VALIDATOR
 /** Return the transient arena backing buffer for debug-only borrow diagnostics. */
 const uint8_t *Transient_getBuffer(void) {
     return s_transient.buffer;
