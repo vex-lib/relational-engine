@@ -1,0 +1,101 @@
+[package]
+name = "relational-engine-owner-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+relational-engine-scratchpad = { path = "../../../host-behavior/relational-engine/rust" }
+libc = "0.2"
+
+[[test]]
+name = "memory_owner"
+path = "nio/mem_test.rs"
+
+[[test]]
+name = "string_owner"
+path = "primitives/string_test.rs"
+
+[[test]]
+name = "atomic_string_owner"
+path = "primitives/atomic_string_test.rs"
+
+[[test]]
+name = "ffi_memory_owner"
+path = "ffi/memory_test.rs"
+
+[[test]]
+name = "chunk_owner"
+path = "nio/chunk_test.rs"
+
+[[test]]
+name = "chunked_list_owner"
+path = "struct/chunked_list_test.rs"
+
+[[test]]
+name = "variable_slot_owner"
+path = "variable/variable_slot_test.rs"
+
+[[test]]
+name = "variable_registry_owner"
+path = "variable/variable_registry_test.rs"
+
+[[test]]
+name = "ffi_variable_registry_owner"
+path = "ffi/variable_registry_test.rs"
+
+[[test]]
+name = "typed_chunk_owner"
+path = "nio/typed_chunk_test.rs"
+
+[[test]]
+name = "typed_pool_owner"
+path = "struct/typed_pool_test.rs"
+
+[[test]]
+name = "handle_owner"
+path = "nio/handle_test.rs"
+
+[[test]]
+name = "row_handle_owner"
+path = "nio/row_handle_test.rs"
+
+[[test]]
+name = "row_chunk_owner"
+path = "nio/row_chunk_test.rs"
+
+[[test]]
+name = "row_pool_owner"
+path = "struct/row_pool_test.rs"
+
+[[test]]
+name = "ffi_row_pool_owner"
+path = "ffi/row_pool_test.rs"
+
+[[test]]
+name = "fixed_mapped_file_owner"
+path = "nio/fixed_mapped_file_test.rs"
+
+[[test]]
+name = "mapping_error_owner"
+path = "nio/mapping_error_test.rs"
+
+[[test]]
+name = "preallocated_file_owner"
+path = "io/preallocated_file_test.rs"
+
+[[test]]
+name = "preallocation_error_owner"
+path = "io/preallocation_error_test.rs"
+
+[[test]]
+name = "preallocation_owner"
+path = "io/preallocation_test.rs"
+
+[[test]]
+name = "preallocated_failure_owner"
+path = "io/preallocated_failure_test.rs"
+
+[[test]]
+name = "growable_mapped_file_owner"
+path = "nio/growable_mapped_file_test.rs"
