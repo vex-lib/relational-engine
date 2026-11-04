@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 #include "nio/mem.h"
 #include "relational/variable_pool.h"
 
