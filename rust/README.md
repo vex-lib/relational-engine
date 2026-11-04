@@ -68,9 +68,9 @@ let mut values = ChunkedList!(u64, 64).unwrap();
 values.add(42).unwrap();
 let gold = values.get(0).unwrap() as *const u64;
 let mut names = VariableRegistry!(64).unwrap();
-names.add(b"Gold", gold.cast()).unwrap();
+names.add(b.sh"Gold", gold.cast()).unwrap();
 values.add(99).unwrap(); // Existing row allocation does not move.
-assert_eq!(names.find(b"gold").unwrap(), Some(0));
+assert_eq!(names.find(b.sh"gold").unwrap(), Some(0));
 // names stores a borrowed pointer: keep values alive while any consumer uses it.
 ```
 
@@ -101,7 +101,7 @@ Constructor macros are CamelCase: `Memory!()` and `Bytes!()`. Lowercase
 use relational_engine_scratchpad::{Memory, Bytes};
 let mut memory = Memory!();
 let hello = memory.copy_bytes(Bytes!("hello"))?;
-assert_eq!(memory.get(hello)?, b"hello");
+assert_eq!(memory.get(hello)?, b.sh"hello");
 # Ok::<(), relational_engine_scratchpad::MemoryError>(())
 ```
 
