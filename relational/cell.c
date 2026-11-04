@@ -8,8 +8,7 @@
 
 #include <stdio.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 #include "nio/mem.h"
 
 _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
