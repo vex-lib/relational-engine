@@ -20,6 +20,6 @@
 //! ```
 
 pub use relational_annotations::{
-    checker, debug, definition, draft, getter, hotcode, incomplete, inherits, intention, overview,
-    platform_exclusive, setter, what,
+    checker, definition, draft, getter, hotcode, incomplete, inherits, intention, overview,
+    platform_exclusive, setter, validator, what,
 };
