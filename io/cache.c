@@ -10,9 +10,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/intention.h"
+#include "annotation/annotation.h"
 #include "io/vexhome.h"
 #include "io/file.h"
 #include "security/crypto.h"
