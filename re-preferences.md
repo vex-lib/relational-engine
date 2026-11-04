@@ -2,7 +2,7 @@
 
 ## Constitution Link
 
-The complete [workspace constitution](https://gist.github.com/vex-graph/4132a6c45cb6d3797c3e8eff2e94035a) governs this repository. The binding law list is `gist.md` (`../../../metadata/gists/preferences/gist.md`); `../../../metadata/gists/preferences/PREFERENCES.md` is its full rationale and is never ingested whole. Read the law first, then this file, the proof lawbook `../../../tests/test-preferences.md` (slice one law with `./tools/prefs test "<title>"`), the evidence ledger `../../../metadata/gists/test-checklist.md`, and the actual implementation.
+The complete [workspace constitution](https://gist.github.com/vex-graph/4132a6c45cb6d3797c3e8eff2e94035a) governs this repository. The binding law list is `gist.md` (`../../metadata/gists/preferences/gist.md`); `../../../metadata/gists/preferences/PREFERENCES.md` is its full rationale and is never ingested whole. Read the law first, then this file, the proof lawbook `../../../tests/test-preferences.md` (slice one law with `./tools/prefs test "<title>"`), the evidence ledger `../../../metadata/gists/test-checklist.md`, and the actual implementation.
 
 ## Law Index (Binding Matrix)
 
@@ -26,7 +26,7 @@ The host states a trusted/stable parent (e.g. private Application Support/vexgra
 
 `FixedMappedFile::from_preallocated` consumes the original descriptor, never reopening the pathname; its unsafe external-file exclusion still applies. Mapping failure retains the artifact for explicit recovery. No resize, format, checksums, transaction or persistence policy is added. APFS COW/snapshots/quotas/device errors may still need space or fail on later edits. Creation can block; keep it off realtime/bounded-join teardown paths.
 
-File/path/length change only through creation/close/transfer (a scoped exception under the Conflict Triage Law and Single Class Per File Law (Java Law)), never setters that forge reservation. Registered real/injected owners under `../../../tests/relational-engine/rust/io` prove physical decimal 1 GB reservation, offset bit changes/reopen, rejection/cleanup/retry and descriptor provenance. OS mapping/sync/cleanup-error injection, Rust sanitizer, Linux/Windows and macOS14 runtime proof remain explicit gaps.
+File/path/length change only through creation/close/transfer (a scoped exception under the Conflict Triage Law and Single Class Per File Law (Java Law)), never setters that forge reservation. Registered real/injected owners under `../../tests/relational-engine/rust/io` prove physical decimal 1 GB reservation, offset bit changes/reopen, rejection/cleanup/retry and descriptor provenance. OS mapping/sync/cleanup-error injection, Rust sanitizer, Linux/Windows and macOS14 runtime proof remain explicit gaps.
 
 ### Fixed File Mapping Law
 
@@ -38,7 +38,7 @@ Reads/writes validate bounds and arithmetic before access; rejection preserves b
 
 Flush requests mapped-page writeback; sync requests file synchronization; both expose OS errors through MappingError/Result, neither claims atomic publication, power-loss transactions or rollback of prior writes, and close does not implicitly sync. memmap2/std Drop does not expose unmap/descriptor-close failures. Mapping/page faults/open/flush/sync/cleanup have no hard latency bound and stay off realtime/bounded-join teardown paths. Geometry/mode/backing change only through admission/access/close (a scoped managed exception under the Conflict Triage Law and Single Class Per File Law (Java Law)), never arbitrary setters.
 
-Registered owners: `fixed_mapped_file_test.rs` and `mapping_error_test.rs` under `../../../tests/relational-engine/rust/nio`, plus intended unsafe/type/arity/borrow compiler rejection cases in the main runner. OS mapping/flush/sync-failure injection, huge-file admission, Rust sanitizer instrumentation, Windows and macOS 14 runtime proof remain explicit gaps.
+Registered owners: `fixed_mapped_file_test.rs` and `mapping_error_test.rs` under `../../tests/relational-engine/rust/nio`, plus intended unsafe/type/arity/borrow compiler rejection cases in the main runner. OS mapping/flush/sync-failure injection, huge-file admission, Rust sanitizer instrumentation, Windows and macOS 14 runtime proof remain explicit gaps.
 
 8. **C reaches the mapping through ONE thin extern-C ABI, never a second implementation.** The mapping is owned in Rust (`ui`/`nio/fixed_mapped_file.rs`); C consumes it through a hand-written `extern "C"` surface and the canonical C header, per the engine's existing Rust/FFI policy (explicit status codes as the failure channel; borrowed byte views read-only and bounded by the committed length; no escaped descriptor; no C/Rust atomic or layout assumptions). A real C client in the owner tests proves the handshake in debug and release; a second C implementation is a defect (the Vertical Integration Law).
 
@@ -105,7 +105,7 @@ The teaching block IDs are allocation handles, not ecosystem type IDs; the exist
 
 ## Proof
 
-Owner tests live in the independent `../../../tests/relational-engine` checkout; migrated native IO/NIO owners in `../../../tests/relational-engine/io` and `../../../tests/relational-engine/nio`, including the Rust byte/string handshake. Use registered runners and the Timestamped Test Checklist Law; platform, sanitizer and migration gaps remain explicit, not production readiness.
+Owner tests live in the independent `../../tests/relational-engine` checkout; migrated native IO/NIO owners in `../../../tests/relational-engine/io` and `../../../tests/relational-engine/nio`, including the Rust byte/string handshake. Use registered runners and the Timestamped Test Checklist Law; platform, sanitizer and migration gaps remain explicit, not production readiness.
 
 ## Readiness Cross-Reference (Living Documentation Law)
 

@@ -2,8 +2,21 @@
 R2 memory/storage owner with Rust-owned spans and native C search.
 
 **Ecosystem repository:** https://github.com/vexgraph-ecosystem/relational-engine
-The local checkout is ``; its physical location
-does not change its R2 rank. This is a partial backend, not a finished engine.
+The local checkout is `vex/re`; its physical location does not change its R2
+rank. This is a partial backend, not a finished engine.
+
+**Library name — `re`.** Consumers import this repository by the short name it
+is known as, not by its remote name:
+
+```c
+#include "re/nio/mem.h"
+#include "re/type/type.h"
+```
+
+Build manifests name it the same way — `"dependencies": ["re", ...]`,
+`"includes": ["re"]`. `re` is this repository; it is not a wrapper, a shim or a
+second engine. The remote keeps the long name because that is where it is
+published; everything that resolves a path uses `re`.
 
 ## Current State
 
@@ -31,7 +44,7 @@ does not change its R2 rank. This is a partial backend, not a finished engine.
 existing regular file and fixed read-only/shared writable byte view until close/drop.
 Checked offset/count access, explicit writeback/sync and unsafe external-file
 exclusion have passing macOS arm64 debug/release owners and intended compiler
-rejections through `../../../tests/relational-engine/rust/run.py`. Mapping is not a database
+rejections through `../../tests/relational-engine/rust/run.py`. Mapping is not a database
 transaction or hot arena; the proof gaps below still apply.
 
 **Physical preallocation slice:** Rust `io::PreallocatedFile` creates a new private
@@ -51,7 +64,7 @@ instrumentation is not claimed. `src/relational` and `src/reflection` remain
 imported C comparison material, not production.
 
 **Evidence:** `../../../tests/relational-engine/{native_run.py,rust/run.py}` and
-`../../../metadata/gists/test-checklist.md`. The registry C API is
+`../../metadata/gists/test-checklist.md`. The registry C API is
 `re_variables_new/drop/add/find/slot/set_pointer`.
 
 ## R2 responsibility split
@@ -163,7 +176,7 @@ files remain comparison material; migrated native IO/NIO is production code.
   `#[intention("...")]`, `#[what("T")]`, `#[checker]`, `#[hotcode]`, `#[debug]`, …);
   `annotation.rs` re-exports them so engine files use `crate::annotation::*`.
   Attributes are compile-time passthroughs (the Two-Semicolon Annotation Style Law).
-- Owner and tooling tests live in the workspace `../../../tests/relational-engine`.
+- Owner and tooling tests live in the workspace `../../tests/relational-engine`.
 
 The imported C reference retains Vexspoke's Boost Software License in
 `src/LICENSE`; the repository's original MIT license remains at the root.
@@ -181,7 +194,7 @@ The build entry is [b](https://github.com/vex-graph/b); with a
 standalone b installation:
 
 ```sh
-b build cargo rust
+b.sh build cargo rust
 ```
 
 That builds only the Rust learning backend. The integrated production native
@@ -213,7 +226,7 @@ unsafe external-file exclusion as ordinary mapping admission.
 space or fail on later edits.** Initial physical reservation is not a forever-space,
 transaction or crash-durability guarantee. Success followed by mapping failure
 leaves the reserved artifact for caller recovery. Real reservation and injected
-stage-failure owners live under `../../../tests/relational-engine/rust/io`; OS mapping/
+stage-failure owners live under `../../tests/relational-engine/rust/io`; OS mapping/
 sync/cleanup-error injection and other-host runtime proof remain gaps. See
 `rust/README.md` for the Application Support example.
 
@@ -280,7 +293,7 @@ complete concurrency/fault coverage, performance, automatic record schema
 migration, live Hotcwap reload integration and Windows execution remain unproved.
 
 Universal architecture and proof follow the linked constitution in
-`CONTRIBUTING.md` and `relational-engine-preferences.md`. The engine is the
+`CONTRIBUTING.md` and `re-preferences.md`. The engine is the
 production native IO/NIO owner; its Rust typed pools are a separate API. Engine
 code/storage remain resident across consumer reloads; value replacement is not
 automatic record schema migration.

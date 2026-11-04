@@ -56,7 +56,7 @@ registered native subprocesses have external watchdogs. Seeds are printed.
 ```sh
 python3 tests/relational-engine/native_run.py
 python3 tests/relational-engine/native_run.py --owner mem_exhaustion_test --mode thread
-./tools/b test mem_exhaustion_test
+./tools/b.sh test mem_exhaustion_test
 ```
 
 The main runner covers optimized strict, release-like (no DEBUG_BORROW_CHECK)
