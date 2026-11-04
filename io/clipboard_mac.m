@@ -1,9 +1,7 @@
 #import <AppKit/AppKit.h>
 #include "io/clipboard.h"
 // Production R2 I/O owner: Relational Engine; native pasteboard ABI preserved.
-#include "annotation/platform_exclusive.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
@@ -49,9 +47,7 @@
  *   - Clipboard_clear(void)
  * ============================================================================
  */
-
 ;;PLATFORM_EXCLUSIVE("Mac")
-
 /** Report whether the system pasteboard advertises its plain-text format. */
 bool Clipboard_hasText(void) {
     @autoreleasepool {
