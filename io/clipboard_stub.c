@@ -1,10 +1,9 @@
 #include "io/clipboard.h"
-#include "platform/platform.h"
+#include "lifetime/platform.h"
 // Production R2 I/O owner: Relational Engine; existing Clipboard ABI preserved.
 #include <string.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 #if !defined(VEX_PLATFORM_APPLE)
 
