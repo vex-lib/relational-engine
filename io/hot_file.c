@@ -1,7 +1,6 @@
 #include "io/hot_file.h"
 // Production R2 I/O owner: Relational Engine; existing HotFile ABI preserved.
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
