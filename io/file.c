@@ -7,8 +7,7 @@
 
 #include "nio/mem.h"
 #include "oop/type.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
@@ -82,21 +81,21 @@ static FILE *map_open(const char *path, uint32_t mode) {
         return fopen(path, "rb");
 
     if (append)
-        return fopen(path, read ? "a+b" : "ab");
+        return fopen(path, read ? "a+b.sh" : "ab");
 
     if (truncate)
-        return fopen(path, read ? "w+b" : "wb");
+        return fopen(path, read ? "w+b.sh" : "wb");
 
     // Write without truncate/append: preserve existing content.
     if (create) {
-        FILE *f = fopen(path, read ? "r+b" : "rb+");
+        FILE *f = fopen(path, read ? "r+b.sh" : "rb+");
         if (f)
             return f;
-        return fopen(path, read ? "w+b" : "wb");
+        return fopen(path, read ? "w+b.sh" : "wb");
     }
 
     // Plain write: file must already exist.
-    return fopen(path, read ? "r+b" : "rb+");
+    return fopen(path, read ? "r+b.sh" : "rb+");
 }
 
 /** Open a path using the requested mode flags and create its File in the engine arena. */
