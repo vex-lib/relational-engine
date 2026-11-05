@@ -77,7 +77,7 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
 
 // CONSTRUCTORS
 
-static Cell *instant(uint64_t typeId, uintptr_t value) {
+Cell *Cell_2(uint64_t typeId, uintptr_t value) {
     Cell *cell = (Cell*) Memory_alloc(typeId, CELL_PAYLOAD_BYTES);
     if (!cell)
         return nullptr;
@@ -87,15 +87,11 @@ static Cell *instant(uint64_t typeId, uintptr_t value) {
 }
 
 Cell *Cell_0(void) {
-    return instant(0u, 0u);
+    return Cell_2(0u, 0u);
 }
 
 Cell *Cell_1(uint64_t typeId) {
-    return instant(typeId, 0u);
-}
-
-Cell *Cell_2(uint64_t typeId, uintptr_t value) {
-    return instant(typeId, value);
+    return Cell_2(typeId, 0u);
 }
 
 void Cell_free(Cell *cell) {
