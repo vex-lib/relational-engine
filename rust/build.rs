@@ -5,7 +5,7 @@ use std::{env, path::PathBuf, process::Command};
 fn main() {
     println!("cargo:rerun-if-changed=../search/primitives/name_search.c");
     println!("cargo:rerun-if-changed=../search/primitives/name_search.h");
-    println!("cargo:rerun-if-changed=../../vexspoke/exception/throw.h");
+    println!("cargo:rerun-if-changed=../../util/throw.h");
     println!("cargo:rerun-if-env-changed=CC");
     println!("cargo:rerun-if-env-changed=AR");
     if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
@@ -18,7 +18,7 @@ fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let object = out.join("name_search.o");
     let mut compiler = Command::new(env::var_os("CC").unwrap_or_else(|| "clang".into()));
-    compiler.args(["-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", "-I..", "-I../../vexspoke"]);
+    compiler.args(["-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", "-I..", "-I../..", "-I../../vexspoke"]);
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         compiler.args(["-arch", "arm64", "-mcpu=apple-m1", "-mmacosx-version-min=14.0"]);
     }
