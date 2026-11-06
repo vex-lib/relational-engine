@@ -7,7 +7,7 @@
 
 #include "util/annotation.h"
 #include "atomic/spin.h"
-#include "vexspoke/c23/constructor.h"
+#include "util/constructor.h"
 #include "nio/mem.h"
 
 // nio/bit_pool.h — engine-owned fixed-stride pool API (replaces vexspoke bit/bit).
