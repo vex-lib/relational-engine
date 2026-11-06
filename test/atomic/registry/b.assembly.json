@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "application": {
+    "id": "org.vexgraph.re.atomic.registry",
+    "name": "registry",
+    "displayName": "ThreadRegistry",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Thread identity and role owner scenarios",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "registry_test.c",
+    "sources": [
+      "registry_test.c"
+    ],
+    "includes": [
+      "re",
+      "lifetime"
+    ],
+    "dependencies": [
+      "lifetime",
+      "re"
+    ],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}

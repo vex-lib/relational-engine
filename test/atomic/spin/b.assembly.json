@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "application": {
+    "id": "org.vexgraph.re.atomic.spin",
+    "name": "spin",
+    "displayName": "Spin",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "SpinLock owner scenarios: ownership, timeout, foreign unlock, contention",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "spin_test.c",
+    "sources": [
+      "spin_test.c"
+    ],
+    "includes": [
+      "re",
+      "lifetime"
+    ],
+    "dependencies": [
+      "lifetime",
+      "re"
+    ],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}
