@@ -4,10 +4,10 @@
 //! to preallocated_file_test/preallocation_test. Stable parent is a caller contract.
 mod annotation { pub use relational_engine_scratchpad::annotation::*; }
 mod preallocation_error { pub use relational_engine_scratchpad::PreallocationError; }
-#[path = "../../../../host-behavior/relational-engine/rust/src/nio/projection.rs"]
+#[path = "../../../rust/nio/projection.rs"]
 pub(crate) mod projection;
 mod nio { pub(crate) use crate::projection; }
-#[path = "../../../../host-behavior/relational-engine/rust/src/io/preallocated_file.rs"]
+#[path = "../../../rust/io/preallocated_file.rs"]
 mod subject;
 use std::{cell::Cell, fs, path::PathBuf};
 

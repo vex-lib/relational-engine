@@ -1,7 +1,7 @@
 //! Procedural backend owner: compile the exact production platform module as a
 //! client and exercise real reserve/EOF/allocation query and readonly rejection.
 //! No mocked syscall earns physical-allocation proof; Windows rejects explicitly.
-#[path = "../../../../host-behavior/relational-engine/rust/src/io/preallocation.rs"]
+#[path = "../../../rust/io/preallocation.rs"]
 mod backend;
 mod preallocation_error { pub use relational_engine_scratchpad::PreallocationError; }
 use std::{fs::{self, File, OpenOptions}, path::PathBuf};

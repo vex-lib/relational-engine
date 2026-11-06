@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-relational-engine-scratchpad = { path = "../../../host-behavior/relational-engine/rust" }
+relational-engine-scratchpad = { path = "../../rust" }
 libc = "0.2"
 
 [[test]]
