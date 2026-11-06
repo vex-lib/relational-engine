@@ -5,7 +5,7 @@
 
 #include "nio/mem.h"
 #include "primitive/vex-string.h"
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 ;;DEFINITION
 /**

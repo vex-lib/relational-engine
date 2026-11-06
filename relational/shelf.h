@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "c23/constructor.h"
+#include "util/constructor.h"
 #include "struct/chunked_list.h"
 
 // relational/shelf.h — the global shelf: a node pool with u32 graph edges.

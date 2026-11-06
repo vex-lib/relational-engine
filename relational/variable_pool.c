@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "atomic/spin.h"
 #include "oop/type.h"
 

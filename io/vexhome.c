@@ -1,5 +1,5 @@
 #include "io/vexhome.h"
-#include "lifetime/platform.h"
+#include "util/platform.h"
 // Production R2 I/O owner: Relational Engine; existing VexHome ABI preserved.
 
 #include <stdio.h>
@@ -8,7 +8,7 @@
 #include <time.h>
 
 #include "io/file.h"
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 ;;DEFINITION
 /**

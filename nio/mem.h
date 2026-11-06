@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 // Relational Engine owns this production ForeignMemory API and its implementation.
 // Canonical nio/mem.h includes preserve the existing C ABI for every consumer.

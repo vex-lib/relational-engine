@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "c23/constructor.h"
+#include "util/constructor.h"
 
 // relational/variable_slot.h — the 32-byte name box (the variable slot atom).
 //

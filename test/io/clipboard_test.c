@@ -8,7 +8,7 @@
 #include "io/clipboard.h"
 #include "io/cache.h"
 #include "c23/free.h"
-#include "test_support.h"
+#include "util/test_support.h"
 
 /* Exercises the host clipboard round trip; execution is gated by explicit mutation permission. */
 static void test_clipboard(void) {

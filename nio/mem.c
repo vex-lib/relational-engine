@@ -1,9 +1,9 @@
 #include "nio/mem.h"
 // Production R2 storage owner: Relational Engine. Memory_* ABI is preserved;
 // this native allocator is not the separate Rust byte/string learning API.
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "atomic/spin.h"
-#include "exception/throw.h"
+#include "util/throw.h"
 
 #include <stdbool.h>
 #include <stdint.h>

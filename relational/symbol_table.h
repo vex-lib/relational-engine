@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "c23/constructor.h"
+#include "util/constructor.h"
 
 // relational/symbol_table.h — the relational symbol registry (Legacy: variable/SymbolTable.java).
 //

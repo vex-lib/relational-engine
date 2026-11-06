@@ -1,7 +1,7 @@
 #import <AppKit/AppKit.h>
 #include "io/clipboard.h"
 // Production R2 I/O owner: Relational Engine; native pasteboard ABI preserved.
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 ;;DEFINITION
 /**

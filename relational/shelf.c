@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "nio/mem.h"
 #include "oop/type.h"
 #include "relational/cell.h"

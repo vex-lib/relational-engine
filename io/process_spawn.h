@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "c23/constructor.h"
+#include "util/constructor.h"
 
 // io/process_spawn.h — engine-owned R2 bounded child table, supervised by R1.
 //

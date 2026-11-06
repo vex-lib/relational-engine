@@ -10,7 +10,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "io/vexhome.h"
 #include "io/file.h"
 #include "security/crypto.h"

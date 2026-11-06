@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "c23/constructor.h"
+#include "util/constructor.h"
 #include "type/type.h"
 
 // io/frame_inbox.h — engine-owned bounded caller-fed byte inbox.

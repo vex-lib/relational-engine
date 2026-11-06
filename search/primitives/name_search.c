@@ -1,5 +1,5 @@
 #include "search/primitives/name_search.h"
-#include "exception/throw.h"
+#include "util/throw.h"
 #include <stdint.h>
 #include <string.h>
 
