@@ -11,7 +11,8 @@
   },
   "build": {
     "sources": [
-      "mem.c"
+      "mem.c",
+      "bit_pool.c"
     ],
     "includes": [
       "re",
