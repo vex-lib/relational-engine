@@ -61,10 +61,6 @@
 
 ;;INTENTION("Cryptographically keyed disk cache avoiding duplicate downloads and recomputations")
 
-struct Cache {
-    char dir_path[512];
-    char subsystem[64];
-};
 
 /** Return wall-clock time in milliseconds for cache TTL metadata. */
 static uint64_t current_time_ms(void) {
