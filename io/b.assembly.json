@@ -17,6 +17,7 @@
   "build": {
     "entry": "",
     "sources": [
+      "event/file_event.c",
       "cache.c",
       "clipboard_stub.c",
       "file.c",
