@@ -120,9 +120,9 @@ static inline PairParseStatus pair_parseDecimal(const char *begin, const char *e
     if (cursor != end)
         return PAIR_PARSE_MALFORMED;
 
-    out->integer = 0;
-    out->fraction = 0.0;
-    out->nonFinite = 0;
+    (*out).integer = 0;
+    (*out).fraction = 0.0;
+    (*out).nonFinite = 0;
 
     if (count == 0)
         return PAIR_PARSE_OK;   // every digit was a leading zero
@@ -172,20 +172,20 @@ static inline PairParseStatus pair_parseDecimal(const char *begin, const char *e
         fraction = -fraction;
 
     if (!negative) {
-        out->integer = (i64) magnitude;
+        (*out).integer = (i64) magnitude;
     }
     else if (magnitude == (u64) maxPositive + 1u) {
         // The one value past the positive bound is the signed minimum.
         if (maxPositive == INT64_MAX)
-            out->integer = INT64_MIN;
+            (*out).integer = INT64_MIN;
         else
-            out->integer = -(i64) maxPositive - 1;
+            (*out).integer = -(i64) maxPositive - 1;
     }
     else {
-        out->integer = -(i64) magnitude;
+        (*out).integer = -(i64) magnitude;
     }
 
-    out->fraction = fraction;
+    (*out).fraction = fraction;
     return PAIR_PARSE_OK;
 }
 
@@ -196,9 +196,9 @@ static inline PairParseStatus pair_parseConstant(const char *literal, u8 negativ
 
 static inline PairParseStatus pair_parseText(const char *text, i64 maxPositive,
                                              PairParseResult *out) {
-    out->integer = 0;
-    out->fraction = 0.0;
-    out->nonFinite = 0;
+    (*out).integer = 0;
+    (*out).fraction = 0.0;
+    (*out).nonFinite = 0;
     if (text == nullptr)
         return PAIR_PARSE_MALFORMED;
 
@@ -235,9 +235,9 @@ static inline PairParseStatus pair_parseText(const char *text, i64 maxPositive,
         pair_tokenEquals(begin, end, "nan")) {
         // A finite pair has no infinity. NaN is the documented sentinel and
         // the sign of -inf is deliberately lost.
-        out->integer = 0;
-        out->fraction = (f64) NAN;
-        out->nonFinite = 1;
+        (*out).integer = 0;
+        (*out).fraction = (f64) NAN;
+        (*out).nonFinite = 1;
         return PAIR_PARSE_OK;
     }
 
