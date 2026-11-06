@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "application": {
+    "id": "org.vexgraph.re.primitive.pair",
+    "name": "pair",
+    "displayName": "Pair",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Pair primitives: canonical form, strict parser, constants, sentinel, projections",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "pair_test.c",
+    "sources": [
+      "pair_test.c"
+    ],
+    "includes": [
+      "re"
+    ],
+    "dependencies": [
+      "re/primitive"
+    ],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}

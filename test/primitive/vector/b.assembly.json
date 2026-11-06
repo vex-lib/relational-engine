@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "application": {
+    "id": "org.vexgraph.re.primitive.vector",
+    "name": "vector",
+    "displayName": "Vector",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Vector and matrix geometry: widths, alignment, padding, columns, projections",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "vector_test.c",
+    "sources": [
+      "vector_test.c"
+    ],
+    "includes": [
+      "re"
+    ],
+    "dependencies": [
+      "re/primitive"
+    ],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}
