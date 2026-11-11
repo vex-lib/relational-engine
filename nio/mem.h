@@ -46,6 +46,7 @@
 // directly here.
 #define MEMORY_PAYLOAD_ALIGN 32u
 _Static_assert(MEMORY_PAYLOAD_ALIGN == 32, "the payload floor is 32 bytes");
+#define MEMORY_ALIGN_MASK (MEMORY_PAYLOAD_ALIGN - 1u)
 
 typedef struct MemoryHeader {
     u64 typeId;   // triple-sugar self-describe id (BE6C sugar inside)
@@ -63,7 +64,7 @@ void *Memory_realloc(void *userPtr, bytes newBytes);
 
 void Memory_free(void *userPtr);
 
-void Memory_freeAll(void);
+void Memory_freeAll();
 
 bytes Memory_length(void *userPtr);
 u64 Memory_type(void *userPtr);
@@ -85,7 +86,56 @@ bytes Memory_findAll(u64 typeId, void **outArray, bytes maxCount);
 // invalidate on free but reclaim capacity only on freeAll, never individually.
 typedef struct MemoryArena MemoryArena;
 
-MemoryArena *Memory_defaultArena(void);
+// Private allocator seam, kept here so nio has one public header. The system
+// wrappers are the only libc allocation path; arena.c and transient.c call
+// them. Consumers may see these declarations but never call them directly.
+void *Memory_systemAlloc(bytes size);
+void *Memory_systemCalloc(bytes count, bytes size);
+void *Memory_systemRealloc(void *ptr, bytes size);
+void Memory_systemFree(void *ptr);
+
+const MemoryHeader *Memory_safeHeader(const void *userPtr);
+MemoryArena *Memory_arenaFor(void *userPtr);
+
+#ifdef NIO_MEM_IMPLEMENTATION
+
+/** Round a freshly allocated base forward to the payload floor. */
+static u8 *Memory_alignUp(const u8 *raw) {
+    return (u8*) (((uintptr_t) raw + MEMORY_ALIGN_MASK) & ~(uintptr_t) MEMORY_ALIGN_MASK);
+}
+
+/**
+ * Compute the nonzero header veto word from type id, length and payload address.
+ * Hash-clarification veto over the stated identity, fed little-endian (never
+ * serialized, but explicit anyway). LSB forced so a stored hash is never 0:
+ * cleared (zeroed) headers always fail verification with no special case.
+ */
+static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
+    u64 hash = 1469598103934665603ull;
+    const u64 words[3] = { typeId, length, pointer };
+    for (int w = 0; w < 3; w++) {
+        for (int i = 0; i < 8; i++) {
+            hash ^= (words[w] >> (i * 8)) & 0xFFull;
+            hash *= 1099511628211ull;
+        }
+    }
+    return hash | 1ull;
+}
+
+/** Stamp a header: identity, length, the block's redirect, and the veto.
+ * The redirect is the object's own address here; a primitive form redirects
+ * to its value cell instead, which the id's form bits decide (Type_isPrimitive).
+ */
+static void Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
+    (*h).typeId = typeId;
+    (*h).length = (u64) numBytes;
+    (*h).pointer = (u64) (uintptr_t) ((u8*) h + sizeof(MemoryHeader));
+    (*h).hash = Memory_headerHash((*h).typeId, (*h).length, (*h).pointer);
+}
+
+#endif
+
+MemoryArena *Memory_defaultArena();
 
 MemoryArena *MemoryArena_create(bytes totalBytes);
 void MemoryArena_destroy(MemoryArena *a);
@@ -97,7 +147,7 @@ bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, void **outArray, bytes max
 bytes MemoryArena_activeBytes(MemoryArena *a);
 bytes MemoryArena_capacity(MemoryArena *a);
 
-u64 Memory_exhaustionCount(void);
+u64 Memory_exhaustionCount();
 u64 MemoryArena_exhaustionCount(const MemoryArena *a);
 
 // Lifetime verification classification

@@ -8,18 +8,18 @@ from pathlib import Path
 import unittest
 
 WORKSPACE = Path(__file__).resolve().parents[2]
-ENGINE = WORKSPACE / "vex/re"
+ENGINE = WORKSPACE / "re"
 
 
 class NativeMemoryDocumentation(unittest.TestCase):
     def test_capacity_and_reset_claims_match_source(self):
-        source = (ENGINE / "src/nio/mem.c").read_text()
+        source = (ENGINE / "nio/arena.c").read_text()
         alloc = source.split("static void *arena_alloc(", 1)[1].split(
             "static void arena_free(", 1)[0]
         self.assertNotIn("malloc(", alloc)
         self.assertIn("return nullptr;", alloc)
         reset = source.split("static void arena_freeAll(", 1)[1].split(
-            "static MemoryArena *arena_for(", 1)[0]
+            "MemoryArena *Memory_arenaFor(", 1)[0]
         self.assertIn("memset((*a).bumpArena, 0, (*a).bumpOffset)", reset)
         enumerate_blocks = source.split("bytes MemoryArena_findAll(", 1)[1].split(
             "bytes MemoryArena_activeBytes(", 1)[0]

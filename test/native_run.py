@@ -19,7 +19,8 @@ LIB = WORKSPACE.parent / "lib"
 assert not (CPU / "nio/mem.c").exists()
 assert not (CPU / "io/mem.c").exists()
 assert not (CPU / "io/file.c").exists()
-sources = [ENGINE / "nio/mem.c", ENGINE / "atomic/spin_lock.c",
+sources = [ENGINE / "nio/mem.c", ENGINE / "nio/arena.c", ENGINE / "nio/transient.c",
+           ENGINE / "atomic/spin_lock.c",
            *sorted((ENGINE / "io").rglob("*.c")),
            *sorted((ENGINE / "clipboard").glob("*.c")),
            ENGINE / "clipboard/clipboard_mac.m"]
