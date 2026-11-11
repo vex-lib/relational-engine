@@ -28,15 +28,15 @@
 #define CELL_BLOCK_BYTES 48u
 
 typedef struct Cell {
-    uintptr_t value; // thin pointer to the value, or the value inline
-    uintptr_t pad;   // tail padding so the block is 32 Bytes
+    pointer value; // thin pointer to the value, or the value inline
+    pointer pad;   // tail padding so the block is 32 Bytes
 } Cell;
 
 _Static_assert(sizeof(Cell) == CELL_PAYLOAD_BYTES, "Cell payload must stay 16 Bytes");
 
 Cell *Cell_0();
 Cell *Cell_1(u64 typeId);
-Cell *Cell_2(u64 typeId, uintptr_t value);
+Cell *Cell_2(u64 typeId, pointer value);
 
 #define Cell(...) CONSTRUCTOR_DISPATCH(Cell, __VA_ARGS__)
 
@@ -45,8 +45,8 @@ void Cell_free(Cell *cell);
 u64 Cell_typeId(const Cell *cell);
 bool Cell_check(const Cell *cell, u64 typeId);
 
-void Cell_setValue(Cell *cell, uintptr_t value);
-uintptr_t Cell_getValue(const Cell *cell);
+void Cell_setValue(Cell *cell, pointer value);
+pointer Cell_getValue(const Cell *cell);
 
 void Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated);
 void Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated);

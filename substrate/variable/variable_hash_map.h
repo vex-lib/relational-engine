@@ -57,9 +57,9 @@ VariableHashMap *VariableHashMap_0(void);
 
 void VariableHashMap_free(VariableHashMap *map);
 
-bool VariableHashMap_add(VariableHashMap *map, const char *name, uintptr_t pointer);
+bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer);
 
-uintptr_t VariableHashMap_get(const VariableHashMap *map, const char *name);
+pointer VariableHashMap_get(const VariableHashMap *map, const char *name);
 
 bool VariableHashMap_contains(const VariableHashMap *map, const char *name);
 

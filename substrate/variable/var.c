@@ -50,7 +50,7 @@ var *var_2(const char *name, MemoryArena *arena) {
 
     memset(self, 0, sizeof(*self));
 
-    if (!VariableSlot_init(&(*self).slot, name, (uintptr_t) self)) {
+    if (!VariableSlot_init(&(*self).slot, name, (pointer) self)) {
         MemoryArena_free(arena, self);
         return nullptr;
     }
@@ -59,11 +59,11 @@ var *var_2(const char *name, MemoryArena *arena) {
     return self;
 }
 
-bool var_set(var *self, uintptr_t value) {
+bool var_set(var *self, pointer value) {
     if (!self)
         return false;
 
-    VariableSlot_setPointer(&(*self).slot, (uintptr_t) self);
+    VariableSlot_setPointer(&(*self).slot, (pointer) self);
     (*self).value = value;
 
     for (bytes i = 0; i < (*self).observerCount; i++) {
@@ -122,7 +122,7 @@ const char *var_name(const var *self) {
     return self ? VariableSlot_getName(&(*self).slot) : nullptr;
 }
 
-uintptr_t var_value(const var *self) {
+pointer var_value(const var *self) {
     return self ? (*self).value : 0u;
 }
 

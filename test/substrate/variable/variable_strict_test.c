@@ -42,11 +42,11 @@ int main(void) {
     SymbolTable scope = SymbolTable();
     CHECK("constructor", scope.active);
 
-    i32 a = SymbolTable_instant(&scope, "hp", 1, (uintptr_t) 0x100);
+    i32 a = SymbolTable_instant(&scope, "hp", 1, (pointer) 0x100);
     CHECK("first instant", a >= 0);
-    i32 dup = SymbolTable_instant(&scope, "hp", 1, (uintptr_t) 0x200);
+    i32 dup = SymbolTable_instant(&scope, "hp", 1, (pointer) 0x200);
     CHECK("dup fails", dup == -1);
-    CHECK("dup keeps old value", SymbolTable_getPointer(&scope, a) == (uintptr_t) 0x100);
+    CHECK("dup keeps old value", SymbolTable_getPointer(&scope, a) == (pointer) 0x100);
 
     CHECK("empty fails", SymbolTable_instant(&scope, "", 1, 1) == -1);
     CHECK("null fails", SymbolTable_instant(&scope, nullptr, 1, 1) == -1);
@@ -56,14 +56,14 @@ int main(void) {
     CHECK("dash fails", SymbolTable_instant(&scope, "has-dash", 1, 1) == -1);
     CHECK("getId bad silent", SymbolTable_getId(&scope, "has space") == -1);
 
-    i32 f = SymbolTable_instant(&scope, "character.position.x", 2, (uintptr_t) 0x300);
+    i32 f = SymbolTable_instant(&scope, "character.position.x", 2, (pointer) 0x300);
     CHECK("dotted instant", f >= 0);
     CHECK("dotted find", SymbolTable_getId(&scope, "character.position.x") == f);
     CHECK("case folds", SymbolTable_getId(&scope, "Character.Position.X") == f);
     CHECK("getName dotted", strcmp(SymbolTable_getName(&scope, f), "character.position.x") == 0);
 
-    SymbolTable_instant(&scope, "mp", 1, (uintptr_t) 0x400);
-    SymbolTable_instant(&scope, "name", 3, (uintptr_t) 0x500);
+    SymbolTable_instant(&scope, "mp", 1, (pointer) 0x400);
+    SymbolTable_instant(&scope, "name", 3, (pointer) 0x500);
     i32 ids[8];
     CHECK("class1 total", SymbolTable_findByClass(&scope, 1, ids, 8) == 2);
     CHECK("class2 total", SymbolTable_findByClass(&scope, 2, ids, 8) == 1);
@@ -71,10 +71,10 @@ int main(void) {
     i32 one[1];
     CHECK("truncated total visible", SymbolTable_findByClass(&scope, 1, one, 1) == 2);
     CHECK("class pinned", SymbolTable_getClassId(&scope, a) == 1);
-    SymbolTable_setPointer(&scope, a, (uintptr_t) 0x111);
-    CHECK("setPointer keeps class", SymbolTable_getClassId(&scope, a) == 1 && SymbolTable_getPointer(&scope, a) == (uintptr_t) 0x111);
-    CHECK("cas ok", SymbolTable_compareAndSetPointer(&scope, a, (uintptr_t) 0x111, (uintptr_t) 0x222) == true);
-    CHECK("cas mismatch", SymbolTable_compareAndSetPointer(&scope, a, (uintptr_t) 0x111, (uintptr_t) 0x333) == false);
+    SymbolTable_setPointer(&scope, a, (pointer) 0x111);
+    CHECK("setPointer keeps class", SymbolTable_getClassId(&scope, a) == 1 && SymbolTable_getPointer(&scope, a) == (pointer) 0x111);
+    CHECK("cas ok", SymbolTable_compareAndSetPointer(&scope, a, (pointer) 0x111, (pointer) 0x222) == true);
+    CHECK("cas mismatch", SymbolTable_compareAndSetPointer(&scope, a, (pointer) 0x111, (pointer) 0x333) == false);
 
     CHECK("rename ok", SymbolTable_rename(&scope, "hp", "health") == true);
     CHECK("old gone", SymbolTable_getId(&scope, "hp") == -1);
@@ -85,7 +85,7 @@ int main(void) {
 
     CHECK("setValue create", Relational_setValue(&scope, "score", 4, (void*) 0x600) == true);
     CHECK("setValue rebind", Relational_setValue(&scope, "score", 4, (void*) 0x601) == true);
-    CHECK("rebound value", (uintptr_t) Relational_getValue(&scope, "score") == (uintptr_t) 0x601);
+    CHECK("rebound value", (pointer) Relational_getValue(&scope, "score") == (pointer) 0x601);
     CHECK("setFunction create", Relational_setFunction(&scope, "tick", (void*) 0x700) == true);
     CHECK("setFunction rebind", Relational_setFunction(&scope, "tick", (void*) 0x701) == true);
     Relational_setString(&scope, "title", "hello");

@@ -50,7 +50,7 @@
  *
  * SLOT RECORD (owned by Shelf, behaviorless):
  * ----------------------------------------------------------------------------
- *   ShelfNode cell; // uintptr_t + the referenced identity cell
+ *   ShelfNode cell; // pointer + the referenced identity cell
  *   ShelfNode next; // u32 + the outgoing graph edge index
  *   ShelfNode pad;  // u32 + explicit row padding
  *
@@ -152,7 +152,7 @@ void Shelf_free(Shelf *shelf) {
 
 // CORE FUNCTIONS
 
-u32 Shelf_addNode(Shelf *shelf, uintptr_t cell) {
+u32 Shelf_addNode(Shelf *shelf, pointer cell) {
     if (!shelf || !(*shelf).active)
         return SHELF_INDEX_NONE;
     ShelfNode *row = (ShelfNode*) ChunkedList_addSlot((*shelf).nodes);
@@ -166,17 +166,17 @@ u32 Shelf_addNode(Shelf *shelf, uintptr_t cell) {
     return index;
 }
 
-u32 Shelf_addCell(Shelf *shelf, u64 typeId, uintptr_t value) {
+u32 Shelf_addCell(Shelf *shelf, u64 typeId, pointer value) {
     Cell *cell = Cell_2(typeId, value);
     if (!cell)
         return SHELF_INDEX_NONE;
-    u32 index = Shelf_addNode(shelf, (uintptr_t) cell);
+    u32 index = Shelf_addNode(shelf, (pointer) cell);
     if (index == SHELF_INDEX_NONE)
         Cell_free(cell);
     return index;
 }
 
-uintptr_t Shelf_getCell(const Shelf *shelf, u32 index) {
+pointer Shelf_getCell(const Shelf *shelf, u32 index) {
     ShelfNode *row = nodeAt(shelf, index);
     if (!row)
         return 0u;
@@ -260,7 +260,7 @@ void Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTr
     }
     int written = snprintf(dest, cap, "Shelf { active=%s, count=%u, head=%d, nodes=0x%llx }",
                            (*shelf).active ? "true" : "false", (*shelf).count,
-                           (int) (*shelf).head, (unsigned long long) (uintptr_t) (*shelf).nodes);
+                           (int) (*shelf).head, (unsigned long long) (pointer) (*shelf).nodes);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;

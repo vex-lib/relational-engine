@@ -5,9 +5,9 @@
 #include "vex.h"
 
 static int g_calls;
-static uintptr_t g_last;
+static pointer g_last;
 
-static void observer(var *self, uintptr_t value, void *context) {
+static void observer(var *self, pointer value, void *context) {
     (void) self;
     g_calls += 1;
     g_last = value;

@@ -66,7 +66,7 @@ static void storage_contract(void) {
     assert(!cut && output.value == 42 && output.revision == 1);
     const u8 *borrowed = nullptr;
     assert(re_rows_borrow(pool, first, &borrowed) == 0);
-    assert((uintptr_t) borrowed % 256 == 0);
+    assert((pointer) borrowed % 256 == 0);
     const u8 *original = borrowed;
     ReRowHandle saved = first;
     assert(re_rows_add(nullptr, (const u8*) &input, sizeof(input), &saved) == 1);

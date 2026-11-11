@@ -81,12 +81,12 @@ static void testBucketsAndFold(void) {
     CHECK(n == 39u);
     for (bytes i = 0u; i < n; i++) {
         char name[4] = { firsts[i], '1', '\0' };
-        CHECK(VariableMiniMap_add(&map, name, 0x100u + (uintptr_t) i) == true);
+        CHECK(VariableMiniMap_add(&map, name, 0x100u + (pointer) i) == true);
     }
     CHECK(VariableMiniMap_count(&map) == 39u);
     for (bytes i = 0u; i < n; i++) {
         char name[4] = { firsts[i], '1', '\0' };
-        CHECK(VariableMiniMap_get(&map, name) == 0x100u + (uintptr_t) i);
+        CHECK(VariableMiniMap_get(&map, name) == 0x100u + (pointer) i);
     }
 
     CHECK(VariableMiniMap_add(&map, "Character.Position.X", 0xAAu) == true);

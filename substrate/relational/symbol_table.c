@@ -52,7 +52,7 @@
  * ----------------------------------------------------------------------------
  *   SymbolRow slot; // i32 + pool slot index (name lives in pool)
  *   SymbolRow classId; // u32 + value class, pinned at creation
- *   SymbolRow pointer; // uintptr_t + the value
+ *   SymbolRow pointer; // pointer + the value
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -167,7 +167,7 @@ void SymbolTable_shutdown(SymbolTable *v) {
     (*v).active = false;
 }
 
-i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, uintptr_t targetPointer) {
+i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer targetPointer) {
     if (!v || !(*v).active) {
         fprintf(stderr, "[variable] instant: inactive registry\n");
         return -1;
@@ -293,19 +293,19 @@ bytes SymbolTable_findByClass(SymbolTable *v, u32 classId, i32 *outIds, bytes ca
     return total;
 }
 
-uintptr_t SymbolTable_getPointer(SymbolTable *v, i32 varId) {
+pointer SymbolTable_getPointer(SymbolTable *v, i32 varId) {
     SymbolRow *row = row_at(v, varId);
     return row ? (*row).pointer : 0;
 }
 
-void SymbolTable_setPointer(SymbolTable *v, i32 varId, uintptr_t targetPointer) {
+void SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer) {
     SymbolRow *row = row_at(v, varId);
     if (!row)
         return;
     (*row).pointer = targetPointer;
 }
 
-bool SymbolTable_compareAndSetPointer(SymbolTable *v, i32 varId, uintptr_t expected, uintptr_t newPointer) {
+bool SymbolTable_compareAndSetPointer(SymbolTable *v, i32 varId, pointer expected, pointer newPointer) {
     SymbolRow *row = row_at(v, varId);
     if (!row)
         return false;

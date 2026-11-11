@@ -192,7 +192,7 @@ void VariableHashMap_free(VariableHashMap *map) {
 
 // CORE FUNCTIONS
 
-bool VariableHashMap_add(VariableHashMap *map, const char *name, uintptr_t pointer) {
+bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer) {
     if (!map || !(*map).active)
         return false;
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -221,7 +221,7 @@ bool VariableHashMap_add(VariableHashMap *map, const char *name, uintptr_t point
     return true;
 }
 
-uintptr_t VariableHashMap_get(const VariableHashMap *map, const char *name) {
+pointer VariableHashMap_get(const VariableHashMap *map, const char *name) {
     if (!map || !(*map).active)
         return 0u;
     char folded[VARIABLE_SLOT_NAME_BYTES];

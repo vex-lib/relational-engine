@@ -133,7 +133,7 @@ static bool grow(void) {
     }
     for (u32 i = 0; i < s_pool.count; i++) {
         slots[i] = s_pool.slots[i];
-        slots[i].self = (u64) (uintptr_t) &slots[i];
+        slots[i].self = (u64) (pointer) &slots[i];
         order[i] = s_pool.order[i];
     }
     if (s_pool.slots)
@@ -221,7 +221,7 @@ i32 StringPool_intern(const char *str) {
     u32 *order = s_pool.order;
     memset(&slots[idx], 0, sizeof(slots[idx]));
     memcpy(slots[idx].name, key, 24);
-    slots[idx].self = (u64) (uintptr_t) &slots[idx];
+    slots[idx].self = (u64) (pointer) &slots[idx];
     memmove(&order[pos + 1], &order[pos], ((bytes) s_pool.count - pos) * sizeof(u32));
     order[pos] = idx;
     s_pool.count++;
@@ -276,7 +276,7 @@ bool StringPool_isSlot(const void *ptr) {
     bool ok = false;
     if (s_pool.magic == STRING_POOL_MAGIC) {
         const StringSlot *slot = (const StringSlot*) ptr;
-        if ((*slot).self == (u64) (uintptr_t) ptr) {
+        if ((*slot).self == (u64) (pointer) ptr) {
             const StringSlot *base = s_pool.slots;
             ok = slot >= base && slot < base + s_pool.capacity;
         }

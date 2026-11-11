@@ -143,7 +143,7 @@ void VariableMiniMap_free(VariableMiniMap *map) {
 
 // CORE FUNCTIONS
 
-bool VariableMiniMap_add(VariableMiniMap *map, const char *name, uintptr_t pointer) {
+bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer) {
     if (!map || !(*map).active)
         return false;
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -170,7 +170,7 @@ bool VariableMiniMap_add(VariableMiniMap *map, const char *name, uintptr_t point
     return true;
 }
 
-uintptr_t VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
+pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
     if (!map || !(*map).active)
         return 0u;
     char folded[VARIABLE_SLOT_NAME_BYTES];

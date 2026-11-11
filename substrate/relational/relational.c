@@ -178,16 +178,16 @@ bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, void
         return false;
     i32 varId = SymbolTable_getId(scope, name);
     if (varId >= 0) {
-        SymbolTable_setPointer(scope, varId, (uintptr_t) ptr);
+        SymbolTable_setPointer(scope, varId, (pointer) ptr);
         return true;
     }
-    return SymbolTable_instant(scope, name, classId, (uintptr_t) ptr) >= 0;
+    return SymbolTable_instant(scope, name, classId, (pointer) ptr) >= 0;
 }
 
 bool Relational_setValueById(SymbolTable *scope, i32 varId, void *ptr) {
     if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope))
         return false;
-    SymbolTable_setPointer(scope, varId, (uintptr_t) ptr);
+    SymbolTable_setPointer(scope, varId, (pointer) ptr);
     return true;
 }
 
@@ -222,12 +222,12 @@ void Relational_setString(SymbolTable *scope, const char *name, const char *valu
     i32 varId = SymbolTable_getId(scope, name);
     if (varId >= 0) {
         void *oldPtr = (void*) SymbolTable_getPointer(scope, varId);
-        SymbolTable_setPointer(scope, varId, (uintptr_t) newPtr);
+        SymbolTable_setPointer(scope, varId, (pointer) newPtr);
         if (oldPtr)
             Memory_free(oldPtr);
         return;
     }
-    i32 assigned = SymbolTable_instant(scope, name, ID_RELATIONAL_STRING, (uintptr_t) newPtr);
+    i32 assigned = SymbolTable_instant(scope, name, ID_RELATIONAL_STRING, (pointer) newPtr);
     if (assigned < 0)
         Memory_free(newPtr);
 }
@@ -243,10 +243,10 @@ bool Relational_setFunction(SymbolTable *scope, const char *name, void *fn) {
         return false;
     i32 varId = SymbolTable_getId(scope, name);
     if (varId >= 0) {
-        SymbolTable_setPointer(scope, varId, (uintptr_t) fn);
+        SymbolTable_setPointer(scope, varId, (pointer) fn);
         return true;
     }
-    return SymbolTable_instant(scope, name, 0, (uintptr_t) fn) >= 0;
+    return SymbolTable_instant(scope, name, 0, (pointer) fn) >= 0;
 }
 
 // spotlight — linear scan, ranked exact > prefix > substring

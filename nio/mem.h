@@ -101,7 +101,7 @@ MemoryArena *Memory_arenaFor(void *userPtr);
 
 /** Round a freshly allocated base forward to the payload floor. */
 static u8 *Memory_alignUp(const u8 *raw) {
-    return (u8*) (((uintptr_t) raw + MEMORY_ALIGN_MASK) & ~(uintptr_t) MEMORY_ALIGN_MASK);
+    return (u8*) (((pointer) raw + MEMORY_ALIGN_MASK) & ~(pointer) MEMORY_ALIGN_MASK);
 }
 
 /**
@@ -129,7 +129,7 @@ static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
 static void Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
     (*h).typeId = typeId;
     (*h).length = (u64) numBytes;
-    (*h).pointer = (u64) (uintptr_t) ((u8*) h + sizeof(MemoryHeader));
+    (*h).pointer = (u64) (pointer) ((u8*) h + sizeof(MemoryHeader));
     (*h).hash = Memory_headerHash((*h).typeId, (*h).length, (*h).pointer);
 }
 

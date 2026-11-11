@@ -88,7 +88,7 @@ static void exhaustion() {
     for (bytes i = 0; i < SMALL_SLOTS + SPILL_SLOTS; i++) {
         blocks[i] = MemoryArena_alloc(a, TYPE_A, SMALL_PAYLOAD);
         assert(blocks[i] != nullptr);
-        assert(((uintptr_t) blocks[i] & 15u) == 0);
+        assert(((pointer) blocks[i] & 15u) == 0);
         memset(blocks[i], (u8) i, SMALL_PAYLOAD);
     }
     assert(MemoryArena_activeBytes(a) == SMALL_SLOTS * 64u + BUMP_BYTES);
@@ -281,7 +281,7 @@ static atomic_bool start;
 
 /** Disjoint worker ownership with an explicit synchronized start, never sleeps. */
 static void *worker(void *context) {
-    bytes identity = (bytes) (uintptr_t) context;
+    bytes identity = (bytes) (pointer) context;
     atomic_fetch_add_explicit(&ready, 1, memory_order_release);
     while (!atomic_load_explicit(&start, memory_order_acquire))
         ;
@@ -301,7 +301,7 @@ static void concurrent() {
     assert(threadArena);
     pthread_t threads[WORKERS];
     for (bytes i = 0; i < WORKERS; i++)
-        assert(pthread_create(&threads[i], nullptr, worker, (void*) (uintptr_t) i) == 0);
+        assert(pthread_create(&threads[i], nullptr, worker, (void*) (pointer) i) == 0);
     while (atomic_load_explicit(&ready, memory_order_acquire) != WORKERS)
         ;
     atomic_store_explicit(&start, true, memory_order_release);

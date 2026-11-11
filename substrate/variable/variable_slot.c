@@ -49,7 +49,7 @@
  * ----------------------------------------------------------------------------
  *   VariableSlot {
  *     char name[24];      // folded name, NUL-terminated, zero-padded
- *     uintptr_t pointer;  // the value cell address (the destination)
+ *     pointer pointer;  // the value cell address (the destination)
  *   }
  *
  * PRIVATE HELPERS (kept file-local, pure logic, no behavior of their own):
@@ -151,7 +151,7 @@ static void storeName(VariableSlot *self, const char *folded) {
 
 // CONSTRUCTORS (PUBLIC & PRIVATE)
 
-bool VariableSlot_init(VariableSlot *self, const char *name, uintptr_t pointer) {
+bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer) {
     if (self == nullptr)
         return false;
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -174,7 +174,7 @@ VariableSlot *VariableSlot_1(const char *name) {
     return VariableSlot_2(name, 0);
 }
 
-VariableSlot *VariableSlot_2(const char *name, uintptr_t pointer) {
+VariableSlot *VariableSlot_2(const char *name, pointer pointer) {
     VariableSlot *self = VariableSlot_0();
     if (self == nullptr)
         return nullptr;
@@ -202,7 +202,7 @@ bool VariableSlot_setName(VariableSlot *self, const char *name) {
     return true;
 }
 
-void VariableSlot_setPointer(VariableSlot *self, uintptr_t pointer) {
+void VariableSlot_setPointer(VariableSlot *self, pointer pointer) {
     if (self == nullptr)
         return;
     (*self).pointer = pointer;
@@ -214,7 +214,7 @@ const char *VariableSlot_getName(const VariableSlot *self) {
     return self ? (*self).name : nullptr;
 }
 
-uintptr_t VariableSlot_getPointer(const VariableSlot *self) {
+pointer VariableSlot_getPointer(const VariableSlot *self) {
     if (self == nullptr)
         return 0;
     return (*self).pointer;

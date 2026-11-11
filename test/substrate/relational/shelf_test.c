@@ -152,7 +152,7 @@ static void testShelfStability(void) {
     }
 
     u32 first = Shelf_addCell(shelf, TYPE_VARIABLE_SLOT, 0x0u);
-    uintptr_t firstCell = Shelf_getCell(shelf, first);
+    pointer firstCell = Shelf_getCell(shelf, first);
     CHECK(firstCell != 0u);
 
     for (u32 i = 1u; i < 500u; i++)

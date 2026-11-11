@@ -45,8 +45,8 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
  * block header before it):
  * ----------------------------------------------------------------------------
  *   Cell {
- *     uintptr_t value; // thin pointer to the value, or the value inline
- *     uintptr_t pad;   // tail padding so the block is 32 Bytes
+ *     pointer value; // thin pointer to the value, or the value inline
+ *     pointer pad;   // tail padding so the block is 32 Bytes
  *   }
  *
  * PRIVATE HELPERS (kept file-local, pure data, no behavior): none.
@@ -77,7 +77,7 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
 
 // CONSTRUCTORS
 
-Cell *Cell_2(u64 typeId, uintptr_t value) {
+Cell *Cell_2(u64 typeId, pointer value) {
     Cell *cell = Memory_alloc(typeId, CELL_PAYLOAD_BYTES);
     if (!cell)
         return nullptr;
@@ -115,7 +115,7 @@ bool Cell_check(const Cell *cell, u64 typeId) {
 
 // SETTERS
 
-void Cell_setValue(Cell *cell, uintptr_t value) {
+void Cell_setValue(Cell *cell, pointer value) {
     if (!cell)
         return;
     (*cell).value = value;
@@ -123,7 +123,7 @@ void Cell_setValue(Cell *cell, uintptr_t value) {
 
 // GETTERS
 
-uintptr_t Cell_getValue(const Cell *cell) {
+pointer Cell_getValue(const Cell *cell) {
     if (!cell)
         return 0u;
     return (*cell).value;

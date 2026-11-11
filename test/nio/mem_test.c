@@ -61,7 +61,7 @@ int main(void) {
 
     CHECK(p != nullptr);
 
-    CHECK(((uintptr_t) p & 31) == 0);
+    CHECK(((pointer) p & 31) == 0);
 
     CHECK(Memory_length(p) == 16);
 
@@ -73,7 +73,7 @@ int main(void) {
 
     CHECK(p_next != nullptr);
 
-    CHECK(((uintptr_t) p_next & 31) == 0);
+    CHECK(((pointer) p_next & 31) == 0);
 
     CHECK(_Alignof(Over32) == 32);
 
@@ -83,14 +83,14 @@ int main(void) {
 
     CHECK(over_slab != nullptr);
 
-    CHECK(((uintptr_t) over_slab & 31) == 0);
+    CHECK(((pointer) over_slab & 31) == 0);
 
     for (int i = 0; i < 3; i++) {
         void *over_bump = Memory_alloc(TEST_TYPE_B, 5000u + (bytes) i * 16u);
 
         CHECK(over_bump != nullptr);
 
-        CHECK(((uintptr_t) over_bump & 31) == 0);
+        CHECK(((pointer) over_bump & 31) == 0);
     }
 
     void *zero = Memory_alloc(TEST_TYPE_C, 0);
@@ -224,7 +224,7 @@ int main(void) {
 
     CHECK(tp != nullptr);
 
-    CHECK(((uintptr_t) tp & 31) == 0);
+    CHECK(((pointer) tp & 31) == 0);
 
     CHECK(Transient_contains(tp));
 
@@ -283,9 +283,9 @@ int main(void) {
     pid_t pid = fork();
 
     if (pid == 0) {
-        Memory_free((void*) (uintptr_t) 0x1000);
+        Memory_free((void*) (pointer) 0x1000);
 
-        volatile bytes len = Memory_length((void*) (uintptr_t) 0x1000);
+        volatile bytes len = Memory_length((void*) (pointer) 0x1000);
 
         _exit(len == 0 ? 0 : 1);
     }

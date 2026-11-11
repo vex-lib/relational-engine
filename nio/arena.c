@@ -147,7 +147,7 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
     if (cap > SIZE_MAX - (MEMORY_ALIGN_MASK + MEMORY_PAYLOAD_ALIGN))
         return false;
     bytes alignedCap = (cap + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
-    u8 *raw = (u8*) Memory_systemAlloc(alignedCap + MEMORY_PAYLOAD_ALIGN);
+    u8 *raw = Memory_systemAlloc(alignedCap + MEMORY_PAYLOAD_ALIGN);
     if (!raw)
         return false;
     u8 *master = Memory_alignUp(raw);
@@ -216,7 +216,7 @@ static void *arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
         if (node) {
             MemoryHeader *h = (MemoryHeader*) ((u8*) node - sizeof(MemoryHeader));
             Memory_headerStamp(h, typeId, numBytes);
-            return (void*) node;
+            return node;
         }
     }
 
@@ -248,7 +248,7 @@ static void arena_free(MemoryArena *a, void *userPtr) {
     if (!a || !userPtr)
         return;
 
-    uintptr_t u = (uintptr_t) userPtr;
+    pointer u = (pointer) userPtr;
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return;
 
@@ -267,7 +267,7 @@ static void arena_free(MemoryArena *a, void *userPtr) {
     SlabClass *slab = nullptr;
     for (bytes s = 0; s < SLAB_COUNT; s++) {
         SlabClass *candidate = &(*a).slabs[s];
-        uintptr_t base = (uintptr_t) (*candidate).arena;
+        pointer base = (pointer) (*candidate).arena;
         bytes extent = (bytes) (*candidate).capacity * (*candidate).slot_size;
         if (u >= base + sizeof(MemoryHeader) && u < base + extent) {
             if ((u - base) % (*candidate).slot_size != sizeof(MemoryHeader)
@@ -326,7 +326,7 @@ static void arena_freeAll(MemoryArena *a) {
 MemoryArena *Memory_arenaFor(void *userPtr) {
     if (!userPtr)
         return nullptr;
-    uintptr_t u = (uintptr_t) userPtr;
+    pointer u = (pointer) userPtr;
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return nullptr;
 
@@ -350,7 +350,7 @@ MemoryArena *Memory_arenaFor(void *userPtr) {
 const MemoryHeader *Memory_safeHeader(const void *userPtr) {
     if (!userPtr)
         return nullptr;
-    uintptr_t u = (uintptr_t) userPtr;
+    pointer u = (pointer) userPtr;
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return nullptr;
 

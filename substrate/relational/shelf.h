@@ -23,7 +23,7 @@
 
 // SLOT RECORD (owned by Shelf, behaviorless): one shelf node.
 typedef struct ShelfNode {
-    uintptr_t cell; // the identity cell this node references (0 when bare)
+    pointer cell; // the identity cell this node references (0 when bare)
     u32 next;  // graph edge: u32 index of the next node (SHELF_INDEX_NONE = end)
     u32 pad;   // explicit padding (keeps the row 16 Bytes)
 } ShelfNode;
@@ -42,10 +42,10 @@ Shelf *Shelf_0(void);
 #define Shelf(...) CONSTRUCTOR_DISPATCH(Shelf, __VA_ARGS__)
 void Shelf_free(Shelf *shelf);
 
-u32 Shelf_addCell(Shelf *shelf, u64 typeId, uintptr_t value);
-u32 Shelf_addNode(Shelf *shelf, uintptr_t cell);
+u32 Shelf_addCell(Shelf *shelf, u64 typeId, pointer value);
+u32 Shelf_addNode(Shelf *shelf, pointer cell);
 
-uintptr_t Shelf_getCell(const Shelf *shelf, u32 index);
+pointer Shelf_getCell(const Shelf *shelf, u32 index);
 u32 Shelf_getNext(const Shelf *shelf, u32 index);
 bool Shelf_setNext(Shelf *shelf, u32 index, u32 next);
 bool Shelf_link(Shelf *shelf, u32 from, u32 to);

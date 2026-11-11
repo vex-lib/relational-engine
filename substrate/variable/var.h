@@ -27,12 +27,12 @@
 
 typedef struct var var;
 
-typedef void (*VarObserver)(var *self, uintptr_t value, void *context);
+typedef void (*VarObserver)(var *self, pointer value, void *context);
 
 ;;CLASSNAME("var")
 struct var {
     VariableSlot slot;
-    uintptr_t value;
+    pointer value;
     MemoryArena *arena;
     VarObserver observers[VAR_MAX_OBSERVERS];
     void *observerContext[VAR_MAX_OBSERVERS];
@@ -42,13 +42,13 @@ struct var {
 var *var_2(const char *name, MemoryArena *arena);
 #define var(...) var_2(__VA_ARGS__)
 
-bool var_set(var *self, uintptr_t value);
+bool var_set(var *self, pointer value);
 bool var_subscribe(var *self, VarObserver observer, void *context);
 void var_unsubscribe(var *self, VarObserver observer, void *context);
 void var_unsubscribeAll(var *self);
 
 const char *var_name(const var *self);
-uintptr_t var_value(const var *self);
+pointer var_value(const var *self);
 bytes var_observerCount(const var *self);
 MemoryArena *var_arena(const var *self);
 

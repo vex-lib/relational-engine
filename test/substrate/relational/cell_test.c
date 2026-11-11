@@ -81,8 +81,8 @@ static void test_value_slot(void) {
     CHECK(Cell_getValue(c) == UINTPTR_MAX);
 
     int local = 7;
-    Cell_setValue(c, (uintptr_t) &local);
-    CHECK(Cell_getValue(c) == (uintptr_t) &local);
+    Cell_setValue(c, (pointer) &local);
+    CHECK(Cell_getValue(c) == (pointer) &local);
 
     CHECK(Cell_check(c, TEST_CLASS_A));
 

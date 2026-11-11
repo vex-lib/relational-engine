@@ -39,8 +39,8 @@ VariableMiniMap *VariableMiniMap_0(void);
 #define VariableMiniMap(...) CONSTRUCTOR_DISPATCH(VariableMiniMap, __VA_ARGS__)
 void VariableMiniMap_free(VariableMiniMap *map);
 
-bool VariableMiniMap_add(VariableMiniMap *map, const char *name, uintptr_t pointer);
-uintptr_t VariableMiniMap_get(const VariableMiniMap *map, const char *name);
+bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer);
+pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name);
 bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name);
 
 // Visit every live entry (cold). Must not mutate the map.

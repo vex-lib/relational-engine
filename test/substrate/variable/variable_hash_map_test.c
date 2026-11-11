@@ -114,13 +114,13 @@ static void testAllBuckets(void) {
 
     for (bytes i = 0; i < n; i++) {
         char name[4] = { firsts[i], '1', '\0' };
-        CHECK(VariableHashMap_add(&map, name, 0x100u + (uintptr_t) i) == true);
+        CHECK(VariableHashMap_add(&map, name, 0x100u + (pointer) i) == true);
     }
     CHECK(VariableHashMap_count(&map) == 39u);
 
     for (bytes i = 0; i < n; i++) {
         char name[4] = { firsts[i], '1', '\0' };
-        CHECK(VariableHashMap_get(&map, name) == 0x100u + (uintptr_t) i);
+        CHECK(VariableHashMap_get(&map, name) == 0x100u + (pointer) i);
     }
 
     VariableHashMap_shutdown(&map);

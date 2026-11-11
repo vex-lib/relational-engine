@@ -31,12 +31,12 @@
 
 typedef struct VariableSlot {
     char name[VARIABLE_SLOT_NAME_BYTES];  // folded name, NUL-terminated, zero-padded
-    uintptr_t pointer;                    // the value cell address (the destination)
+    pointer pointer;                    // the value cell address (the destination)
 } VariableSlot;
 
 _Static_assert(sizeof(VariableSlot) == VARIABLE_SLOT_SIZE, "VariableSlot must stay 32 Bytes");
 
-bool VariableSlot_init(VariableSlot *self, const char *name, uintptr_t pointer);
+bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer);
 
 bool VariableSlot_foldName(const char *name, char *out);
 
@@ -44,17 +44,17 @@ int VariableSlot_bucketOf(char c);
 
 VariableSlot *VariableSlot_0(void);
 VariableSlot *VariableSlot_1(const char *name);
-VariableSlot *VariableSlot_2(const char *name, uintptr_t pointer);
+VariableSlot *VariableSlot_2(const char *name, pointer pointer);
 
 #define VariableSlot(...) CONSTRUCTOR_DISPATCH(VariableSlot, __VA_ARGS__)
 
 void VariableSlot_free(VariableSlot *self);
 
 bool VariableSlot_setName(VariableSlot *self, const char *name);
-void VariableSlot_setPointer(VariableSlot *self, uintptr_t pointer);
+void VariableSlot_setPointer(VariableSlot *self, pointer pointer);
 
 const char *VariableSlot_getName(const VariableSlot *self);
-uintptr_t VariableSlot_getPointer(const VariableSlot *self);
+pointer VariableSlot_getPointer(const VariableSlot *self);
 bool VariableSlot_isEmpty(const VariableSlot *self);
 bool VariableSlot_nameEquals(const VariableSlot *self, const char *name);
 
