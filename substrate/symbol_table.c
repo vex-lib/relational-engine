@@ -7,11 +7,11 @@
 #include "substrate/symbol_table.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "lang/annotation.h"
 #include "nio/mem.h"
+#include "type/type.h"
 #include "variable/variable_pool.h"
 
 ;;DEFINITION
@@ -25,7 +25,7 @@
  * validated cold (ASCII alnum/underscore/dot, folded lowercase, max
  * STRING_POOL_NAME_MAX) before interning; typed queries filter rows by
  * classId over one structure with no segregated lists. Rows and the bySlot
- * table grow on demand via malloc/realloc; shutdown frees both and marks the
+ * table grow on demand via Memory_alloc/Memory_realloc; shutdown frees both and marks the
  * registry inactive.
  * ============================================================================
  */
@@ -124,14 +124,14 @@ static bool ensure_byslot(SymbolTable *v, u32 need) {
             return false;
         cap *= 2;
     }
-    i32 *next = (i32*) malloc((bytes) cap * sizeof(i32));
+    i32 *next = (i32*) Memory_alloc(TYPE_SYMBOL_TABLE, (bytes) cap * sizeof(i32));
     if (!next)
         return false;
     for (u32 i = 0; i < cap; i++)
         next[i] = -1;
     if ((*v).bySlot) {
         memcpy(next, (*v).bySlot, (bytes)(*v).bySlotCap * sizeof(i32));
-        free((*v).bySlot);
+        Memory_free((*v).bySlot);
     }
     (*v).bySlot = next;
     (*v).bySlotCap = cap;
@@ -146,7 +146,7 @@ SymbolTable SymbolTable_0(void) {
         return v;
     if (!StringPool_init(arena))
         return v;
-    v.rows = (SymbolRow*) malloc(SYMBOL_TABLE_DEFAULT_CAPACITY * sizeof(SymbolRow));
+    v.rows = (SymbolRow*) Memory_alloc(TYPE_SYMBOL_TABLE, SYMBOL_TABLE_DEFAULT_CAPACITY * sizeof(SymbolRow));
     if (!v.rows)
         return v;
     v.capacity = SYMBOL_TABLE_DEFAULT_CAPACITY;
@@ -157,8 +157,8 @@ SymbolTable SymbolTable_0(void) {
 void SymbolTable_shutdown(SymbolTable *v) {
     if (!v || !(*v).active)
         return;
-    free((*v).rows);
-    free((*v).bySlot);
+    Memory_free((*v).rows);
+    Memory_free((*v).bySlot);
     (*v).rows = nullptr;
     (*v).bySlot = nullptr;
     (*v).count = 0;
@@ -202,7 +202,7 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, uintptr_t
     }
     if ((*v).count >= (*v).capacity) {
         bytes newCap = (bytes)(*v).capacity + SYMBOL_TABLE_DEFAULT_CAPACITY;
-        SymbolRow *next = (SymbolRow*) realloc((*v).rows, newCap * sizeof(SymbolRow));
+        SymbolRow *next = (SymbolRow*) Memory_realloc((*v).rows, newCap * sizeof(SymbolRow));
         if (!next) {
             fprintf(stderr, "[variable] instant: out of memory ('%s')\n", lowered);
             return -1;
