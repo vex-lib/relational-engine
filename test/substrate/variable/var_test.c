@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "variable/var.h"
+#include "substrate/variable/var.h"
 #include "vex.h"
 
 static int g_calls;

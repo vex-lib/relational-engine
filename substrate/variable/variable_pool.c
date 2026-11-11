@@ -1,4 +1,4 @@
-#include "variable/variable_pool.h"
+#include "substrate/variable/variable_pool.h"
 
 #include <string.h>
 
@@ -27,7 +27,7 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * MODULE: StringPoolService (variable/variable_pool.c — static intern table)
+ * MODULE: StringPoolService (substrate/variable/variable_pool.c — static intern table)
  * ============================================================================
  * Process-wide interned string pool: names stated once in fixed 32-byte
  * slots ([ptr][str1][str2][str3]), shared by pointer, never copied. Static
@@ -39,7 +39,7 @@
  * critical section is bounded by pool size, lock order is pool-then-arena
  * with no reverse path, so no cycle).
  *
- * STRUCT FIELDS (Mirroring variable/variable_pool.h):
+ * STRUCT FIELDS (Mirroring substrate/variable/variable_pool.h):
  * ----------------------------------------------------------------------------
  *   StringSlot {
  *     u64 self;  // intrusive validity: must equal own address

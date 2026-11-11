@@ -1,4 +1,4 @@
-// re/test/substrate/cell_test.c — owner test for substrate/cell.
+// re/test/substrate/relational/cell_test.c — owner test for substrate/cell.
 //
 // Proves the 32-byte identity cell:
 //   - all three arity constructors (Cell_0/_1/_2) and the Cell(...) chooser
@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "substrate/cell.h"
+#include "substrate/relational/cell.h"
 #include "nio/mem.h"
 
 enum {

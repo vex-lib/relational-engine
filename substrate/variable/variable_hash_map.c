@@ -1,10 +1,10 @@
-// variable/variable_hash_map.c — the relational name => pointer hash map.
+// substrate/variable/variable_hash_map.c — the relational name => pointer hash map.
 //
 // Two-level index (bucket = first folded char, slot = Murmur3(FNV1a(tail)) &
 // 1023); each occupied slot is a lazily-minted ChunkedList of VariableSlot rows.
 // Bands are minted lazily too. Cold path only.
 
-#include "variable/variable_hash_map.h"
+#include "substrate/variable/variable_hash_map.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +12,7 @@
 #include "lang/annotation.h"
 #include "nio/mem.h"
 #include "type/type.h"
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_slot.h"
 #include "vexspoke/util/hash.h"
 
 ;;DEFINITION
@@ -44,11 +44,11 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * CLASS: VariableHashMap (variable/variable_hash_map.c)
+ * CLASS: VariableHashMap (substrate/variable/variable_hash_map.c)
  * ============================================================================
  * the relational name => pointer hash map (hash system B).
  *
- * STRUCT FIELDS (Mirroring variable/variable_hash_map.h):
+ * STRUCT FIELDS (Mirroring substrate/variable/variable_hash_map.h):
  * ----------------------------------------------------------------------------
  *   VariableHashMap {
  *     bool active;                                // runtime-active flag

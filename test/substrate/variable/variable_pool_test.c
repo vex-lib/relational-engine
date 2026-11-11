@@ -6,7 +6,7 @@
 #include "vex.h"
 
 #include "nio/mem.h"
-#include "variable/variable_pool.h"
+#include "substrate/variable/variable_pool.h"
 
 ;;OVERVIEW
 /**

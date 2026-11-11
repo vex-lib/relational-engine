@@ -1,10 +1,10 @@
-// substrate/symbol_table.c — SymbolTable registry port (Legacy: variable/SymbolTable.java).
+// substrate/relational/symbol_table.c — SymbolTable registry port (Legacy: substrate/variable/SymbolTable.java).
 //
 // Rows reference shared pool slots by index (never inline names); lookup
 // goes pool-first, then one sparse hop (slot -> var id). Typed queries
 // filter rows by classId — one structure, no segregated lists.
 
-#include "substrate/symbol_table.h"
+#include "substrate/relational/symbol_table.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +12,7 @@
 #include "lang/annotation.h"
 #include "nio/mem.h"
 #include "type/type.h"
-#include "variable/variable_pool.h"
+#include "substrate/variable/variable_pool.h"
 
 ;;DEFINITION
 /**
@@ -33,11 +33,11 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * CLASS: SymbolTable (substrate/symbol_table.c)
+ * CLASS: SymbolTable (substrate/relational/symbol_table.c)
  * ============================================================================
- * the relational symbol registry (Legacy: variable/SymbolTable.java).
+ * the relational symbol registry (Legacy: substrate/variable/SymbolTable.java).
  *
- * STRUCT FIELDS (Mirroring substrate/symbol_table.h):
+ * STRUCT FIELDS (Mirroring substrate/relational/symbol_table.h):
  * ----------------------------------------------------------------------------
  *   SymbolTable {
  *     bool active; // runtime-active flag

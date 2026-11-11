@@ -1,10 +1,10 @@
-// variable/variable_slot.c — the 32-byte name box.
+// substrate/variable/variable_slot.c — the 32-byte name box.
 //
 // Fold + validate the name once (cold, quiet), store it zero-padded, keep the
 // value pointer opaque. No allocation on the read path; the arity constructors
 // are the only allocators.
 
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_slot.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -41,11 +41,11 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * CLASS: VariableSlot (variable/variable_slot.c)
+ * CLASS: VariableSlot (substrate/variable/variable_slot.c)
  * ============================================================================
  * the 32-byte name box: a folded name plus a value-cell pointer.
  *
- * STRUCT FIELDS (Mirroring variable/variable_slot.h):
+ * STRUCT FIELDS (Mirroring substrate/variable/variable_slot.h):
  * ----------------------------------------------------------------------------
  *   VariableSlot {
  *     char name[24];      // folded name, NUL-terminated, zero-padded

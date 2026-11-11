@@ -6,8 +6,8 @@
 
 #include "nio/mem.h"
 #include "type/type.h"
-#include "substrate/cell.h"
-#include "substrate/shelf.h"
+#include "substrate/relational/cell.h"
+#include "substrate/relational/shelf.h"
 
 ;;OVERVIEW
 /**

@@ -10,7 +10,7 @@
 #include "io/io.h"
 #include "nio/nio.h"
 #include "substrate/substrate.h"
-#include "variable/variable.h"
+#include "substrate/variable/variable.h"
 #include "search/search.h"
 #include "thread/thread.h"
 #include "type/type.h"

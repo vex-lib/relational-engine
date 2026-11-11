@@ -5,7 +5,7 @@
 
 #include "nio/mem.h"
 
-// variable/variable_pool.h — process-wide interned string pool.
+// substrate/variable/variable_pool.h — process-wide interned string pool.
 //
 // Names are stated once, shared by pointer, never copied: each distinct name
 // lives in exactly one 32-byte slot, and variable rows (or any consumer)

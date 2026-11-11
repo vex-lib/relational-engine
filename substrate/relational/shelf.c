@@ -1,13 +1,13 @@
-// substrate/shelf.c — the global shelf: a node pool with u32 graph edges.
+// substrate/relational/shelf.c — the global shelf: a node pool with u32 graph edges.
 //
 // Nodes are never-moved ChunkedList rows; edges are u32 indices; each node
 // references one separately-allocated identity Cell. Cold path only.
 
-#include "substrate/shelf.h"
+#include "substrate/relational/shelf.h"
 
 #include "vex.h"
 #include "nio/mem.h"
-#include "substrate/cell.h"
+#include "substrate/relational/cell.h"
 #include "type/type.h"
 
 ;;DEFINITION
@@ -35,11 +35,11 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * CLASS: Shelf (substrate/shelf.c)
+ * CLASS: Shelf (substrate/relational/shelf.c)
  * ============================================================================
  * the global shelf: a never-moved node pool with u32 graph edges.
  *
- * STRUCT FIELDS (Mirroring substrate/shelf.h):
+ * STRUCT FIELDS (Mirroring substrate/relational/shelf.h):
  * ----------------------------------------------------------------------------
  *   Shelf {
  *     bool active;        // runtime-active flag

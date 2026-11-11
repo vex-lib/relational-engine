@@ -5,7 +5,7 @@
 
 #include "lang/constructor.h"
 
-// substrate/symbol_table.h — the relational symbol registry (Legacy: variable/SymbolTable.java).
+// substrate/relational/symbol_table.h — the relational symbol registry (Legacy: substrate/variable/SymbolTable.java).
 //
 // Maps a name to a (classId, targetPointer) payload. Every registered symbol
 // is a row: the name lives in the shared string pool (referenced by slot,

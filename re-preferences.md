@@ -56,7 +56,7 @@ Tier: lifetime (R0 storage substrate). Owns: `nio/mem.c`, `nio/arena.c`, and `ni
 * `nio/chunk.rs` owns a fixed-capacity typed row allocation; `struct/chunked_list.rs` grows its directory without moving initialized rows.
 * Geometry is chosen at construction (named default, caller override), validated for size/alignment, immutable thereafter.
 * Rows are append-only, never deleted/reused in this version.
-* `variable/variable_slot.rs` is a C-layout 32-byte binding: `[name: u8[24]][value pointer: 8 bytes]`, offsets 0/24 checked.
+* `substrate/variable/variable_slot.rs` is a C-layout 32-byte binding: `[name: u8[24]][value pointer: 8 bytes]`, offsets 0/24 checked.
 * Names are 1..23 ASCII bytes plus NUL and zero padding, folded lowercase; invalid input rejects without silent truncation or mutating prior state.
 * Zero slots are unnamed/unbound; registry admission requires a valid name.
 * `VariableRegistry` owns stable slot rows and rejects folded duplicate names.

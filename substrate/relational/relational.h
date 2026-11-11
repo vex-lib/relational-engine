@@ -3,9 +3,9 @@
 
 #include "vex.h"
 
-#include "substrate/symbol_table.h"
+#include "substrate/relational/symbol_table.h"
 
-// substrate/relational.h — spotlight relational facade over SymbolTable (Legacy: relational/RelationalEngine.java).
+// substrate/relational/relational.h — spotlight relational facade over SymbolTable (Legacy: relational/RelationalEngine.java).
 //
 // RELATIONAL ENGINE PHILOSOPHY: this engine refuses the textbook trilemma —
 // textbook OOP vs textbook DOD vs textbook ECS — because none of them, as

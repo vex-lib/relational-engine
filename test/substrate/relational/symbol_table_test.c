@@ -1,4 +1,4 @@
-// re/test/substrate/symbol_table_test.c — owner test for
+// re/test/substrate/relational/symbol_table_test.c — owner test for
 // substrate/symbol_table.
 //
 // The relational symbol registry maps a name to (classId, pointer):
@@ -21,7 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "substrate/symbol_table.h"
+#include "substrate/relational/symbol_table.h"
 #include "nio/mem.h"
 
 enum {

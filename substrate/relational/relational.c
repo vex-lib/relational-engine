@@ -27,7 +27,7 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * MODULE: Relational (substrate/relational.c)
+ * MODULE: Relational (substrate/relational/relational.c)
  * ============================================================================
  * spotlight relational facade over SymbolTable (Legacy: relational/RelationalEngine.java).
  *

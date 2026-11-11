@@ -6,8 +6,8 @@
 
 #include "nio/mem.h"
 #include "type/type.h"
-#include "variable/variable_hash_map.h"
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_hash_map.h"
+#include "substrate/variable/variable_slot.h"
 #include "vexspoke/util/hash.h"
 
 ;;OVERVIEW

@@ -6,8 +6,8 @@
 
 #include "nio/mem.h"
 #include "type/type.h"
-#include "variable/variable_mini_map.h"
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_mini_map.h"
+#include "substrate/variable/variable_slot.h"
 
 ;;OVERVIEW
 /**

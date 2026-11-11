@@ -4,7 +4,7 @@
 // payload is one Cell (value + pad). No behavior beyond the header reads and the
 // value slot.
 
-#include "substrate/cell.h"
+#include "substrate/relational/cell.h"
 
 #include <stdio.h>
 

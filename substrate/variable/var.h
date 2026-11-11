@@ -4,10 +4,10 @@
 #include "vex.h"
 
 #include "nio/mem.h"
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_slot.h"
 #include "type/type.h"
 
-// variable/var.h — an arena-owned reactive binding.
+// substrate/variable/var.h — an arena-owned reactive binding.
 //
 // The caller asks for `var *v = var("name", &arena);` and gets a stable pointer
 // inside that arena. The name is the 32-byte VariableSlot atom; the value is a

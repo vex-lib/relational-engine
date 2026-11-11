@@ -5,7 +5,7 @@
 
 #include "lang/constructor.h"
 
-// variable/variable_slot.h — the 32-byte name box (the variable slot atom).
+// substrate/variable/variable_slot.h — the 32-byte name box (the variable slot atom).
 //
 // The Relational Engine's reflection atom: a 32-byte record holding a folded
 // 23-character name (plus NUL, zero-padded to 24) and an 8-byte pointer. It is

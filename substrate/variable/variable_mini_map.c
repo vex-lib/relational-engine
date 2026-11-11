@@ -1,9 +1,9 @@
-// variable/variable_mini_map.c — the scoped name => pointer mini map.
+// substrate/variable/variable_mini_map.c — the scoped name => pointer mini map.
 //
 // One bucket level: first folded char -> a lazily-minted ChunkedList of
 // VariableSlot rows. Cold path only.
 
-#include "variable/variable_mini_map.h"
+#include "substrate/variable/variable_mini_map.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -35,11 +35,11 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * CLASS: VariableMiniMap (variable/variable_mini_map.c)
+ * CLASS: VariableMiniMap (substrate/variable/variable_mini_map.c)
  * ============================================================================
  * the scoped name => pointer mini map (39 single-level buckets).
  *
- * STRUCT FIELDS (Mirroring variable/variable_mini_map.h):
+ * STRUCT FIELDS (Mirroring substrate/variable/variable_mini_map.h):
  * ----------------------------------------------------------------------------
  *   VariableMiniMap {
  *     bool active;      // runtime-active flag

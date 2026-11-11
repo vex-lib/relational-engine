@@ -4,10 +4,10 @@
 #include "vex.h"
 
 #include "lang/constructor.h"
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_slot.h"
 #include "struct/chunked_list.h"
 
-// variable/variable_mini_map.h — the scoped name => pointer mini map.
+// substrate/variable/variable_mini_map.h — the scoped name => pointer mini map.
 //
 // The big VariableHashMap (39 x 1024) is overkill for names that are scoped to
 // ONE owner — a class's field names, a class's method names — where the whole

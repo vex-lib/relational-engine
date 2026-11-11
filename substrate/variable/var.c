@@ -1,4 +1,4 @@
-#include "variable/var.h"
+#include "substrate/variable/var.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -24,7 +24,7 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * MODULE: var (variable/var.c)
+ * MODULE: var (substrate/variable/var.c)
  * ============================================================================
  * var_2            arena-owned binding from a folded name
  * var_set          publish one value to the subscriber list

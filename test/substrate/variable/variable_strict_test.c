@@ -5,7 +5,7 @@
 #include <string.h>
 #include "vex.h"
 
-#include "substrate/symbol_table.h"
+#include "substrate/relational/symbol_table.h"
 #include "substrate/substrate.h"
 #include "nio/mem.h"
 

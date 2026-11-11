@@ -6,7 +6,7 @@
 #include "lang/constructor.h"
 #include "struct/chunked_list.h"
 
-// substrate/shelf.h — the global shelf: a node pool with u32 graph edges.
+// substrate/relational/shelf.h — the global shelf: a node pool with u32 graph edges.
 //
 // The shelf is the Relational Engine's "linked list inside an arraylist": nodes
 // live in a never-moved ChunkedList (so a node's address is stable for life),

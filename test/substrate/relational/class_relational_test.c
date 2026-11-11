@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "substrate/symbol_table.h"
-#include "substrate/relational.h"
+#include "substrate/relational/symbol_table.h"
+#include "substrate/relational/relational.h"
 #include "nio/mem.h"
 
 static int g_failures = 0;

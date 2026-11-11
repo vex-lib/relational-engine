@@ -4,10 +4,10 @@
 #include "vex.h"
 
 #include "lang/constructor.h"
-#include "variable/variable_slot.h"
+#include "substrate/variable/variable_slot.h"
 #include "struct/chunked_list.h"
 
-// variable/variable_hash_map.h — the relational name => pointer hash map.
+// substrate/variable/variable_hash_map.h — the relational name => pointer hash map.
 //
 // Hash system B of the Relational Engine (the manifesto's two-hash design; the
 // other is Hash_pointer over a whole pointer). Keys are variable names, values
