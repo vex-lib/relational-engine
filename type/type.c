@@ -1,7 +1,6 @@
 #include "type/type.h"
 #include "lang/annotation.h"
 
-#include "vex.h"
 #include <string.h>
 
 #include "nio/mem.h"
@@ -284,31 +283,6 @@ u32 Type_isPrimitive(u64 typeId) {
     u64 form = typeId & MASK_FORM;
     return form == FORM_SINGLETON || form == FORM_ARRAY || form == FORM_POINTER;
 }
-inline u32 Type_isStructSingleton(u64 typeId);
-
-inline u32 Type_isStructArray(u64 typeId);
-
-inline u32 Type_isStructSOA(u64 typeId);
-
-inline u32 Type_isStructAOS(u64 typeId);
-
-inline u32 Type_isStructCoexistent(u64 typeId);
-
-inline u32 Type_isStructPointer(u64 typeId);
-
-inline u32 Type_isPrimitive(u64 typeId);
-
-inline u32 Type_isGlobal(u64 typeId);
-
-inline u32 Type_isLocale(u64 typeId);
-
-inline u32 Type_isTransient(u64 typeId);
-
-inline u32 Type_isProactive(u64 typeId);
-
-inline u32 Type_isReactive(u64 typeId);
-
-inline u32 Type_isProbable(u64 typeId);
 
 u32 Type_isGlobal(u64 typeId) {
     return (typeId & MASK_MODIFIER) == MOD_GLOBAL;
