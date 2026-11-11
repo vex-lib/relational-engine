@@ -34,7 +34,6 @@ impl RowChunk {
     pub fn new(size: usize, alignment: usize, capacity: usize) -> Result<Self, StorageError> {
         let (stride, layout) = Self::geometry(size, alignment, capacity)?;
         let slots = TypedChunk::new(capacity)?;
-        // SAFETY: nonzero validated Layout; allocation is paired with the same layout in Drop.
         let data = NonNull::new(unsafe { alloc_zeroed(layout) }).ok_or(StorageError::Allocation)?;
         Ok(Self { data: Some(data), layout, row_size: size, stride, slots })
     }
@@ -44,13 +43,10 @@ impl RowChunk {
         if source.len() != self.row_size { return Err(StorageError::Layout); }
         if self.slots.is_full() { return Err(StorageError::Capacity); }
         if self.data.is_none() {
-            // SAFETY: stored layout remains validated and nonzero.
             self.data = Some(NonNull::new(unsafe { alloc_zeroed(self.layout) }).ok_or(StorageError::Allocation)?);
         }
         let handle = self.slots.add_handle(1)?;
-        // SAFETY: successful admission gives a unique slot within the allocated extent.
         let target = unsafe { self.data.unwrap().as_ptr().add(handle.index() * self.stride) };
-        // source is a safe borrow, disjoint from exclusive self; every visible byte is written.
         unsafe { std::ptr::copy_nonoverlapping(source.as_ptr(), target, self.row_size); }
         Ok(handle)
     }
@@ -59,7 +55,6 @@ impl RowChunk {
     pub fn get(&self, handle: Handle) -> Option<&[u8]> {
         self.slots.get_handle(handle)?;
         let data = self.data?;
-        // SAFETY: live marker implies backing and initialized bytes within immutable geometry.
         Some(unsafe { std::slice::from_raw_parts(data.as_ptr().add(handle.index() * self.stride), self.row_size) })
     }
 
@@ -67,7 +62,6 @@ impl RowChunk {
     pub fn get_mut(&mut self, handle: Handle) -> Option<&mut [u8]> {
         self.slots.get_handle(handle)?;
         let data = self.data?;
-        // SAFETY: exclusive self excludes aliases, and live marker proves bounds/initialization.
         Some(unsafe { std::slice::from_raw_parts_mut(data.as_ptr().add(handle.index() * self.stride), self.row_size) })
     }
 
@@ -81,7 +75,6 @@ impl RowChunk {
     pub fn release_empty(&mut self) -> bool {
         if !self.slots.is_empty() { return false; }
         let Some(data) = self.data.take() else { return false; };
-        // SAFETY: no live row remains and allocation uses this exact layout.
         unsafe { dealloc(data.as_ptr(), self.layout); }
         self.slots.release_backing();
         true
@@ -112,7 +105,6 @@ impl Drop for RowChunk {
     /// Free exactly the byte allocation still owned by this chunk.
     fn drop(&mut self) {
         if let Some(data) = self.data.take() {
-            // SAFETY: unique allocation; all Rust borrowers end before owner drop.
             unsafe { dealloc(data.as_ptr(), self.layout); }
         }
     }

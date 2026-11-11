@@ -44,8 +44,6 @@ fn ffi_atomic_publication_across_readers() {
         let owner = re_memory_new();
         let mut string_id = 0;
         assert_eq!(re_memory_new_atomic_string(owner, [0; WIDTH].as_ptr(), WIDTH, BUDGET, &mut string_id), 0);
-        // Freeze topology before sharing. Calls use the same Rust-owned owner;
-        // no C/Rust atomic representation is ever shared.
         let shared = &*owner;
         let barrier = std::sync::Barrier::new(3);
         std::thread::scope(|scope| {

@@ -1,8 +1,6 @@
 #ifndef RE_FIXED_MAPPED_FILE_H
 #define RE_FIXED_MAPPED_FILE_H
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 
 /* Fixed-extent, file-backed byte view owned by Rust, reached from C through this
  * ONE thin extern-C surface. There is no second mapping implementation in C: the
@@ -43,35 +41,23 @@
 
 typedef struct ReFixedMappedFile ReFixedMappedFile;
 
-/* Open an existing regular file at its current size. Never creates or truncates.
- * `path` is a NUL-terminated UTF-8 path. Writable admission requires write access. */
-uint32_t re_mmap_open(const char *path, bool writable, ReFixedMappedFile **out_owner);
-/* Release the owner: unmaps before releasing the file. Null is a quiet no-op. */
+u32 re_mmap_open(const char *path, bool writable, ReFixedMappedFile **out_owner);
 void re_mmap_drop(ReFixedMappedFile *owner);
 
-uint32_t re_mmap_len(const ReFixedMappedFile *owner, size_t *out_len);
-uint32_t re_mmap_is_open(const ReFixedMappedFile *owner, bool *out_open);
-uint32_t re_mmap_is_writable(const ReFixedMappedFile *owner, bool *out_writable);
+u32 re_mmap_len(const ReFixedMappedFile *owner, bytes *out_len);
+u32 re_mmap_is_open(const ReFixedMappedFile *owner, bool *out_open);
+u32 re_mmap_is_writable(const ReFixedMappedFile *owner, bool *out_writable);
 
-/* Copy a checked range out. A destination smaller than `length` refuses with
- * status 7 and leaves `dest` untouched — never a silent short read. */
-uint32_t re_mmap_read(const ReFixedMappedFile *owner, size_t offset, size_t length,
-                      uint8_t *dest, size_t capacity, bool *out_truncated);
-/* Copy `length` bytes in from `source` into a checked writable range. On any
- * rejection the whole view is preserved. */
-uint32_t re_mmap_write(ReFixedMappedFile *owner, size_t offset,
-                       const uint8_t *source, size_t length);
-/* Borrow the mapped bytes: readonly, bounded by the length, valid until drop.
- * No copy. The caller must not write through it. */
-uint32_t re_mmap_borrow(const ReFixedMappedFile *owner,
-                        const uint8_t **out_bytes, size_t *out_len);
-/* Request mapped-page writeback; then re_mmap_sync requests file sync. Neither is
- * implicit, neither promises atomic publication, and neither rolls back. */
-uint32_t re_mmap_flush(ReFixedMappedFile *owner);
-uint32_t re_mmap_sync(ReFixedMappedFile *owner);
-/* Unmap now; repeat safely. Does not flush or sync. */
-uint32_t re_mmap_close(ReFixedMappedFile *owner);
-uint32_t re_mmap_to_string(const ReFixedMappedFile *owner, char *dest, size_t capacity,
+u32 re_mmap_read(const ReFixedMappedFile *owner, bytes offset, bytes length,
+                      u8 *dest, bytes capacity, bool *out_truncated);
+u32 re_mmap_write(ReFixedMappedFile *owner, bytes offset,
+                       const u8 *source, bytes length);
+u32 re_mmap_borrow(const ReFixedMappedFile *owner,
+                        const u8 **out_bytes, bytes *out_len);
+u32 re_mmap_flush(ReFixedMappedFile *owner);
+u32 re_mmap_sync(ReFixedMappedFile *owner);
+u32 re_mmap_close(ReFixedMappedFile *owner);
+u32 re_mmap_to_string(const ReFixedMappedFile *owner, char *dest, bytes capacity,
                            bool *out_truncated);
 
 #endif

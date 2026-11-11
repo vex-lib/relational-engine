@@ -23,7 +23,6 @@ fn owner_allocation_and_add_failure_preserve_outputs() {
         let mut len = usize::MAX;
         assert_eq!(unsafe { re_rows_len(owner, &mut len) }, 0);
         assert_eq!(len, 0);
-        // Drop recreates a fresh owner so each stage includes the directory allocation.
         unsafe { re_rows_drop(owner); }
         owner = std::ptr::null_mut();
         assert_eq!(unsafe { re_rows_new(8, 8, 1, &mut owner) }, 0);

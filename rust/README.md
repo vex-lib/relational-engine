@@ -260,7 +260,7 @@ and quiesce calls before destruction. No Hot loader code has been changed or
 live-reload integration proved. String length replacement works; automatic
 record layout upgrades still require a staged migration/rollback design.
 
-Known gaps in this Rust byte API: no slabs, BitPool, typed record macros, 16-byte native headers,
+Known gaps in this Rust byte API: no slabs, typed record macros, 16-byte native headers,
 pointer compatibility, exhaustive legacy Memory OOM injection, shared registry
 mutation, performance or Windows
 proof, deterministic writer-busy fault injection or full Rust sanitizer proof.

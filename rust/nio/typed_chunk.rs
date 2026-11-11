@@ -96,7 +96,6 @@ impl<T> TypedChunk<T> {
                 }
             }
         }
-        // The private live count and bitmap agree; no public path can reach this.
         Err(StorageError::Capacity)
     }
 
@@ -106,8 +105,6 @@ impl<T> TypedChunk<T> {
         self.occupied[index / BITMAP_WORD_BITS] &= !(1u64 << (index % BITMAP_WORD_BITS));
         self.bump_generation(index);
         self.len -= 1;
-        // SAFETY: occupancy proved initialization; exclusive access transfers the
-        // value exactly once and clearing its bit prevents later reads/drops.
         Ok(unsafe { self.rows[index].assume_init_read() })
     }
 
@@ -115,14 +112,12 @@ impl<T> TypedChunk<T> {
     pub fn get(&self, index: usize) -> Option<&T> {
         if index >= self.rows.len() || self.occupied[index / BITMAP_WORD_BITS] &
             (1u64 << (index % BITMAP_WORD_BITS)) == 0 { return None; }
-        // SAFETY: this bit is set only after writing an initialized T.
         Some(unsafe { self.rows[index].assume_init_ref() })
     }
 
     /// Mutably borrow a live value at `index`; empty slots and out-of-range indices return `None`.
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         if self.get(index).is_none() { return None; }
-        // SAFETY: initialization checked above; &mut self excludes all borrowers.
         Some(unsafe { self.rows[index].assume_init_mut() })
     }
 
@@ -211,7 +206,6 @@ impl<T> Drop for TypedChunk<T> {
     fn drop(&mut self) {
         for index in 0..self.rows.len() {
             if self.get(index).is_some() {
-                // SAFETY: only initialized, still-owned slots are dropped.
                 unsafe { self.rows[index].assume_init_drop(); }
             }
         }

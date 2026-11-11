@@ -18,7 +18,7 @@ fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let object = out.join("name_search.o");
     let mut compiler = Command::new(env::var_os("CC").unwrap_or_else(|| "clang".into()));
-    compiler.args(["-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", "-I..", "-I../..", "-I../../vexspoke"]);
+    compiler.args(["-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", "-I..", "-I../..", "-I../../../lib", "-I../../vexspoke"]);
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         compiler.args(["-arch", "arm64", "-mcpu=apple-m1", "-mmacosx-version-min=14.0"]);
     }

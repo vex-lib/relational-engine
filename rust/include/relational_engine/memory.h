@@ -1,8 +1,6 @@
 #ifndef RELATIONAL_MEMORY_H
 #define RELATIONAL_MEMORY_H
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include "vex.h"
 /* Standalone learning ABI, NOT Vexspoke Memory_* compatibility.
  * Owner is opaque and exclusively managed; drop once, never concurrently.
  * IDs are owner-local. Pointer arguments must be live, aligned and sized;
@@ -21,13 +19,13 @@
 typedef struct ReMemory ReMemory;
 ReMemory *re_memory_new(void);
 void re_memory_drop(ReMemory *owner);
-uint32_t re_memory_copy(ReMemory *owner, const uint8_t *source, size_t length, uint64_t *output);
-uint32_t re_memory_read(const ReMemory *owner, uint64_t id, uint8_t *destination, size_t capacity, size_t *output_length);
-uint32_t re_memory_get_byte(const ReMemory *owner, uint64_t id, size_t index, uint8_t *output);
-uint32_t re_memory_new_atomic_byte(ReMemory *owner, uint8_t value, uint64_t *output);
-uint32_t re_memory_get_atomic_byte(const ReMemory *owner, uint64_t id, uint8_t *output);
-uint32_t re_memory_set_atomic_byte(const ReMemory *owner, uint64_t id, uint8_t value);
-uint32_t re_memory_new_atomic_string(ReMemory *owner, const uint8_t *source, size_t length, size_t retention_limit, uint64_t *output);
-uint32_t re_memory_get_atomic_string(const ReMemory *owner, uint64_t id, uint8_t *destination, size_t capacity, size_t *output_length, bool *out_truncated);
-uint32_t re_memory_set_atomic_string(const ReMemory *owner, uint64_t id, const uint8_t *source, size_t length);
+u32 re_memory_copy(ReMemory *owner, const u8 *source, bytes length, u64 *output);
+u32 re_memory_read(const ReMemory *owner, u64 id, u8 *destination, bytes capacity, bytes *output_length);
+u32 re_memory_get_byte(const ReMemory *owner, u64 id, bytes index, u8 *output);
+u32 re_memory_new_atomic_byte(ReMemory *owner, u8 value, u64 *output);
+u32 re_memory_get_atomic_byte(const ReMemory *owner, u64 id, u8 *output);
+u32 re_memory_set_atomic_byte(const ReMemory *owner, u64 id, u8 value);
+u32 re_memory_new_atomic_string(ReMemory *owner, const u8 *source, bytes length, bytes retention_limit, u64 *output);
+u32 re_memory_get_atomic_string(const ReMemory *owner, u64 id, u8 *destination, bytes capacity, bytes *output_length, bool *out_truncated);
+u32 re_memory_set_atomic_string(const ReMemory *owner, u64 id, const u8 *source, bytes length);
 #endif

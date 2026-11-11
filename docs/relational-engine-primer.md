@@ -143,8 +143,8 @@ A concrete example, from `rust/include/relational_engine/memory.h` and
 /* C sees this. The owner is opaque; the bytes are copied in/out. */
 typedef struct ReMemory ReMemory;
 ReMemory *re_memory_new(void);
-uint32_t  re_memory_copy(ReMemory *owner, const uint8_t *source, size_t length, uint64_t *output);
-uint32_t  re_memory_read(const ReMemory *owner, uint64_t id, uint8_t *dest, size_t cap, size_t *out_len);
+u32  re_memory_copy(ReMemory *owner, const u8 *source, bytes length, u64 *output);
+u32  re_memory_read(const ReMemory *owner, u64 id, u8 *dest, bytes cap, bytes *out_len);
 ```
 
 ```rust
@@ -162,7 +162,7 @@ opaque handles, and status codes.
 | :--- | :--- |
 | `#[repr(C)]` structs | `String`, `Vec`, `Box` (by value) |
 | raw pointers (`*const T`, `*mut T`) | Rust references (`&T`, `&mut T`) |
-| fixed-width ints (`u32`, `u64`), target-sized `usize` / C `size_t` | trait objects, closures |
+| fixed-width ints (`u32`, `u64`), target-sized `usize` / C `bytes` | trait objects, closures |
 | function pointers with C signatures | Rust enums with data |
 | explicitly agreed records such as `VariableSlot` | Rust atomics reinterpreted as C `_Atomic` |
 
@@ -176,7 +176,7 @@ inside the storage owner, in exchange for a second language and a maintained ABI
 - **No mandatory garbage collector.** Rust supports explicit allocation and
   destruction. `Vec`, `Box` and `format!` still allocate; Rust does not automatically
   make a path allocation-free or realtime-safe.
-- **Ownership and borrowing** catch use-after-free, double-free, and aliasing bugs
+- **Ownership and borrowing** catch use-after-free, d64-free, and aliasing bugs
   in safe Rust before the program runs, provided unsafe implementations uphold
   their contracts. The compiler cannot validate arbitrary pointers supplied by C.
 - **`MaybeUninit`, explicit `unsafe`, and `Drop`** let the engine build manual,
@@ -268,11 +268,11 @@ the C caller's responsibility. All calls require external serialization.
 #include "nio/relational_rows.h"
 
 ReRowPool *rows = nullptr;
-uint64_t value = 42;
+u64 value = 42;
 ReRowHandle identity = ReRowHandle_zero();
-uint32_t status = ReRowPool(sizeof(value), _Alignof(uint64_t), &rows);
+u32 status = ReRowPool(sizeof(value), _Alignof(u64), &rows);
 if (status == 0)
-    status = re_rows_add(rows, (const uint8_t*) &value, sizeof(value), &identity);
+    status = re_rows_add(rows, (const u8*) &value, sizeof(value), &identity);
 /* Check status before use. Detach borrowers before destruction. */
 re_rows_drop(rows);
 ```
@@ -290,7 +290,7 @@ borrower before dropping storage. It is not an R3–R5 application migration.
 A **`VariableSlot`** is a 32-byte record:
 
 ```
-{ uint8_t name[24], pointer-to-value }
+{ u8 name[24], pointer-to-value }
 ```
 
 The name is a 24-byte byte span (folded, validated); the pointer addresses the

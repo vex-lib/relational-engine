@@ -1,7 +1,8 @@
 """Strict migrated native IO/NIO owners, with assertions and ASan/UBSan.
 
 The engine owns every storage/I/O object; only SpinLock and Crypto computation
-come from Vexspoke. No Vexspoke io/nio source or header exists in this build.
+come from Vexspoke. Vexspoke may own higher-level io policy (VexHome) above re,
+but no native allocator/file implementation.
 """
 from pathlib import Path
 import argparse
@@ -11,14 +12,17 @@ import tempfile
 
 SUITE = Path(__file__).resolve().parent
 WORKSPACE = SUITE.parents[1]
-ENGINE = WORKSPACE / "suite/ecosystem/relational-engine"
-CPU = WORKSPACE / "suite/ecosystem/vexspoke"
+ENGINE = WORKSPACE / "re"
+CPU = WORKSPACE / "vexspoke"
+LIB = WORKSPACE.parent / "lib"
 
-assert not (CPU / "src/nio/mem.c").exists()
-assert not list((CPU / "src/io").glob("*"))
-sources = [ENGINE / "src/nio/mem.c", *sorted((ENGINE / "src/io").glob("*.c")),
-           ENGINE / "src/io/clipboard_mac.m", CPU / "src/atomic/spin.c",
-           CPU / "src/security/crypto.c", CPU / "src/c23/free.c"]
+assert not (CPU / "nio/mem.c").exists()
+assert not (CPU / "io/mem.c").exists()
+assert not (CPU / "io/file.c").exists()
+sources = [ENGINE / "nio/mem.c", ENGINE / "atomic/spin_lock.c",
+           *sorted((ENGINE / "io").rglob("*.c")),
+           *sorted((ENGINE / "clipboard").glob("*.c")),
+           ENGINE / "clipboard/clipboard_mac.m"]
 owners = [*sorted((SUITE / "io").glob("*_test.c")),
           SUITE / "nio/mem_test.c", SUITE / "nio/mem_exhaustion_test.c",
           SUITE / "nio/transient_lifetime_test.c"]
@@ -38,8 +42,8 @@ with tempfile.TemporaryDirectory(prefix="re-native-", dir=os.environ.get("TMPDIR
     for mode, sanitizer in modes:
         flags = ["-std=gnu23", "-Wall", "-Wextra", "-Werror", "-O2", "-UNDEBUG",
                  "-mcpu=apple-m1", "-mmacosx-version-min=14.0",
-                 "-I" + str(CPU / "src"), "-I" + str(ENGINE / "src"),
-                  "-I" + str(WORKSPACE / "tests"), *sanitizer]
+                 "-I" + str(WORKSPACE), "-I" + str(ENGINE), "-I" + str(CPU),
+                 "-I" + str(LIB), "-I" + str(LIB / "lang"), *sanitizer]
         if mode != "release":
             flags.append("-DDEBUG_BORROW_CHECK")
         objects = []

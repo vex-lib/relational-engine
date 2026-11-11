@@ -1,6 +1,6 @@
 // Current HotFileSys module is a draft no-op, not a working file watcher.
 // Proves safe repeated lifecycle calls only; event delivery remains unimplemented.
-#include "io/hot_file.h"
+#include "io/file/file.h"
 int main(void) {
     HotFileSys_pumpEvents();
     HotFileSys_shutdown();

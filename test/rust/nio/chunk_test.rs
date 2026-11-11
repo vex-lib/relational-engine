@@ -46,7 +46,7 @@ fn stable_chunk_contract() {
         let mut tracked = Chunk!(Tracked, 1).unwrap();
         tracked.add(Tracked(drops.clone())).unwrap();
         assert_eq!(tracked.add(Tracked(drops.clone())), Err(StorageError::Capacity));
-        assert_eq!(drops.get(), 1); // Rejected input dropped, owned row untouched.
+        assert_eq!(drops.get(), 1);
     }
     assert_eq!(drops.get(), 2);
     let mut dest = [0; 128];

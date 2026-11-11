@@ -18,10 +18,10 @@ fn stable_rows_growth_and_failure() {
     }
     assert!(matches!(ChunkedList::<()>::new(1), Err(StorageError::Layout)));
     let mut empty = ChunkedList!(u64, 2).unwrap();
-    faults::fail_after(0); // First directory admission.
+    faults::fail_after(0);
     assert_eq!(empty.add(1), Err(StorageError::Allocation));
     assert_eq!(empty.len(), 0);
-    faults::fail_after(1); // Directory reservation succeeds; first leaf fails.
+    faults::fail_after(1);
     assert_eq!(empty.add(1), Err(StorageError::Allocation));
     assert_eq!(empty.get_chunk_count(), 0);
     assert_eq!(empty.add(1), Ok(0));

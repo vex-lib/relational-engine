@@ -1,8 +1,6 @@
 #ifndef RE_GROWABLE_MAPPED_FILE_H
 #define RE_GROWABLE_MAPPED_FILE_H
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 
 /* Reservation-backed, file-backed byte view owned by Rust, reached from C through
  * this ONE thin extern-C surface. There is no second mapping implementation in C.
@@ -41,52 +39,30 @@
 
 typedef struct ReGrowableMappedFile ReGrowableMappedFile;
 
-/* Create a NEW file (an existing path is refused, never clobbered) and map the whole
- * reservation once. `committed <= reserved`, and both must be nonzero for reserved.
- * `path` is a NUL-terminated UTF-8 path. Blocks for `committed` are reserved before
- * the mapping is published. */
-uint32_t re_gmap_create(const char *path, size_t reserved, size_t committed,
+u32 re_gmap_create(const char *path, bytes reserved, bytes committed,
                         ReGrowableMappedFile **out_owner);
-/* Open an EXISTING reserved file — the counterpart of create, for reopening a store
- * rather than making one — and map the whole reservation once. Never creates,
- * resizes or truncates: a missing file is an IO/OS failure and a file shorter than
- * `reserved` is refused, because the reservation was fixed when the file was made.
- * `committed` is the caller's starting extent and must already be backed by
- * allocated blocks; raise it with re_gmap_grow_to, which is free when the blocks
- * are already there. Returns 3 for a file that cannot hold the reservation. */
-uint32_t re_gmap_open(const char *path, size_t reserved, size_t committed,
+u32 re_gmap_open(const char *path, bytes reserved, bytes committed,
                       ReGrowableMappedFile **out_owner);
-/* Release the owner: unmaps before releasing the file. Null is a quiet no-op. */
 void re_gmap_drop(ReGrowableMappedFile *owner);
 
-/* The committed length: the only extent this API ever exposes. */
-uint32_t re_gmap_len(const ReGrowableMappedFile *owner, size_t *out_len);
-/* The fixed reservation chosen at create; it never grows. */
-uint32_t re_gmap_reserved(const ReGrowableMappedFile *owner, size_t *out_reserved);
-uint32_t re_gmap_is_open(const ReGrowableMappedFile *owner, bool *out_open);
-/* Bytes the filesystem has physically allocated, observed rather than assumed. */
-uint32_t re_gmap_allocated_bytes(const ReGrowableMappedFile *owner, uint64_t *out_allocated);
+u32 re_gmap_len(const ReGrowableMappedFile *owner, bytes *out_len);
+u32 re_gmap_reserved(const ReGrowableMappedFile *owner, bytes *out_reserved);
+u32 re_gmap_is_open(const ReGrowableMappedFile *owner, bool *out_open);
+u32 re_gmap_allocated_bytes(const ReGrowableMappedFile *owner, u64 *out_allocated);
 
-/* Copy a checked range out, bounded by the COMMITTED length. A destination smaller
- * than `length` refuses with status 7 and leaves `dest` untouched. */
-uint32_t re_gmap_read(const ReGrowableMappedFile *owner, size_t offset, size_t length,
-                      uint8_t *dest, size_t capacity, bool *out_truncated);
-/* Copy `length` bytes in from `source`; must lie inside the committed length. */
-uint32_t re_gmap_write(ReGrowableMappedFile *owner, size_t offset,
-                       const uint8_t *source, size_t length);
-/* Borrow the committed bytes: readonly, no copy, and valid across later growth. */
-uint32_t re_gmap_borrow(const ReGrowableMappedFile *owner,
-                        const uint8_t **out_bytes, size_t *out_len);
+u32 re_gmap_read(const ReGrowableMappedFile *owner, bytes offset, bytes length,
+                      u8 *dest, bytes capacity, bool *out_truncated);
+u32 re_gmap_write(ReGrowableMappedFile *owner, bytes offset,
+                       const u8 *source, bytes length);
+u32 re_gmap_borrow(const ReGrowableMappedFile *owner,
+                        const u8 **out_bytes, bytes *out_len);
 
-/* Grow the committed length inside the reservation. Reserve-then-publish: blocks
- * for the step exist before the length changes, and the mapping is never remade.
- * Refuses backwards growth, growth past the reservation, and a closed owner. */
-uint32_t re_gmap_grow_to(ReGrowableMappedFile *owner, size_t length);
+u32 re_gmap_grow_to(ReGrowableMappedFile *owner, bytes length);
 
-uint32_t re_gmap_flush(ReGrowableMappedFile *owner);
-uint32_t re_gmap_sync(ReGrowableMappedFile *owner);
-uint32_t re_gmap_close(ReGrowableMappedFile *owner);
-uint32_t re_gmap_to_string(const ReGrowableMappedFile *owner, char *dest, size_t capacity,
+u32 re_gmap_flush(ReGrowableMappedFile *owner);
+u32 re_gmap_sync(ReGrowableMappedFile *owner);
+u32 re_gmap_close(ReGrowableMappedFile *owner);
+u32 re_gmap_to_string(const ReGrowableMappedFile *owner, char *dest, bytes capacity,
                            bool *out_truncated);
 
 #endif

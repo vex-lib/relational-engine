@@ -1,11 +1,9 @@
 #ifndef NIO_MEM_H
 #define NIO_MEM_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 
-#include "util/annotation.h"
+#include "lang/primitive.h"
 
 // Relational Engine owns this production ForeignMemory API and its implementation.
 // Canonical nio/mem.h includes preserve the existing C ABI for every consumer.
@@ -18,7 +16,7 @@
 // Every allocation returns a payload pointer whose 32-byte prefix holds four
 // 64-bit words:
 //
-//     [ id with sugar ][ hash ][ length ][ pointer ]
+//     [ id with sugar ][ hash ][ length ]<*>[ pointer ]
 //
 // The id is the triple-sugar self-describe word — form, project, modifier,
 // wrapper one, wrapper two, the BE6C sugar and the class number — so any
@@ -50,65 +48,29 @@
 _Static_assert(MEMORY_PAYLOAD_ALIGN == 32, "the payload floor is 32 bytes");
 
 typedef struct MemoryHeader {
-    uint64_t typeId;   // triple-sugar self-describe id (BE6C sugar inside)
-    uint64_t hash;     // recomputed veto over (typeId, length, pointer)
-    uint64_t length;   // payload byte count
-    uint64_t pointer;  // redirect: the object's address, or a primitive's value address
+    u64 typeId;   // triple-sugar self-describe id (BE6C sugar inside)
+    u64 hash;     // recomputed veto over (typeId, length, pointer)
+    u64 length;   // payload byte count
+    u64 pointer;  // redirect: the object's address, or a primitive's value address
 } MemoryHeader;
 _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
-// 32-byte payload alignment is the ecosystem floor (the Universal Alignment
-// Law), and it holds by construction, not by attribute (this toolchain's
-// _Alignas rejects typedef application): the arenas over-allocate one unit and
-// round their base forward to 32, every slot size and bump stride is a multiple
-// of 32, and mem.c guards every release with (u & 31) == 0. malloc alone would
-// not be enough: Windows x64/arm64 and macOS arm64 promise 16, so the 32 is
-// built here, on every platform, not inherited from the platform's allocator.
-// The header is 32 bytes, so a 32-aligned payload implies a 32-aligned block
-// start. A type whose _Alignof exceeds 32 is not arena-allocated directly: it is
-// embedded in a 32-aligned owner or lives in a typed owner with construction-time
-// geometry (RowPool/RowChunk), whose alignment is a caller-chosen floor of 32.
 
-// Initialize the master arena with a specific total capacity (e.g. 64MB).
-// If not called explicitly, Memory_alloc initializes a 64MB arena lazily.
-bool Memory_init(size_t totalBytes);
+bool Memory_init(bytes totalBytes);
 
-// Allocate nbytes with the given type id stamped in the 32-byte header.
-// Returns the aligned payload pointer, or nullptr on failure/exhaustion. Backing
-// capacity is selected at construction, a physical resource bound, not a dynamic
-// entity ceiling. No untracked heap fallback; choose a larger owner when needed.
-// Exhaustion is LOUD but bounded (the Exhaustion Loudness Law): the FIRST
-// rejection of an epoch emits its THROW diagnostic naming the request and the
-// arena's used/available bytes; later rejections only increment a counter, so a
-// failing frame loop cannot flood stderr. The return contract is unchanged
-// (nullptr) and existing blocks and the allocation cursor survive.
-void *Memory_alloc(uint64_t typeId, size_t numBytes);
+void *Memory_alloc(u64 typeId, bytes numBytes);
 
-// Grow/shrink a block, preserving contents and type. Returns the new payload
-// pointer (the old one is freed). nullptr on failure leaves the original intact.
-void *Memory_realloc(void *userPtr, size_t newBytes);
+void *Memory_realloc(void *userPtr, bytes newBytes);
 
-// Free a block back to its slab pool in O(1) cache-hot time.
 void Memory_free(void *userPtr);
 
-// Reset slab lists and clear used bump storage, invalidating existing headers.
-// Work scales with slab capacity plus used bump bytes; excludes active users.
-// Also starts a fresh exhaustion epoch (counter and one-report latch reset).
 void Memory_freeAll(void);
 
-// Metadata accessors: cost a single pointer subtract in O(1) without locks.
-size_t Memory_length(void *userPtr);
-uint64_t Memory_type(void *userPtr);
+bytes Memory_length(void *userPtr);
+u64 Memory_type(void *userPtr);
 
-// Standard comparison: same kind (provenance-checked self Bytes equal).
-// Answers identity, never content: two ID_STRING blocks of different
-// lengths are similar. Foreign, corrupted, or freed pointers fail closed.
 bool Memory_similar(const void *a, const void *b);
 
-// Search slabs AND bump blocks. Return total live matches; typeId zero is wildcard.
-// If outArray is not nullptr, fill up to maxCount payload pointers, leaving the
-// tail unchanged. Enumeration excludes mutation; corrupted headers are not a
-// trusted serialization format and a forged checksum is not an identity proof.
-size_t Memory_findAll(uint64_t typeId, void **outArray, size_t maxCount);
+bytes Memory_findAll(u64 typeId, void **outArray, bytes maxCount);
 
 // Phase-4 instancing (Arena-B): the process-global allocator above is the
 // DEFAULT arena. Secondary arenas are fully isolated slab sets carved from
@@ -123,28 +85,20 @@ size_t Memory_findAll(uint64_t typeId, void **outArray, size_t maxCount);
 // invalidate on free but reclaim capacity only on freeAll, never individually.
 typedef struct MemoryArena MemoryArena;
 
-// The process-global (default) arena, lazily initialized like Memory_alloc.
-// Borrowed — never destroy it (destroy guards the default). Exists so
-// leaf-global services (the string pool) can anchor backing without
-// threading arena handles through every caller.
 MemoryArena *Memory_defaultArena(void);
 
-MemoryArena *MemoryArena_create(size_t totalBytes);
+MemoryArena *MemoryArena_create(bytes totalBytes);
 void MemoryArena_destroy(MemoryArena *a);
-void *MemoryArena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes);
-void *MemoryArena_realloc(MemoryArena *a, void *userPtr, size_t newBytes);
+void *MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes);
+void *MemoryArena_realloc(MemoryArena *a, void *userPtr, bytes newBytes);
 void MemoryArena_free(MemoryArena *a, void *userPtr);
 void MemoryArena_freeAll(MemoryArena *a);
-size_t MemoryArena_findAll(MemoryArena *a, uint64_t typeId, void **outArray, size_t maxCount);
-size_t MemoryArena_activeBytes(MemoryArena *a);
-size_t MemoryArena_capacity(MemoryArena *a);
+bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, void **outArray, bytes maxCount);
+bytes MemoryArena_activeBytes(MemoryArena *a);
+bytes MemoryArena_capacity(MemoryArena *a);
 
-// --- Exhaustion observability (the Exhaustion Loudness Law) ---
-// Every rejection counted since the arena's last init/freeAll; the diagnostic
-// itself fires once per epoch. A test/tool asserts the count deterministically
-// instead of parsing stderr.
-uint64_t Memory_exhaustionCount(void);
-uint64_t MemoryArena_exhaustionCount(const MemoryArena *a);
+u64 Memory_exhaustionCount(void);
+u64 MemoryArena_exhaustionCount(const MemoryArena *a);
 
 // Lifetime verification classification
 typedef enum MemoryLifetime {
@@ -153,22 +107,15 @@ typedef enum MemoryLifetime {
     MEMORY_LIFETIME_TRANSIENT,
 } MemoryLifetime;
 
-// Transient (Frame / Scratchpad) bump-only arena lifecycle
-// Overflow/layout/capacity rejection is LOUD but bounded: the first rejection
-// of an epoch reports via THROW, later ones only count (Transient_exhaustionCount).
-// Transient payload lengths must fit the 64-bit header length; a request whose
-// header-plus-alignment arithmetic overflows size_t is refused. Initialization
-// capacity must round to 16-byte alignment without overflowing size_t. Reset
-// excludes active users and starts a fresh exhaustion epoch.
-bool Memory_initTransient(size_t capacity);
-void *Transient_alloc(uint64_t typeId, size_t numBytes);
+bool Memory_initTransient(bytes capacity);
+void *Transient_alloc(u64 typeId, bytes numBytes);
 void Transient_reset(void);
 bool Transient_contains(const void *ptr);
-uint32_t Transient_getGeneration(void);
-uint64_t Transient_exhaustionCount(void);
+u32 Transient_getGeneration(void);
+u64 Transient_exhaustionCount(void);
 #if defined(DEBUG_BORROW_CHECK)
 ;;VALIDATOR
-const uint8_t *Transient_getBuffer(void);
+const u8 *Transient_getBuffer(void);
 #endif
 MemoryLifetime Memory_getLifetime(const void *ptr);
 

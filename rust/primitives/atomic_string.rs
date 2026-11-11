@@ -35,8 +35,6 @@ impl AtomicString {
     /// Acquire the current immutable snapshot; its borrow remains valid for this owner's lifetime.
     pub fn get(&self) -> &[u8] {
         let pointer = self.current.load(Ordering::Acquire);
-        // Construction publishes before returning. Retention owns this allocation
-        // until self dies; the returned borrow cannot outlive self.
         unsafe { &(*pointer).bytes }
     }
 
@@ -57,9 +55,7 @@ impl AtomicString {
         let mut bytes = Vec::new();
         bytes.try_reserve_exact(source.len()).map_err(|_| MemoryError::Allocation)?;
         bytes.extend_from_slice(source);
-        
-        // Like the learning owner's Box constructor, this can abort on allocator
-        // OOM; no claim of exhaustive fallible allocation is made.
+
         let mut snapshot = Box::new(Snapshot { bytes: bytes.into_boxed_slice() });
         let pointer: *mut Snapshot = &mut *snapshot;
         history.snapshots.push(snapshot);

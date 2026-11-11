@@ -40,16 +40,11 @@ impl VariableRegistry {
 
     /// Resolve a validated name with the native span-search routine; return `None` when absent.
     pub fn find(&self, name: &[u8]) -> Result<Option<usize>, StorageError> {
-        // Cold name rendezvous per the Cold-Only Reflection Law; hot consumers
-        // resolve once and borrow the stable row/value instead of scanning again.
         let key = VariableSlot::new(name, std::ptr::null())?;
         let mut base = 0;
         for chunk_index in 0..self.slots.get_chunk_count() {
             let rows = self.slots.get_chunk(chunk_index).ok_or(StorageError::Bounds)?;
             let mut local = 0;
-            // Safety: initialized repr(C) rows are stable for this shared borrow;
-            // their first 24 bytes are the fully initialized, padded name. C reads
-            // only those bytes and neither retains pointers nor reads pointer fields.
             let status = unsafe { re_name_search(rows.as_ptr().cast(), std::mem::size_of_val(rows),
                 std::mem::size_of::<VariableSlot>(), key.get_name_bytes().as_ptr(), VARIABLE_NAME_BYTES, &mut local) };
             match status {

@@ -6,7 +6,8 @@ import tempfile
 
 SUITE = Path(__file__).resolve().parent
 WORKSPACE = SUITE.parents[2]
-ROOT = WORKSPACE / "host-behavior" / "re"
+ROOT = WORKSPACE / "re"
+LIB = WORKSPACE.parent / "lib"
 
 def run(*args, env=None):
     subprocess.run(args, cwd=ROOT, env=env, check=True, timeout=90)
@@ -19,7 +20,9 @@ with tempfile.TemporaryDirectory(prefix="relational-owner-", dir=os.environ.get(
     run("cargo", "test", "--doc", "--offline", "--locked", "--manifest-path", "rust/Cargo.toml", env=env)
     run("cargo", "build", "--offline", "--locked", "--manifest-path", "rust/Cargo.toml", env=env)
     binary = str(target / "ffi-test")
-    run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", "-Irust/include",
+    c_includes = ("-Irust/include", "-I" + str(ROOT), "-I" + str(WORKSPACE / "vexspoke"),
+                  "-I" + str(LIB), "-I" + str(LIB / "lang"))
+    run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", *c_includes,
         str(SUITE / "ffi/memory_test.c"), str(target / "debug/librelational_engine_scratchpad.a"),
         "-o", binary)
     run(binary)
@@ -30,26 +33,29 @@ with tempfile.TemporaryDirectory(prefix="relational-owner-", dir=os.environ.get(
         cwd=ROOT, capture_output=True, text=True, timeout=90)
     assert result.returncode != 0 and "E0502" in result.stderr, result.stderr
     run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined",
-        "-Irust/include", str(SUITE / "ffi/memory_test.c"),
+        *c_includes, str(SUITE / "ffi/memory_test.c"),
         str(target / "debug/librelational_engine_scratchpad.a"), "-o", binary)
     run(binary)
     print("PASS: debug/release owners, executable docs, C ABI, C ASan/UBSan, E0502 borrow rejection")
     for sanitizers in ([], ["-fsanitize=address,undefined"]):
         run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", *sanitizers,
-            "-Irust/include", "-Isrc", "-I" + str(WORKSPACE / "host-behavior/vexspoke/src"),
+            "-Irust/include", "-I" + str(ROOT),
+            "-I" + str(WORKSPACE / "vexspoke"), "-I" + str(LIB), "-I" + str(LIB / "lang"),
             str(WORKSPACE / "re/test/nio/relational_memory_test.c"),
             str(target / "debug/librelational_engine_scratchpad.a"), "-o", binary)
         run(binary)
     for sanitizers in ([], ["-fsanitize=address,undefined"]):
         run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", *sanitizers,
-            "-Irust/include", "-Isrc", "-I" + str(WORKSPACE / "host-behavior/vexspoke/src"),
+            "-Irust/include", "-I" + str(ROOT),
+            "-I" + str(WORKSPACE / "vexspoke"), "-I" + str(LIB), "-I" + str(LIB / "lang"),
             str(WORKSPACE / "re/test/nio/fixed_mapped_file_abi_test.c"),
             str(target / "debug/librelational_engine_scratchpad.a"), "-o", binary)
         run(binary)
     print("PASS: C client of the fixed-extent mapping ABI (strict + ASan/UBSan)")
     for sanitizers in ([], ["-fsanitize=address,undefined"]):
         run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", *sanitizers,
-            "-Irust/include", "-Isrc", "-I" + str(WORKSPACE / "host-behavior/vexspoke/src"),
+            "-Irust/include", "-I" + str(ROOT),
+            "-I" + str(WORKSPACE / "vexspoke"), "-I" + str(LIB), "-I" + str(LIB / "lang"),
             str(WORKSPACE / "re/test/nio/growable_mapped_file_abi_test.c"),
             str(target / "debug/librelational_engine_scratchpad.a"), "-o", binary)
         run(binary)
@@ -58,8 +64,8 @@ with tempfile.TemporaryDirectory(prefix="relational-owner-", dir=os.environ.get(
     print("PASS: engine-owned separate atomic byte/string extern handshake")
     for sanitizers in ([], ["-fsanitize=address,undefined"]):
         run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", *sanitizers,
-            "-Isrc", str(WORKSPACE / "re/test/search/primitives/name_search_test.c"),
-            "src/search/primitives/name_search.c", "-o", binary)
+            "-I" + str(ROOT), "-I" + str(LIB), str(WORKSPACE / "re/test/search/name_search_test.c"),
+            "search/primitives/name_search.c", "-o", binary)
         result = subprocess.run([binary], cwd=ROOT, capture_output=True, text=True, timeout=90)
         assert result.returncode == 0, result.stderr
         lines = result.stderr.splitlines()
@@ -68,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix="relational-owner-", dir=os.environ.get(
     print("PASS: native C name-search boundary and exact cold rejection diagnostics")
     for sanitizers in ([], ["-fsanitize=address,undefined"]):
         run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", *sanitizers,
-            "-Irust/include", str(SUITE / "ffi/variable_registry_test.c"),
+            *c_includes, str(SUITE / "ffi/variable_registry_test.c"),
             str(target / "debug/librelational_engine_scratchpad.a"), "-o", binary)
         result = subprocess.run([binary], cwd=ROOT, capture_output=True, text=True, timeout=90)
         assert result.returncode == 0 and result.stderr == "", result.stderr
@@ -78,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="relational-owner-", dir=os.environ.get(
             "--offline", "--locked", "--manifest-path", "rust/Cargo.toml", env=env)
         for sanitizers in ([], ["-fsanitize=address,undefined"]):
             run("clang", "-std=c23", "-Wall", "-Wextra", "-Werror", "-O2", *sanitizers,
-                "-Irust/include", "-Isrc", str(SUITE / "ffi/row_pool_test.c"),
+                *c_includes, str(SUITE / "ffi/row_pool_test.c"),
                 str(target / profile / "librelational_engine_scratchpad.a"), "-o", binary)
             result = subprocess.run([binary], cwd=ROOT, capture_output=True, text=True, timeout=90)
             assert result.returncode == 0 and result.stderr == "", result.stderr
@@ -102,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix="relational-owner-", dir=os.environ.get(
     for form, diagnostic in [("unsafe_admission", "E0133"), ("unsafe_explicit", "E0133"),
         ("arity", "no rules expected"), ("wrong_mode", "E0308"), ("wrong_path", "E0277"),
         ("close_borrow", "E0502"), ("write_borrow", "E0502"),
-        ("drop_borrow", "E0505"), ("double_mut", "E0499"),
+        ("drop_borrow", "E0505"), ("f64_mut", "E0499"),
         ("preallocation_arity", "unexpected end"), ("preallocation_length", "E0308"),
         ("preallocation_extra_arity", "no rules expected"),
         ("preallocation_move", "E0382"), ("preallocation_borrow", "E0502"),

@@ -45,7 +45,6 @@ fn constructor_forms_read_bounds_and_closed_defaults() {
         closed.close();
         closed.close();
     }
-    // SAFETY: fixture has no external file users and lives longer than all mappings.
     let owners = unsafe { [FixedMappedFile::new(&fixture.path).unwrap(),
         FixedMappedFile!(&fixture.path).unwrap(), FixedMappedFile!(&fixture.path, false).unwrap(),
         FixedMappedFile::open(&fixture.path, false).unwrap()] };
@@ -71,7 +70,6 @@ fn constructor_forms_read_bounds_and_closed_defaults() {
 #[test]
 fn writable_roundtrip_failure_preservation_and_drop() {
     let fixture = Fixture::new(&vec![0; 131_073]);
-    // SAFETY: this is the only view; no file IO occurs until close/drop.
     let mut owner = unsafe { FixedMappedFile!(&fixture.path, true).unwrap() };
     assert!(owner.is_writable());
     assert_eq!(owner.len(), 131_073);
@@ -86,19 +84,17 @@ fn writable_roundtrip_failure_preservation_and_drop() {
         assert!(matches!(owner.write(offset, source), Err(MappingError::Bounds)));
         assert_eq!(owner.as_slice(), before);
     }
-    owner.write(3, &[9]).unwrap(); // valid recovery after rejection
+    owner.write(3, &[9]).unwrap();
     owner.flush().unwrap();
     owner.sync().unwrap();
     let expected = owner.as_slice().to_vec();
     owner.close();
     assert_eq!(fs::read(&fixture.path).unwrap(), expected);
-    // SAFETY: prior mapping is closed; no external access until drop.
     let reopened = unsafe { FixedMappedFile::new(&fixture.path).unwrap() };
     assert_eq!(reopened.as_slice(), expected);
-    drop(reopened); // natural field drop unmaps before closing the descriptor
+    drop(reopened);
     fs::remove_file(&fixture.path).unwrap();
     fs::write(&fixture.path, b"recreated").unwrap();
-    // SAFETY: fresh private file with no competing access.
     let recreated = unsafe { FixedMappedFile::new(&fixture.path).unwrap() };
     assert_eq!(recreated.as_slice(), b"recreated");
 }
@@ -106,14 +102,12 @@ fn writable_roundtrip_failure_preservation_and_drop() {
 #[test]
 fn empty_file_admission_missing_and_nonregular_recovery() {
     let fixture = Fixture::new(&[]);
-    // SAFETY: empty private fixture, no file mutation while any owner lives.
     let mut readonly = unsafe { FixedMappedFile::new(&fixture.path).unwrap() };
     assert!(readonly.is_open() && readonly.is_empty());
     assert_eq!(readonly.read(0, 0).unwrap(), &[]);
     assert!(matches!(readonly.read(0, 1), Err(MappingError::Bounds)));
     assert!(matches!(readonly.as_mut_slice(), Err(MappingError::ReadOnly)));
     readonly.close();
-    // SAFETY: prior owner closed and fixture is exclusively held.
     let mut writable = unsafe { FixedMappedFile::open(&fixture.path, true).unwrap() };
     assert!(writable.is_open() && writable.is_empty() && writable.is_writable());
     assert!(writable.as_mut_slice().unwrap().is_empty());
@@ -122,7 +116,6 @@ fn empty_file_admission_missing_and_nonregular_recovery() {
     writable.flush().unwrap();
     writable.sync().unwrap();
     writable.close();
-    // SAFETY: these admissions either reject or concern private stable files.
     unsafe {
         for _ in 0..3 {
             let missing = FixedMappedFile::new(fixture.dir.join("absent"));
@@ -134,7 +127,6 @@ fn empty_file_admission_missing_and_nonregular_recovery() {
         assert!(matches!(FixedMappedFile::new(&fixture.dir), Err(MappingError::NotRegularFile)));
     }
     fs::write(&fixture.path, b"retry").unwrap();
-    // SAFETY: no earlier mapping survived admission/close.
     let retry = unsafe { FixedMappedFile::new(&fixture.path).unwrap() };
     assert_eq!(retry.as_slice(), b"retry");
 }
@@ -142,7 +134,6 @@ fn empty_file_admission_missing_and_nonregular_recovery() {
 #[test]
 fn projections_and_synchronized_readers() {
     let fixture = Fixture::new(b"shared read-only bytes");
-    // SAFETY: fixture is immutable until owner drop; readers share immutable borrows.
     let owner = unsafe { FixedMappedFile::new(&fixture.path).unwrap() };
     let start = Barrier::new(4);
     std::thread::scope(|scope| {
@@ -177,7 +168,6 @@ fn projections_and_synchronized_readers() {
 #[test]
 fn one_byte_extent_and_exact_write_capacity() {
     let fixture = Fixture::new(&[255]);
-    // SAFETY: private single-owner file, unchanged externally until close/drop.
     let mut owner = unsafe { FixedMappedFile::open(&fixture.path, true).unwrap() };
     assert_eq!(owner.len(), 1);
     assert_eq!(owner.read(0, 1).unwrap(), &[255]);
@@ -195,14 +185,11 @@ fn retained_file_survives_path_replacement_and_symlink_follows_os() {
     let fixture = Fixture::new(b"original inode");
     let alias = fixture.dir.join("alias");
     std::os::unix::fs::symlink(&fixture.path, &alias).unwrap();
-    // SAFETY: only the directory entry changes below, never the mapped inode's
-    // content/extent. Both original bytes and their immutable mapping remain live.
     let owner = unsafe { FixedMappedFile::new(&alias).unwrap() };
     fs::remove_file(&fixture.path).unwrap();
     fs::write(&fixture.path, b"replacement").unwrap();
     assert_eq!(owner.as_slice(), b"original inode");
     drop(owner);
-    // SAFETY: old view gone; new inode has no external mutations while mapped.
     let reopened = unsafe { FixedMappedFile::new(&alias).unwrap() };
     assert_eq!(reopened.as_slice(), b"replacement");
 }

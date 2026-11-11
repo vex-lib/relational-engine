@@ -24,7 +24,6 @@ fn status(error: StorageError) -> u32 {
 pub unsafe extern "C" fn re_rows_new(size: usize, alignment: usize, capacity: usize, output: *mut *mut RowPool) -> u32 {
     if output.is_null() { return 1; }
     let pool = match RowPool::new(size, alignment, capacity) { Ok(pool) => pool, Err(error) => return status(error) };
-    // SAFETY: nonzero layout of RowPool, allocation will be returned via Box::from_raw.
     let owner = unsafe { alloc(Layout::new::<RowPool>()) }.cast::<RowPool>();
     if owner.is_null() { return 2; }
     unsafe { owner.write(pool); *output = owner; }

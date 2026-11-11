@@ -35,7 +35,6 @@ impl<T> TypedPool<T> {
     /// Insert into an available slot or a newly allocated chunk and return its reusable pool-local index.
     pub fn add(&mut self, value: T) -> Result<usize, StorageError> {
         let next_len = self.len.checked_add(1).ok_or(StorageError::Capacity)?;
-        // Reuse all allocated holes before allocating another chunk.
         for (chunk_index, chunk) in self.chunks.iter_mut().enumerate() {
             if chunk.has_backing() && !chunk.is_full() {
                 let index = chunk_index * self.rows_per_chunk + chunk.add(value)?;

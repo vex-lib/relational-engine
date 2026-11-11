@@ -31,7 +31,6 @@ fn native_search_and_stable_bindings() {
     assert_eq!(registry.add(b"gold", std::ptr::null()), Err(StorageError::Duplicate));
     assert_eq!(registry.len(), 257);
     assert_eq!(registry.get(0).unwrap().get_pointer(), pointer);
-    // Fill the partial leaf, then fail the next leaf allocation with existing rows.
     assert_eq!(registry.add(b"last", std::ptr::null()), Ok(257));
     faults::fail_after(0);
     assert_eq!(registry.add(b"retry", std::ptr::null()), Err(StorageError::Allocation));
@@ -54,6 +53,6 @@ fn native_search_and_stable_bindings() {
     assert!(registry.to_string_struct(&mut dest, &mut truncated));
     assert!(!registry.to_string_struct(&mut [], &mut truncated) && truncated);
     drop(registry);
-    assert_eq!(*value, 42); // Borrowed target was not freed by registry teardown.
+    assert_eq!(*value, 42);
     faults::reset();
 }

@@ -17,7 +17,6 @@ use crate::nio::memory_error::MemoryError;
 #[unsafe(no_mangle)]
 /// Allocate a new opaque memory owner for the C ABI.
 pub extern "C" fn re_memory_new() -> *mut Memory {
-    // Box allocation follows Rust's process-level OOM policy (may abort).
     Box::into_raw(Box::new(Memory::new()))
 }
 
@@ -49,7 +48,7 @@ pub unsafe extern "C" fn re_memory_copy(
 
 /// # Safety
 /// Owner is live/shared; destination spans capacity writable Bytes. Output is
-/// writable size_t storage disjoint from destination and owner. No concurrent mutation.
+/// writable bytes storage disjoint from destination and owner. No concurrent mutation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn re_memory_read(
     owner: *const Memory, id: u64, destination: *mut u8, capacity: usize,

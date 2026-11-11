@@ -40,7 +40,6 @@ impl FixedMappedFile {
     /// # Safety
     /// The caller must meet `open`'s external-file exclusion requirements.
     pub unsafe fn new(path: impl AsRef<Path>) -> Result<Self, MappingError> {
-        // SAFETY: caller grants the same lifetime contract as open.
         unsafe { Self::open(path, false) }
     }
 
@@ -57,7 +56,6 @@ impl FixedMappedFile {
     /// follow OS open semantics: this API is not a sandbox/path-confinement boundary.
     pub unsafe fn open(path: impl AsRef<Path>, writable: bool) -> Result<Self, MappingError> {
         let file = OpenOptions::new().read(true).write(writable).open(path)?;
-        // SAFETY: caller grants the same external-file exclusion for this handle.
         unsafe { Self::from_file(file, writable) }
     }
 
@@ -70,7 +68,6 @@ impl FixedMappedFile {
     /// until close/drop, exactly as for open. Creation alone cannot enforce this.
     pub unsafe fn from_preallocated(owner: PreallocatedFile) -> Result<Self, MappingError> {
         let file = owner.into_file().map_err(MappingError::Preallocation)?;
-        // SAFETY: caller grants stable/exclusive file lifetime for the retained handle.
         unsafe { Self::from_file(file, true) }
     }
 
@@ -85,8 +82,6 @@ impl FixedMappedFile {
             let file = owner.file.as_ref().expect("admitted file");
             let mut options = MmapOptions::new();
             options.len(length);
-            // SAFETY: unsafe admission requires stable file extent/content and excludes
-            // aliases. Mapping length is representable; OS validates mapping admission.
             if writable {
                 owner.write = Some(unsafe { options.map_mut(file)? });
             } else {

@@ -45,12 +45,10 @@ pub unsafe extern "C" fn re_gmap_create(path: *const core::ffi::c_char, reserved
     if path.is_null() || out_owner.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: caller promises a live NUL-terminated string.
     let text = match unsafe { core::ffi::CStr::from_ptr(path) }.to_str() {
         Ok(text) => text,
         Err(_) => return GMAP_INVALID,
     };
-    // SAFETY: the caller accepts the writer-exclusion contract documented in the header.
     match unsafe { GrowableMappedFile::create(text, reserved as u64, committed as u64) } {
         Ok(owner) => {
             unsafe { *out_owner = Box::into_raw(Box::new(owner)) };
@@ -72,12 +70,10 @@ pub unsafe extern "C" fn re_gmap_open(path: *const core::ffi::c_char, reserved: 
     if path.is_null() || out_owner.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: caller promises a live NUL-terminated string.
     let text = match unsafe { core::ffi::CStr::from_ptr(path) }.to_str() {
         Ok(text) => text,
         Err(_) => return GMAP_INVALID,
     };
-    // SAFETY: the caller accepts the writer-exclusion contract documented in the header.
     match unsafe { GrowableMappedFile::open(text, reserved as u64, committed as u64) } {
         Ok(owner) => {
             unsafe { *out_owner = Box::into_raw(Box::new(owner)) };
@@ -92,7 +88,6 @@ pub unsafe extern "C" fn re_gmap_open(path: *const core::ffi::c_char, reserved: 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn re_gmap_drop(owner: *mut GrowableMappedFile) {
     if !owner.is_null() {
-        // SAFETY: caller guarantees a live owner and no further use.
         drop(unsafe { Box::from_raw(owner) });
     }
 }
@@ -140,7 +135,6 @@ pub unsafe extern "C" fn re_gmap_allocated_bytes(owner: *const GrowableMappedFil
     if owner.is_null() || out_allocated.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: live owner per the caller.
     match unsafe { (&*owner).allocated_bytes() } {
         Ok(bytes) => {
             unsafe { *out_allocated = bytes };
@@ -161,17 +155,13 @@ pub unsafe extern "C" fn re_gmap_read(owner: *const GrowableMappedFile, offset: 
         return GMAP_INVALID;
     }
     unsafe { *out_truncated = false };
-    // The destination is checked BEFORE the view is touched, so a refusal never
-    // half-fills the caller's buffer.
     if length > capacity {
         unsafe { *out_truncated = true };
         return GMAP_TRUNCATED;
     }
-    // SAFETY: live owner per the caller.
     match unsafe { (&*owner).read(offset, length) } {
         Ok(bytes) => {
             if !bytes.is_empty() {
-                // SAFETY: dest holds `capacity >= length` bytes and cannot alias the mapping.
                 unsafe { core::ptr::copy_nonoverlapping(bytes.as_ptr(), dest, bytes.len()) };
             }
             GMAP_OK
@@ -189,9 +179,7 @@ pub unsafe extern "C" fn re_gmap_write(owner: *mut GrowableMappedFile, offset: u
     if owner.is_null() || source.is_null() || length > isize::MAX as usize {
         return GMAP_INVALID;
     }
-    // SAFETY: caller guarantees a readable span of `length` bytes.
     let input = unsafe { core::slice::from_raw_parts(source, length) };
-    // SAFETY: live owner, exclusively borrowed for this call.
     match unsafe { (&mut *owner).write(offset, input) } {
         Ok(()) => GMAP_OK,
         Err(error) => status(error),
@@ -227,7 +215,6 @@ pub unsafe extern "C" fn re_gmap_grow_to(owner: *mut GrowableMappedFile, length:
     if owner.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed.
     match unsafe { (&mut *owner).grow_to(length as u64) } {
         Ok(()) => GMAP_OK,
         Err(error) => status(error),
@@ -241,7 +228,6 @@ pub unsafe extern "C" fn re_gmap_flush(owner: *mut GrowableMappedFile) -> u32 {
     if owner.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed.
     match unsafe { (&*owner).flush() } {
         Ok(()) => GMAP_OK,
         Err(error) => status(error),
@@ -255,7 +241,6 @@ pub unsafe extern "C" fn re_gmap_sync(owner: *mut GrowableMappedFile) -> u32 {
     if owner.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed.
     match unsafe { (&*owner).sync() } {
         Ok(()) => GMAP_OK,
         Err(error) => status(error),
@@ -269,7 +254,6 @@ pub unsafe extern "C" fn re_gmap_close(owner: *mut GrowableMappedFile) -> u32 {
     if owner.is_null() {
         return GMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed; the caller drops outstanding borrows.
     unsafe { (&mut *owner).close() };
     GMAP_OK
 }
@@ -284,7 +268,6 @@ pub unsafe extern "C" fn re_gmap_to_string(owner: *const GrowableMappedFile, des
         return GMAP_INVALID;
     }
     let mut truncated = false;
-    // SAFETY: caller guarantees a writable span of `capacity` bytes.
     let span = unsafe { core::slice::from_raw_parts_mut(dest, capacity) };
     let ok = unsafe { (&*owner).to_string(span, &mut truncated) };
     unsafe { *out_truncated = truncated };

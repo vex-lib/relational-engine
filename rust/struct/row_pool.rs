@@ -35,8 +35,6 @@ impl RowPool {
         RowChunk::geometry(size, alignment, capacity)?;
         let owner = NEXT_OWNER.load(Ordering::Relaxed);
         let next = owner.checked_add(1).ok_or(StorageError::Capacity)?;
-        // One attempt, never a retry/wait loop. Racing cold constructions may reject
-        // with Capacity; the host retries under its serialization domain.
         NEXT_OWNER.compare_exchange(owner, next, Ordering::Relaxed, Ordering::Relaxed)
             .map_err(|_| StorageError::Capacity)?;
         Ok(Self { chunks: Vec::new(), row_size: size, alignment, rows_per_chunk: capacity, len: 0, owner })

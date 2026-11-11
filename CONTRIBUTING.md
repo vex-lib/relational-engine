@@ -18,7 +18,7 @@ Public scratchpad code is not battle-tested readiness. Owner tests live in the
 workspace `../../tests/relational-engine` tree; generated binaries,
 Cargo target output and IDE state stay ignored.
 
-This repository belongs to [vexgraph-ecosystem](https://github.com/vexgraph-ecosystem/relational-engine)
+This repository belongs to [vex-lib](https://github.com/vex-lib/relational-engine)
 at R2 with workspace path ``. Vexspoke
 owns CPU computation/behavior; this engine owns memory/storage and native C
 search. Production native IO/NIO and default Memory implementation have migrated

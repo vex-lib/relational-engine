@@ -43,7 +43,6 @@ fn geometry_bitmap_reuse_and_lifetime() {
         assert_eq!(chunk.add(Row(999)), Ok(hole));
         for (index, pointer) in pointers.iter().copied().enumerate() {
             assert_eq!(chunk.get(index).unwrap() as *const Row, pointer);
-            // No dereference of a freed pointer: this is the currently live slot.
             assert_eq!(chunk.get(index).unwrap().0, if index == hole { 999 } else { index as u64 });
         }
         chunk.get_mut(hole).unwrap().0 = 1000;
@@ -66,7 +65,7 @@ fn geometry_bitmap_reuse_and_lifetime() {
         assert_eq!(chunk.add(Tracked(drops.clone())), Err(StorageError::Capacity));
         assert_eq!(drops.get(), 1);
         let value = chunk.remove(0).unwrap();
-        assert_eq!(drops.get(), 1); // Removal transfers, does not destroy.
+        assert_eq!(drops.get(), 1);
         drop(value);
         assert_eq!(drops.get(), 2);
         chunk.add(Tracked(drops.clone())).unwrap();
@@ -83,7 +82,6 @@ fn each_allocation_stage_rejects_and_recovers() {
         faults::reset();
         assert!(matches!(rejected, Err(StorageError::Allocation)));
         let mut chunk = TypedChunk::<u64>::new(65).unwrap();
-        // Admitted storage never allocates on add/remove/reuse/get.
         faults::fail_after(0);
         let first = chunk.add(3);
         let removed = chunk.remove(0);
@@ -105,12 +103,12 @@ fn handles_reject_stale_generations() {
     let first = chunk.add_handle(10).unwrap();
     assert_eq!(chunk.get_handle(first), Some(&10));
     assert_eq!(chunk.remove_handle(first), Ok(10));
-    assert!(chunk.get_handle(first).is_none()); // stale: the slot was removed
+    assert!(chunk.get_handle(first).is_none());
     assert!(matches!(chunk.remove_handle(first), Err(StorageError::Bounds)));
-    let reused = chunk.add_handle(20).unwrap(); // same slot, new generation
+    let reused = chunk.add_handle(20).unwrap();
     assert_eq!(reused.index(), first.index());
     assert_ne!(reused.generation(), first.generation());
-    assert!(chunk.get_handle(first).is_none()); // the old handle stays stale
+    assert!(chunk.get_handle(first).is_none());
     assert_eq!(chunk.get_handle(reused), Some(&20));
     *chunk.get_handle_mut(reused).unwrap() = 21;
     assert_eq!(chunk.get_handle(reused), Some(&21));
@@ -129,11 +127,11 @@ fn zero_and_generation_exhaustion_never_name_live_rows() {
     assert!(chunk.get_handle(Handle::zero()).is_none());
     assert!(chunk.get_handle_mut(Handle::zero()).is_none());
     assert_eq!(chunk.remove_handle(Handle::zero()), Err(StorageError::Bounds));
-    assert_eq!(chunk.remove(first.index()), Ok(1)); // raw removal invalidates handles too
+    assert_eq!(chunk.remove(first.index()), Ok(1));
     let last = chunk.add_handle(2).unwrap();
     assert_eq!(last.generation(), 2);
     assert_eq!(chunk.remove_handle(last), Ok(2));
-    assert_eq!(chunk.generation_at(first.index()), 0); // permanent retirement
+    assert_eq!(chunk.generation_at(first.index()), 0);
     let other = chunk.add_handle(3).unwrap();
     assert_ne!(other.index(), first.index());
     assert!(chunk.get_handle(first).is_none() && chunk.get_handle(last).is_none());

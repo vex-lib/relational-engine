@@ -1,7 +1,7 @@
 # relational-engine
 R2 memory/storage owner with Rust-owned spans and native C search.
 
-**Ecosystem repository:** https://github.com/vexgraph-ecosystem/relational-engine
+**Ecosystem repository:** https://github.com/vex-lib/relational-engine
 The local checkout is `vex/re`; its physical location does not change its R2
 rank. This is a partial backend, not a finished engine.
 
@@ -24,9 +24,7 @@ published; everything that resolves a path uses `re`.
 
 **Implemented and proven (macOS arm64):**
 - Migrated production native C IO/NIO: `Memory`/`MemoryArena`/`Transient` (32-byte
-  header arena, 32-byte payload floor) and `File`/`Cache`/`Log`/`VexHome`/`ProcessSpawn` plus a bounded
-  caller-fed `FrameInbox` (not a WebSocket client) and
-  the macOS clipboard adapter.
+  header arena, 32-byte payload floor) and `File`/`Log` plus the macOS clipboard adapter.
 - Rust `primitives` byte/string with atomic byte and retained immutable string
   snapshots over a standalone C ABI; stable `Chunk`/`ChunkedList`,
   `TypedChunk`/`TypedPool`, and a 32-byte `repr(C)` `VariableSlot` +
@@ -60,7 +58,7 @@ manifest-backed persistence (discussion, not implemented durable snapshots or
 concurrent writes); live Hotcwap reload integration.
 
 **Platforms proven:** macOS arm64 only; Windows is unproven. Rust sanitizer
-instrumentation is not claimed. `src/relational` and `src/reflection` remain
+instrumentation is not claimed. `substrate/` and `src/reflection` remain
 imported C comparison material, not production.
 
 **Evidence:** `../../../tests/relational-engine/{native_run.py,rust/run.py}` and
@@ -91,7 +89,7 @@ atomic-layout compatibility or automatic record-schema migration is assumed.
 This is a boundary decision, not a taste one — and it is the question every reader
 asks, so it is answered here once.
 
-**The ABI is already C, and it is wide.** `Memory_*`, `File`, `VexHome`, the 32-byte
+**The ABI is already C, and it is wide.** `Memory_*`, `File`, the 32-byte
 block header, the project-scoped type algebra and the legacy per-project type ids are
 consumed by *every* tier: R1 `hotcwap`, the R3 drivers, R4 interfaces and R5 apps all
 link the C ABI. The constitution is explicit that native allocation semantics and the
@@ -161,7 +159,7 @@ files remain comparison material; migrated native IO/NIO is production code.
 - `src/nio`, `src/io`: migrated production native C allocation, scratch, filesystem,
   cache, logging and bounded transport/job APIs. The macOS clipboard adapter is
   engine-owned too. Vexspoke supplies CPU-only spin/crypto/annotation/type contracts.
-- `src/relational`, `src/reflection`: preserved C comparison material, never part
+- `substrate/`, `src/reflection`: preserved C comparison material, never part
   of the production native target or a source of shadow consumer headers.
 - `rust`: Cargo-recognized Rust scratchpad for the future storage manager.
   A learning backend now owns byte blocks and exposes a standalone C copy ABI;
@@ -321,7 +319,7 @@ shared type-id algebra. It is a backend, not a host or a driver.
 - No GPU work: shaders, dispatch, capabilities and synchronization are Graphvex R3.
 - No host/supervisor role: R1 `hotcwap` owns lifetimes/residency and excludes
   active users before destruction.
-- Imported `src/relational` and `src/reflection` are comparison material, never
+- Imported `substrate/` and `src/reflection` are comparison material, never
   part of the production native target.
 
 **Known limits and gaps:**

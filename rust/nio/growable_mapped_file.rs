@@ -63,16 +63,11 @@ impl GrowableMappedFile {
             .read(true)
             .write(true)
             .open(path.as_ref())?;
-        // Reserve real blocks for the initial committed region first, then set the
-        // logical extent to the whole reservation: the mapping must cover the
-        // reservation, and the region past `committed` must stay unallocated so
-        // creation stays cheap and growth stays meaningful.
         if committed > 0 {
             preallocation::reserve(&file, committed).map_err(MappingError::Preallocation)?;
         }
         preallocation::set_length(&file, reserved).map_err(MappingError::Preallocation)?;
         let length = usize::try_from(reserved).map_err(|_| MappingError::Length)?;
-        // SAFETY: caller supplied the exclusion contract; the file is live and writable.
         let write = unsafe { MmapOptions::new().len(length).map_mut(&file)? };
         Ok(Self {
             write: Some(write),
@@ -110,7 +105,6 @@ impl GrowableMappedFile {
         if file.metadata()?.len() < reserved {
             return Err(MappingError::Bounds);
         }
-        // Never publish a committed region the filesystem cannot actually back.
         let allocated = preallocation::allocated_bytes(&file).map_err(MappingError::Preallocation)?;
         if allocated < committed {
             return Err(MappingError::Preallocation(PreallocationError::Incomplete {
@@ -119,7 +113,6 @@ impl GrowableMappedFile {
             }));
         }
         let length = usize::try_from(reserved).map_err(|_| MappingError::Length)?;
-        // SAFETY: caller supplied the exclusion contract; the file is live and writable.
         let write = unsafe { MmapOptions::new().len(length).map_mut(&file)? };
         Ok(Self {
             write: Some(write),
@@ -201,17 +194,11 @@ impl GrowableMappedFile {
         if target == self.committed {
             return Ok(());
         }
-        // Growth is free when the blocks are already there, which is the reopened
-        // case: opening a store and raising the extent back to what the file already
-        // holds must not reserve a second copy past the physical end. The check is on
-        // OBSERVED allocation, never on the request.
         let already = preallocation::allocated_bytes(file).map_err(MappingError::Preallocation)?;
         if already >= target as u64 {
             self.committed = target;
             return Ok(());
         }
-        // Allocate before publishing: reserve the step, then verify the filesystem
-        // really holds that many bytes rather than taking the request on faith.
         preallocation::reserve_more(file, (target - self.committed) as u64)
             .map_err(MappingError::Preallocation)?;
         let allocated = preallocation::allocated_bytes(file).map_err(MappingError::Preallocation)?;

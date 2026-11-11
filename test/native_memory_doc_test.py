@@ -21,8 +21,8 @@ class NativeMemoryDocumentation(unittest.TestCase):
         reset = source.split("static void arena_freeAll(", 1)[1].split(
             "static MemoryArena *arena_for(", 1)[0]
         self.assertIn("memset((*a).bumpArena, 0, (*a).bumpOffset)", reset)
-        enumerate_blocks = source.split("size_t MemoryArena_findAll(", 1)[1].split(
-            "size_t MemoryArena_activeBytes(", 1)[0]
+        enumerate_blocks = source.split("bytes MemoryArena_findAll(", 1)[1].split(
+            "bytes MemoryArena_activeBytes(", 1)[0]
         self.assertIn("(*a).slabs[s]", enumerate_blocks)
         self.assertIn("offset < (*a).bumpOffset", enumerate_blocks)
         self.assertIn("count < maxCount", enumerate_blocks)

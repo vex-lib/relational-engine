@@ -35,7 +35,7 @@ fn slot_layout_and_names() {
     slot.set_pointer(std::ptr::null());
     assert!(slot.get_pointer().is_null());
     let opaque = std::ptr::without_provenance::<u8>(1);
-    slot.set_pointer(opaque); // Stored, not dereferenced or claimed valid.
+    slot.set_pointer(opaque);
     assert_eq!(slot.get_pointer(), opaque);
     assert!(VariableSlot!(b"a").unwrap().get_pointer().is_null());
     assert!(VariableSlot::zero().is_empty());

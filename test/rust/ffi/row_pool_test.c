@@ -3,17 +3,17 @@
  * growth and reclaim stability, a named-registry binding, and reverse borrower /
  * storage teardown. No unsafe stale-pointer dereferences or concurrent mutation.
  * This is a consumer seam, NOT proof of any R3-R5 application or live Hot loader. */
-#include "nio/relational_rows.h"
+#include "relational_engine/row_pool.h"
 #include "relational_engine/variable_registry.h"
 #include <assert.h>
 #include <stdalign.h>
 #include <string.h>
-#include <stdint.h>
+#include "vex.h"
 
 /* Plain C record stored as initialized bytes, never as a Rust object. */
 typedef struct ExampleRow {
-    uint64_t value;
-    uint64_t revision;
+    u64 value;
+    u64 revision;
 } ExampleRow;
 
 /* Proves the C handle matches Rust's target ABI and cannot hide uninitialized padding. */
@@ -36,7 +36,7 @@ static void geometry_rejections(void) {
     assert(re_rows_new(8, 8, SIZE_MAX, &pool) == 1 && pool == nullptr);
     assert(re_rows_new(8, 8, 1, nullptr) == 1);
     assert(ReRowPool_3(8, 8, &pool) == 0);
-    size_t size = 0, alignment = 0, capacity = 0;
+    bytes size = 0, alignment = 0, capacity = 0;
     assert(re_rows_geometry(pool, &size, &alignment, &capacity) == 0);
     assert(size == 8 && alignment == 8 && capacity == RE_ROWS_PER_CHUNK_DEFAULT);
     re_rows_drop(pool);
@@ -57,34 +57,34 @@ static void storage_contract(void) {
     assert(ReRowPool(sizeof(ExampleRow), 256, 2, &other) == 0);
     ExampleRow input = {42, 1}, output = {99, 99};
     ReRowHandle first = ReRowHandle_zero(), foreign = ReRowHandle_zero();
-    assert(re_rows_add(pool, (const uint8_t*) &input, sizeof(input), &first) == 0);
+    assert(re_rows_add(pool, (const u8*) &input, sizeof(input), &first) == 0);
     assert(first.owner != 0 && first.generation != 0 && first.reserved == 0);
-    assert(re_rows_add(other, (const uint8_t*) &input, sizeof(input), &foreign) == 0);
-    input.value = 7; /* Original source is not retained. */
+    assert(re_rows_add(other, (const u8*) &input, sizeof(input), &foreign) == 0);
+    input.value = 7;
     bool cut = true;
-    assert(re_rows_read(pool, first, (uint8_t*) &output, sizeof(output), &cut) == 0);
+    assert(re_rows_read(pool, first, (u8*) &output, sizeof(output), &cut) == 0);
     assert(!cut && output.value == 42 && output.revision == 1);
-    const uint8_t *borrowed = nullptr;
+    const u8 *borrowed = nullptr;
     assert(re_rows_borrow(pool, first, &borrowed) == 0);
     assert((uintptr_t) borrowed % 256 == 0);
-    const uint8_t *original = borrowed;
+    const u8 *original = borrowed;
     ReRowHandle saved = first;
-    assert(re_rows_add(nullptr, (const uint8_t*) &input, sizeof(input), &saved) == 1);
+    assert(re_rows_add(nullptr, (const u8*) &input, sizeof(input), &saved) == 1);
     assert(re_rows_add(pool, nullptr, sizeof(input), &saved) == 1);
-    assert(re_rows_add(pool, (const uint8_t*) &input, SIZE_MAX, &saved) == 1);
-    assert(re_rows_add(pool, (const uint8_t*) &input, 0, &saved) == 1);
-    assert(re_rows_add(pool, (const uint8_t*) &input, sizeof(input), nullptr) == 1);
+    assert(re_rows_add(pool, (const u8*) &input, SIZE_MAX, &saved) == 1);
+    assert(re_rows_add(pool, (const u8*) &input, 0, &saved) == 1);
+    assert(re_rows_add(pool, (const u8*) &input, sizeof(input), nullptr) == 1);
     assert(memcmp(&saved, &first, sizeof(first)) == 0);
-    assert(re_rows_read(nullptr, first, (uint8_t*) &output, sizeof(output), &cut) == 1);
+    assert(re_rows_read(nullptr, first, (u8*) &output, sizeof(output), &cut) == 1);
     assert(re_rows_read(pool, first, nullptr, sizeof(output), &cut) == 1);
-    assert(re_rows_read(pool, first, (uint8_t*) &output, SIZE_MAX, &cut) == 1);
-    assert(re_rows_read(pool, first, (uint8_t*) &output, sizeof(output), nullptr) == 1);
+    assert(re_rows_read(pool, first, (u8*) &output, SIZE_MAX, &cut) == 1);
+    assert(re_rows_read(pool, first, (u8*) &output, sizeof(output), nullptr) == 1);
     output.value = 99;
     cut = false;
-    assert(re_rows_read(pool, first, (uint8_t*) &output, sizeof(output) - 1, &cut) == 4);
+    assert(re_rows_read(pool, first, (u8*) &output, sizeof(output) - 1, &cut) == 4);
     assert(cut && output.value == 99);
     assert(re_rows_read(pool, first, nullptr, 0, &cut) == 4 && cut);
-    assert(re_rows_read(pool, foreign, (uint8_t*) &output, sizeof(output), &cut) == 3);
+    assert(re_rows_read(pool, foreign, (u8*) &output, sizeof(output), &cut) == 3);
     assert(output.value == 99);
     ReRowHandle bad = first;
     bad.reserved = 1;
@@ -95,14 +95,14 @@ static void storage_contract(void) {
     bad = ReRowHandle_zero();
     assert(re_rows_remove(pool, bad) == 3);
     assert(re_rows_remove(nullptr, first) == 1);
-    assert(re_rows_write(nullptr, first, (const uint8_t*) &input, sizeof(input)) == 1);
+    assert(re_rows_write(nullptr, first, (const u8*) &input, sizeof(input)) == 1);
     assert(re_rows_write(pool, first, nullptr, sizeof(input)) == 1);
-    assert(re_rows_write(pool, first, (const uint8_t*) &input, sizeof(input) - 1) == 1);
-    assert(re_rows_write(pool, foreign, (const uint8_t*) &input, sizeof(input)) == 3);
-    assert(re_rows_write(pool, first, (const uint8_t*) &input, sizeof(input)) == 0);
+    assert(re_rows_write(pool, first, (const u8*) &input, sizeof(input) - 1) == 1);
+    assert(re_rows_write(pool, foreign, (const u8*) &input, sizeof(input)) == 3);
+    assert(re_rows_write(pool, first, (const u8*) &input, sizeof(input)) == 0);
     assert(re_rows_borrow(nullptr, first, &borrowed) == 1);
     assert(re_rows_borrow(pool, first, nullptr) == 1);
-    size_t count = 99, released = 99, size = 99, alignment = 99, capacity = 99;
+    bytes count = 99, released = 99, size = 99, alignment = 99, capacity = 99;
     assert(re_rows_len(nullptr, &count) == 1 && count == 99);
     assert(re_rows_len(pool, nullptr) == 1);
     assert(re_rows_geometry(nullptr, &size, &alignment, &capacity) == 1 && size == 99);
@@ -113,9 +113,9 @@ static void storage_contract(void) {
     assert(re_rows_release_empty(pool, nullptr) == 1);
     assert(re_rows_geometry(pool, &size, &alignment, &capacity) == 0);
     assert(size == sizeof(input) && alignment == 256 && capacity == 2);
-    ReRowHandle handles[1025]; /* Named test workload, not a production capacity ceiling. */
-    for (size_t i = 0; i < 1025; ++i)
-        assert(re_rows_add(pool, (const uint8_t*) &input, sizeof(input), &handles[i]) == 0);
+    ReRowHandle handles[1025];
+    for (bytes i = 0; i < 1025; ++i)
+        assert(re_rows_add(pool, (const u8*) &input, sizeof(input), &handles[i]) == 0);
     assert(re_rows_borrow(pool, first, &borrowed) == 0 && borrowed == original);
     assert(re_rows_len(pool, &count) == 0 && count == 1026);
     assert(re_rows_release_empty(pool, &released) == 0 && released == 0);
@@ -132,38 +132,37 @@ static void storage_contract(void) {
     assert(re_rows_to_string_struct(pool, text, SIZE_MAX, &cut) == 1);
     assert(re_rows_to_string(pool, text, sizeof(text), nullptr) == 1);
     assert(re_rows_to_string_struct(pool, text, sizeof(text), nullptr) == 1);
-    for (size_t i = 0; i < 1025; ++i)
+    for (bytes i = 0; i < 1025; ++i)
         assert(re_rows_remove(pool, handles[i]) == 0);
     assert(re_rows_remove(pool, first) == 0);
     assert(re_rows_remove(pool, first) == 3);
     assert(re_rows_release_empty(pool, &released) == 0 && released == 513);
     assert(re_rows_release_empty(pool, &released) == 0 && released == 0);
     ReRowHandle fresh;
-    assert(re_rows_add(pool, (const uint8_t*) &input, sizeof(input), &fresh) == 0);
+    assert(re_rows_add(pool, (const u8*) &input, sizeof(input), &fresh) == 0);
     assert(fresh.index == first.index && fresh.generation != first.generation);
-    assert(re_rows_read(pool, first, (uint8_t*) &output, sizeof(output), &cut) == 3);
-    assert(re_rows_write(pool, first, (const uint8_t*) &input, sizeof(input)) == 3);
+    assert(re_rows_read(pool, first, (u8*) &output, sizeof(output), &cut) == 3);
+    assert(re_rows_write(pool, first, (const u8*) &input, sizeof(input)) == 3);
     assert(re_rows_borrow(pool, first, &borrowed) == 3);
-    /* C named binding consumes actual Rust-owned row bytes. Detach borrower first. */
     ReVariableRegistry *names = nullptr;
     assert(re_variables_new(2, &names) == 0);
     assert(re_rows_borrow(pool, fresh, &borrowed) == 0);
-    size_t index = 99;
-    assert(re_variables_add(names, (const uint8_t*) "health", 6, borrowed, &index) == 0);
-    assert(re_variables_find(names, (const uint8_t*) "health", 6, &index) == 0);
+    bytes index = 99;
+    assert(re_variables_add(names, (const u8*) "health", 6, borrowed, &index) == 0);
+    assert(re_variables_find(names, (const u8*) "health", 6, &index) == 0);
     const ReVariableSlot *slot = nullptr;
     assert(re_variables_slot(names, index, &slot) == 0);
     assert((*slot).pointer == borrowed);
     memcpy(&output, (*slot).pointer, sizeof(output));
     assert(output.value == input.value);
-    re_variables_drop(names); /* all borrowers detach before Rust storage drop */
-    uint64_t old_owner = fresh.owner;
+    re_variables_drop(names);
+    u64 old_owner = fresh.owner;
     re_rows_drop(pool);
     pool = nullptr;
     assert(ReRowPool(sizeof(input), 256, 2, &pool) == 0);
-    assert(re_rows_add(pool, (const uint8_t*) &input, sizeof(input), &fresh) == 0);
+    assert(re_rows_add(pool, (const u8*) &input, sizeof(input), &fresh) == 0);
     assert(fresh.owner != old_owner);
-    assert(re_rows_remove(pool, saved) == 3); /* dead-owner identity, not a stale owner pointer */
+    assert(re_rows_remove(pool, saved) == 3);
     re_rows_drop(pool);
     re_rows_drop(other);
 }

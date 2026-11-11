@@ -1,12 +1,10 @@
 #include "nio/mem.h"
 // Production R2 storage owner: Relational Engine. Memory_* ABI is preserved;
 // this native allocator is not the separate Rust byte/string learning API.
-#include "util/annotation.h"
-#include "atomic/spin.h"
-#include "util/throw.h"
+#include "atomic/atomic.h"
+#include "debug/throw.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "vex.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,10 +41,10 @@
  * STRUCT FIELDS (Mirroring nio/mem.h + local to this file):
  * ----------------------------------------------------------------------------
  *   MemoryHeader {
- *     uint64_t typeId;  // triple-sugar self-describe id (BE6C sugar inside)
- *     uint64_t hash;    // recomputed veto over (typeId, length, pointer)
- *     uint64_t length;  // payload byte count
- *     uint64_t pointer; // redirect: the object's address, or a primitive's value
+ *     u64 typeId;  // triple-sugar self-describe id (BE6C sugar inside)
+ *     u64 hash;    // recomputed veto over (typeId, length, pointer)
+ *     u64 length;  // payload byte count
+ *     u64 pointer; // redirect: the object's address, or a primitive's value
  *   }
  *   Zones: identity (id+length+pointer, stated), provenance (hash veto +
  *   arena-range gate, no magic cookie), allocator (size class is a pure
@@ -54,21 +52,21 @@
  *   evolution is detected per object via length + refused at the manifest
  *   gate). The header is frozen at 32 Bytes, read backwards.
  *   SlabClass {
- *     uint32_t slot_size;        // Bytes per slot in this size class
- *     uint32_t capacity;         // total slots carved from the arena
- *     uint32_t count;            // live (checked-out) slots
- *     uint8_t *arena;            // backing store for this class
+ *     u32 slot_size;        // Bytes per slot in this size class
+ *     u32 capacity;         // total slots carved from the arena
+ *     u32 count;            // live (checked-out) slots
+ *     u8 *arena;            // backing store for this class
  *     FreeNode *free_head;       // lock-free recycled slot stack
  *     SpinLock lock;             // serializes alloc/free on this class
  *   }
  *   MemoryArena {
  *     SlabClass slabs[SLAB_COUNT]; // size-class slab table (64B..4K)
- *     uint8_t *masterArena;      // 32-aligned base the slabs are carved from
- *     uint8_t *masterRaw;        // allocation to release (rounded base +31)
- *     size_t masterCapacity;     // usable master bytes after the rounding
- *     uint8_t *bumpArena;        // large/allocation bump region
- *     size_t bumpCapacity;       // bump region capacity
- *     size_t bumpOffset;         // bump cursor (monotonic)
+ *     u8 *masterArena;      // 32-aligned base the slabs are carved from
+ *     u8 *masterRaw;        // allocation to release (rounded base +31)
+ *     bytes masterCapacity;     // usable master bytes after the rounding
+ *     u8 *bumpArena;        // large/allocation bump region
+ *     bytes bumpCapacity;       // bump region capacity
+ *     bytes bumpOffset;         // bump cursor (monotonic)
  *     SpinLock bumpLock;         // serializes bump allocation
  *     SpinLock initLock;         // serializes lazy arena init
  *     bool live;                 // arena ready flag
@@ -104,7 +102,7 @@
  *   header-plus-alignment arithmetic overflows, or that exceeds capacity, is
  *   refused LOUDLY once per epoch (THROW) and counted thereafter, without
  *   changing headers, generation or bump cursor. Initialization capacity must
- *   round to the 32-byte payload floor without size_t overflow.
+ *   round to the 32-byte payload floor without bytes overflow.
  *   - Memory_initTransient(capacity)
  *   - Transient_alloc(typeId, numBytes)
  *   - Transient_reset(void)
@@ -138,17 +136,20 @@
 #define MEMORY_ALIGN_MASK (MEMORY_PAYLOAD_ALIGN - 1u)
 
 /** Round a freshly allocated base forward to the payload floor. */
-static inline uint8_t *align_up(uint8_t *raw) {
-    return (uint8_t*) (((uintptr_t) raw + MEMORY_ALIGN_MASK) & ~(uintptr_t) MEMORY_ALIGN_MASK);
+static inline u8 *align_up(const u8 *raw) {
+    return (u8*) (((uintptr_t) raw + MEMORY_ALIGN_MASK) & ~(uintptr_t) MEMORY_ALIGN_MASK);
 }
 
-// Hash-clarification veto over the stated identity, fed little-endian (never
-// serialized, but explicit anyway). LSB forced so a stored hash is never 0:
-// cleared (zeroed) headers always fail verification with no special case.
-/** Compute the nonzero header veto word from type id, length and payload address. */
-static uint64_t header_hash(uint64_t typeId, uint64_t length, uint64_t pointer) {
-    uint64_t hash = 1469598103934665603ull;
-    const uint64_t words[3] = { typeId, length, pointer };
+
+/**
+ * Compute the nonzero header veto word from type id, length and payload address.
+ * Hash-clarification veto over the stated identity, fed little-endian (never
+ * serialized, but explicit anyway). LSB forced so a stored hash is never 0:
+ * cleared (zeroed) headers always fail verification with no special case.
+ */
+static u64 header_hash(u64 typeId, u64 length, u64 pointer) {
+    u64 hash = 1469598103934665603ull;
+    const u64 words[3] = { typeId, length, pointer };
     for (int w = 0; w < 3; w++) {
         for (int i = 0; i < 8; i++) {
             hash ^= (words[w] >> (i * 8)) & 0xFFull;
@@ -158,13 +159,14 @@ static uint64_t header_hash(uint64_t typeId, uint64_t length, uint64_t pointer) 
     return hash | 1ull;
 }
 
-/** Stamp a header: identity, length, the block's redirect, and the veto. */
-static void header_stamp(MemoryHeader *h, uint64_t typeId, size_t numBytes) {
+/** Stamp a header: identity, length, the block's redirect, and the veto.
+ * he redirect is the object's own address here; a primitive form redirects
+ * to its value cell instead, which the id's form bits decide (Type_isPrimitive).
+ */
+static void header_stamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
     (*h).typeId = typeId;
-    (*h).length = (uint64_t) numBytes;
-    // The redirect is the object's own address here; a primitive form redirects
-    // to its value cell instead, which the id's form bits decide (Type_isPrimitive).
-    (*h).pointer = (uint64_t) (uintptr_t) ((uint8_t*) h + sizeof(MemoryHeader));
+    (*h).length = (u64) numBytes;
+    (*h).pointer = (u64) (uintptr_t) ((u8*) h + sizeof(MemoryHeader));
     (*h).hash = header_hash((*h).typeId, (*h).length, (*h).pointer);
 }
 
@@ -184,34 +186,34 @@ typedef struct FreeNode {
 } FreeNode;
 
 typedef struct SlabClass {
-    uint32_t slot_size;
-    uint32_t capacity;
-    uint32_t count;
-    uint8_t *arena;
+    u32 slot_size;
+    u32 capacity;
+    u32 count;
+    u8 *arena;
     FreeNode *free_head;
     SpinLock lock;
 } SlabClass;
 
 struct MemoryArena {
     SlabClass slabs[SLAB_COUNT];
-    uint8_t *masterArena;      // 32-aligned base the slabs are carved from
-    uint8_t *masterRaw;        // allocation to release (may sit up to 31B below)
-    size_t masterCapacity;     // usable master bytes after the rounding
-    uint8_t *bumpArena;
-    size_t bumpCapacity;
-    size_t bumpOffset;
+    u8 *masterArena;      // 32-aligned base the slabs are carved from
+    u8 *masterRaw;        // allocation to release (may sit up to 31B below)
+    bytes masterCapacity;     // usable master bytes after the rounding
+    u8 *bumpArena;
+    bytes bumpCapacity;
+    bytes bumpOffset;
     SpinLock bumpLock;
     SpinLock initLock;
     bool live;
     // Exhaustion is LOUD but bounded: the first rejection in an epoch reports
     // through THROW and later ones only count, so a failing frame loop cannot
     // flood stderr. Both reset on init/freeAll (a fresh epoch).
-    uint64_t exhaustionCount;   // rejected requests since the last reset
+    u64 exhaustionCount;   // rejected requests since the last reset
     bool exhaustionReported;    // the epoch's one diagnostic was emitted
 };
 
-static uint32_t s_slabSizes[SLAB_COUNT] = { 64, 128, 256, 512, 1024, 2048, 4096 };
-static uint32_t s_slabCaps[SLAB_COUNT] = { 32768, 32768, 16384, 8192, 4096, 2048, 2048 };
+static u32 s_slabSizes[SLAB_COUNT] = { 64, 128, 256, 512, 1024, 2048, 4096 };
+static u32 s_slabCaps[SLAB_COUNT] = { 32768, 32768, 16384, 8192, 4096, 2048, 2048 };
 
 static MemoryArena s_default = {0};
 
@@ -222,8 +224,8 @@ static MemoryArena s_default = {0};
 // can never recurse into itself. Writes happen at init/create/destroy
 // (pre-threads); walks are lock-free reads.
 static MemoryArena **s_registry = nullptr;
-static size_t s_registryCount = 0;
-static size_t s_registryCap = 0;
+static bytes s_registryCount = 0;
+static bytes s_registryCap = 0;
 static SpinLock s_registryLock = SPIN_LOCK_INIT;
 
 // Append an arena pointer, growing the table exponentially. OOM returns false
@@ -231,7 +233,7 @@ static SpinLock s_registryLock = SPIN_LOCK_INIT;
 /** Append an arena to the global free-routing registry, growing the table on demand. */
 static bool registry_push(MemoryArena *a) {
     if (s_registryCount == s_registryCap) {
-        size_t newCap = (s_registryCap == 0) ? 8 : s_registryCap * 2;
+        bytes newCap = (s_registryCap == 0) ? 8 : s_registryCap * 2;
         MemoryArena **nb = (MemoryArena**) realloc(
             s_registry, newCap * sizeof(MemoryArena*));
         if (!nb) return false;
@@ -252,16 +254,16 @@ static bool registry_ensureDefault(void) {
 #define ANTI_TRANSIENT_DEFAULT_SIZE (64 * 1024 * 1024) // 64 MB
 
 typedef struct TransientArena {
-    uint8_t *buffer;    // 32-aligned scratch base
-    uint8_t *raw;       // allocation to release (buffer is rounded forward)
-    size_t capacity;
-    size_t bumpOffset;
-    uint32_t generation;
+    u8 *buffer;    // 32-aligned scratch base
+    u8 *raw;       // allocation to release (buffer is rounded forward)
+    bytes capacity;
+    bytes bumpOffset;
+    u32 generation;
     SpinLock lock;
     bool live;
     // Same bounded loudness as the permanent arenas: report the first scratch
     // rejection of an epoch, count the rest.
-    uint64_t exhaustionCount;
+    u64 exhaustionCount;
     bool exhaustionReported;
 } TransientArena;
 
@@ -276,8 +278,8 @@ static TransientArena s_transient = {
 
 
 /** Select the smallest slab class that can hold a header and payload, or -1 for bump storage. */
-static inline int find_slab(size_t payload_bytes) {
-    size_t needed = payload_bytes + sizeof(MemoryHeader);
+static inline int find_slab(bytes payload_bytes) {
+    bytes needed = payload_bytes + sizeof(MemoryHeader);
     if (needed <= 64)   return 0;
     if (needed <= 128)  return 1;
     if (needed <= 256)  return 2;
@@ -289,7 +291,7 @@ static inline int find_slab(size_t payload_bytes) {
 }
 
 /** Initialize a slab descriptor from its fixed class-size and capacity tables. */
-static void slab_template(SlabClass *slab, uint32_t idx) {
+static void slab_template(SlabClass *slab, u32 idx) {
     (*slab).slot_size = s_slabSizes[idx];
     (*slab).capacity = s_slabCaps[idx];
     (*slab).count = 0;
@@ -299,31 +301,29 @@ static void slab_template(SlabClass *slab, uint32_t idx) {
 }
 
 /** Allocate and partition an arena into initialized slab freelists and a bump region. */
-static bool arena_init(MemoryArena *a, size_t totalBytes) {
+static bool arena_init(MemoryArena *a, bytes totalBytes) {
     if (!a)
         return false;
-    for (size_t s = 0; s < SLAB_COUNT; s++)
-        slab_template(&(*a).slabs[s], (uint32_t) s);
+    for (bytes s = 0; s < SLAB_COUNT; s++)
+        slab_template(&(*a).slabs[s], (u32) s);
     (*a).initLock = SPIN_LOCK_INIT;
     (*a).bumpLock = SPIN_LOCK_INIT;
     (*a).live = false;
 
-    size_t cap = totalBytes > 0 ? totalBytes : ANTI_ARENA_DEFAULT_SIZE;
+    bytes cap = totalBytes > 0 ? totalBytes : ANTI_ARENA_DEFAULT_SIZE;
     if (cap > SIZE_MAX - (MEMORY_ALIGN_MASK + MEMORY_PAYLOAD_ALIGN))
         return false;
-    size_t alignedCap = (cap + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
-    // Over-allocate one alignment unit so the base can be rounded forward; the
-    // raw pointer is what release frees, the rounded one is the arena origin.
-    uint8_t *raw = (uint8_t*) malloc(alignedCap + MEMORY_PAYLOAD_ALIGN);
+    bytes alignedCap = (cap + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
+    u8 *raw = (u8*) malloc(alignedCap + MEMORY_PAYLOAD_ALIGN);
     if (!raw)
         return false;
-    uint8_t *master = align_up(raw);
+    u8 *master = align_up(raw);
 
-    uint8_t *cur = master;
-    size_t left = alignedCap;
-    for (size_t s = 0; s < SLAB_COUNT; s++) {
+    u8 *cur = master;
+    bytes left = alignedCap;
+    for (bytes s = 0; s < SLAB_COUNT; s++) {
         SlabClass *slab = &(*a).slabs[s];
-        size_t need = (size_t)(*slab).capacity * (*slab).slot_size;
+        bytes need = (bytes)(*slab).capacity * (*slab).slot_size;
         if (need > left) {
             free(raw);
             return false;
@@ -331,9 +331,9 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
         (*slab).arena = cur;
         (*slab).free_head = nullptr;
         (*slab).count = 0;
-        uint32_t sz = (*slab).slot_size;
-        for (size_t i = (*slab).capacity; i > 0; i--) {
-            uint8_t *slot_ptr = (*slab).arena + (i - 1) * sz;
+        u32 sz = (*slab).slot_size;
+        for (bytes i = (*slab).capacity; i > 0; i--) {
+            u8 *slot_ptr = (*slab).arena + (i - 1) * sz;
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
             memset(h, 0, sizeof(MemoryHeader));
             FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
@@ -358,12 +358,10 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
 
 /** Allocate from owner storage only; exhaustion is reported loudly, once per epoch. */
 ;;INTENTION("exhaustion is a cold, terminal detection reached from a hot allocator: it reports once per epoch (never per call) and counts the rest, so the Cold-Strict hot-minimal contract holds for the success path while a failure can never be silent -- the Exhaustion Loudness Law's hot-path clause under the Conflict Triage Law")
-static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
+static void *arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
     if (!a || !(*a).live)
         return nullptr;
     if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
-        // A size whose header-plus-alignment arithmetic overflows is a refusal,
-        // not a silent no-op.
         (*a).exhaustionCount++;
         if (!(*a).exhaustionReported) {
             (*a).exhaustionReported = true;
@@ -384,18 +382,18 @@ static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
         SpinLock_unlock(&(*slab).lock);
 
         if (node) {
-            MemoryHeader *h = (MemoryHeader*) ((uint8_t*) node - sizeof(MemoryHeader));
+            MemoryHeader *h = (MemoryHeader*) ((u8*) node - sizeof(MemoryHeader));
             header_stamp(h, typeId, numBytes);
             return (void*) node;
         }
     }
 
-    size_t aligned_len = (numBytes + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
-    size_t total = sizeof(MemoryHeader) + aligned_len;
+    bytes aligned_len = (numBytes + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
+    bytes total = sizeof(MemoryHeader) + aligned_len;
 
     SpinLock_lock(&(*a).bumpLock);
     if ((*a).bumpOffset + total <= (*a).bumpCapacity) {
-        uint8_t *slot_ptr = (*a).bumpArena + (*a).bumpOffset;
+        u8 *slot_ptr = (*a).bumpArena + (*a).bumpOffset;
         (*a).bumpOffset += total;
         SpinLock_unlock(&(*a).bumpLock);
 
@@ -405,8 +403,6 @@ static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
     }
     SpinLock_unlock(&(*a).bumpLock);
 
-    // The arena is exhausted: no slab slot and no bump room. Report once with
-    // the quantity needed, then count every further rejection.
     (*a).exhaustionCount++;
     if (!(*a).exhaustionReported) {
         (*a).exhaustionReported = true;
@@ -425,31 +421,23 @@ static void arena_free(MemoryArena *a, void *userPtr) {
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return;
 
-    // Validate the pointer is within this arena's known address range before
-    // performing the negative-offset header read.  MemoryArena_free calls us
-    // directly (bypassing safe_header / arena_for), so a foreign pointer that
-    // happens to be aligned would otherwise blindly dereference p-32, which
-    // can SIGSEGV when those Bytes are in an unmapped page.
-    uint8_t *p = (uint8_t*) userPtr;
+    u8 *p = (u8*) userPtr;
     bool in_range = false;
     if ((*a).masterArena && p >= (*a).masterArena + sizeof(MemoryHeader) && p < (*a).masterArena + (*a).masterCapacity)
         in_range = true;
     if (!in_range) {
-        // Foreign storage is not ours to inspect or release.
         return;
     }
 
-    MemoryHeader *h = (MemoryHeader*) ((uint8_t*) userPtr - sizeof(MemoryHeader));
+    MemoryHeader *h = (MemoryHeader*) ((u8*) userPtr - sizeof(MemoryHeader));
     if (!header_valid(h))
         return;
 
-    // Provenance is physical: small spill blocks belong to the bump region,
-    // never a slab list. Recycling them into a slab corrupts counts/enum/reset.
     SlabClass *slab = nullptr;
-    for (size_t s = 0; s < SLAB_COUNT; s++) {
+    for (bytes s = 0; s < SLAB_COUNT; s++) {
         SlabClass *candidate = &(*a).slabs[s];
         uintptr_t base = (uintptr_t) (*candidate).arena;
-        size_t extent = (size_t) (*candidate).capacity * (*candidate).slot_size;
+        bytes extent = (bytes) (*candidate).capacity * (*candidate).slot_size;
         if (u >= base + sizeof(MemoryHeader) && u < base + extent) {
             if ((u - base) % (*candidate).slot_size != sizeof(MemoryHeader)
                 || (*h).length > (*candidate).slot_size - sizeof(MemoryHeader))
@@ -460,7 +448,7 @@ static void arena_free(MemoryArena *a, void *userPtr) {
     }
     memset(h, 0, sizeof(MemoryHeader));
     if (!slab)
-        return; // Bump storage is reclaimed wholesale only.
+        return;
     FreeNode *node = (FreeNode*) userPtr;
 
     SpinLock_lock(&(*slab).lock);
@@ -476,15 +464,15 @@ static void arena_freeAll(MemoryArena *a) {
     if (!a || !(*a).live)
         return;
 
-    for (size_t s = 0; s < SLAB_COUNT; s++) {
+    for (bytes s = 0; s < SLAB_COUNT; s++) {
         SlabClass *slab = &(*a).slabs[s];
         SpinLock_lock(&(*slab).lock);
         (*slab).free_head = nullptr;
         (*slab).count = 0;
 
-        uint32_t sz = (*slab).slot_size;
-        for (size_t i = (*slab).capacity; i > 0; i--) {
-            uint8_t *slot_ptr = (*slab).arena + (i - 1) * sz;
+        u32 sz = (*slab).slot_size;
+        for (bytes i = (*slab).capacity; i > 0; i--) {
+            u8 *slot_ptr = (*slab).arena + (i - 1) * sz;
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
             memset(h, 0, sizeof(MemoryHeader));
             FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
@@ -495,11 +483,9 @@ static void arena_freeAll(MemoryArena *a) {
     }
 
     SpinLock_lock(&(*a).bumpLock);
-    // Clear used headers too: rewinding alone leaves old bump pointers valid.
     memset((*a).bumpArena, 0, (*a).bumpOffset);
     (*a).bumpOffset = 0;
     SpinLock_unlock(&(*a).bumpLock);
-    // A reset starts a fresh exhaustion epoch: the next rejection reports again.
     (*a).exhaustionCount = 0;
     (*a).exhaustionReported = false;
 }
@@ -515,12 +501,12 @@ static MemoryArena *arena_for(void *userPtr) {
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return nullptr;
 
-    uint8_t *p = (uint8_t*) userPtr;
+    u8 *p = (u8*) userPtr;
 
-    for (size_t i = 0; i < s_registryCount; i++) {
+    for (bytes i = 0; i < s_registryCount; i++) {
         MemoryArena *a = s_registry[i];
         if (a && (*a).live && (*a).masterArena) {
-            uint8_t *base = (*a).masterArena;
+            u8 *base = (*a).masterArena;
             if (p >= base + sizeof(MemoryHeader) && p < base + (*a).masterCapacity) {
                 MemoryHeader *h = (MemoryHeader*) (p - sizeof(MemoryHeader));
                 if (header_valid(h))
@@ -539,7 +525,7 @@ static const MemoryHeader *safe_header(const void *userPtr) {
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return nullptr;
 
-    uint8_t *p = (uint8_t*) userPtr;
+    u8 *p = (u8*) userPtr;
 
     if (s_transient.live && s_transient.buffer) {
         if (p >= s_transient.buffer + sizeof(MemoryHeader) && p < s_transient.buffer + s_transient.bumpOffset) {
@@ -549,10 +535,10 @@ static const MemoryHeader *safe_header(const void *userPtr) {
         }
     }
 
-    for (size_t i = 0; i < s_registryCount; i++) {
+    for (bytes i = 0; i < s_registryCount; i++) {
         MemoryArena *a = s_registry[i];
         if (a && (*a).live && (*a).masterArena) {
-            uint8_t *base = (*a).masterArena;
+            u8 *base = (*a).masterArena;
             if (p >= base + sizeof(MemoryHeader) && p < base + (*a).masterCapacity) {
                 const MemoryHeader *h = (const MemoryHeader*) (p - sizeof(MemoryHeader));
                 if (header_valid(h))
@@ -570,19 +556,19 @@ static inline void ensure_initialized(void) {
 }
 
 /** Initialize and register the default arena; repeated calls succeed without reinitializing it. */
-bool Memory_init(size_t totalBytes) {
+bool Memory_init(bytes totalBytes) {
     SpinLock_lock(&s_default.initLock);
     if (s_default.live) {
         SpinLock_unlock(&s_default.initLock);
         return true;
     }
     SpinLock_unlock(&s_default.initLock);
-    if (!registry_ensureDefault()) return false;   // slot 0 must exist first
+    if (!registry_ensureDefault()) return false;
     return arena_init(&s_default, totalBytes);
 }
 
 /** Allocate a default-arena payload with a 32-byte self-describing header. */
-void *Memory_alloc(uint64_t typeId, size_t numBytes) {
+void *Memory_alloc(u64 typeId, bytes numBytes) {
     ensure_initialized();
     return arena_alloc(&s_default, typeId, numBytes);
 }
@@ -594,14 +580,14 @@ MemoryArena *Memory_defaultArena(void) {
 }
 
 /** Allocate a replacement in the default arena, copy the shorter length, and free the old arena block. */
-void *Memory_realloc(void *userPtr, size_t newBytes) {
+void *Memory_realloc(void *userPtr, bytes newBytes) {
     if (!userPtr)
         return Memory_alloc(0, newBytes);
     if (!safe_header(userPtr))
         return nullptr;
 
-    uint64_t typeId = Memory_type(userPtr);
-    size_t oldLen = Memory_length(userPtr);
+    u64 typeId = Memory_type(userPtr);
+    bytes oldLen = Memory_length(userPtr);
     void *next = Memory_alloc(typeId, newBytes);
     if (!next)
         return nullptr;
@@ -622,7 +608,6 @@ void Memory_free(void *userPtr) {
     if (!h)
         return;
 
-    // Only registered owner storage can reach this free-routing branch.
     MemoryArena *a = arena_for(userPtr);
     if (!a)
         return;
@@ -635,15 +620,15 @@ void Memory_freeAll(void) {
 }
 
 /** Return a validated block's payload length, or zero when the pointer is rejected. */
-size_t Memory_length(void *userPtr) {
+bytes Memory_length(void *userPtr) {
     const MemoryHeader *h = safe_header(userPtr);
     if (h)
-        return (size_t) (*h).length;
+        return (bytes) (*h).length;
     return 0;
 }
 
 /** Return a validated block's type id, or zero when the pointer is rejected. */
-uint64_t Memory_type(void *userPtr) {
+u64 Memory_type(void *userPtr) {
     const MemoryHeader *h = safe_header(userPtr);
     if (h)
         return (*h).typeId;
@@ -664,7 +649,7 @@ bool Memory_similar(const void *a, const void *b) {
 }
 
 /** Initialize the transient bump arena once, rounding capacity up to the payload floor. */
-bool Memory_initTransient(size_t capacity) {
+bool Memory_initTransient(bytes capacity) {
     if (capacity > SIZE_MAX - (MEMORY_ALIGN_MASK + MEMORY_PAYLOAD_ALIGN))
         return false;
     SpinLock_lock(&s_transient.lock);
@@ -675,8 +660,8 @@ bool Memory_initTransient(size_t capacity) {
     if (capacity == 0)
         capacity = ANTI_TRANSIENT_DEFAULT_SIZE;
 
-    size_t aligned_cap = (capacity + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
-    uint8_t *raw = (uint8_t*) malloc(aligned_cap + MEMORY_PAYLOAD_ALIGN);
+    bytes aligned_cap = (capacity + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
+    u8 *raw = (u8*) malloc(aligned_cap + MEMORY_PAYLOAD_ALIGN);
     if (!raw) {
         SpinLock_unlock(&s_transient.lock);
         return false;
@@ -701,10 +686,7 @@ static inline void ensure_transient_initialized(void) {
 }
 
 /** Allocate an aligned transient payload, rejecting length, arithmetic, and capacity overflow. */
-void *Transient_alloc(uint64_t typeId, size_t numBytes) {
-    // The header length is 64-bit; only arithmetic overflow is refused. An
-    // oversized request is a refusal and is reported (once per epoch) rather
-    // than dropped; the guard stays cheap.
+void *Transient_alloc(u64 typeId, bytes numBytes) {
     if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
         s_transient.exhaustionCount++;
         if (!s_transient.exhaustionReported) {
@@ -717,13 +699,13 @@ void *Transient_alloc(uint64_t typeId, size_t numBytes) {
     if (!s_transient.live)
         return nullptr;
 
-    size_t aligned_len = (numBytes + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
-    size_t total = sizeof(MemoryHeader) + aligned_len;
+    bytes aligned_len = (numBytes + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
+    bytes total = sizeof(MemoryHeader) + aligned_len;
 
     SpinLock_lock(&s_transient.lock);
     if (total > s_transient.capacity - s_transient.bumpOffset) {
-        size_t used = s_transient.bumpOffset;
-        size_t capacity = s_transient.capacity;
+        bytes used = s_transient.bumpOffset;
+        bytes capacity = s_transient.capacity;
         SpinLock_unlock(&s_transient.lock);
         s_transient.exhaustionCount++;
         if (!s_transient.exhaustionReported) {
@@ -734,7 +716,7 @@ void *Transient_alloc(uint64_t typeId, size_t numBytes) {
         return nullptr;
     }
 
-    uint8_t *slot = s_transient.buffer + s_transient.bumpOffset;
+    u8 *slot = s_transient.buffer + s_transient.bumpOffset;
     s_transient.bumpOffset += total;
     SpinLock_unlock(&s_transient.lock);
 
@@ -751,7 +733,7 @@ void Transient_reset(void) {
 
     SpinLock_lock(&s_transient.lock);
 #if defined(DEBUG_BORROW_CHECK)
-    size_t used = s_transient.bumpOffset;
+    bytes used = s_transient.bumpOffset;
 #endif
     s_transient.bumpOffset = 0;
     s_transient.generation++;
@@ -770,24 +752,24 @@ void Transient_reset(void) {
 bool Transient_contains(const void *ptr) {
     if (!ptr || !s_transient.live || !s_transient.buffer)
         return false;
-    uint8_t *p = (uint8_t*) ptr;
+    u8 *p = (u8*) ptr;
     return (p >= s_transient.buffer + sizeof(MemoryHeader) && p < s_transient.buffer + s_transient.bumpOffset);
 }
 
 /** Return the current transient allocation generation. */
-uint32_t Transient_getGeneration(void) {
+u32 Transient_getGeneration(void) {
     return s_transient.generation;
 }
 
 /** Return the number of rejected scratch requests since the last reset. */
-uint64_t Transient_exhaustionCount(void) {
+u64 Transient_exhaustionCount(void) {
     return s_transient.exhaustionCount;
 }
 
 #if defined(DEBUG_BORROW_CHECK)
 ;;VALIDATOR
 /** Return the transient arena backing buffer for debug-only borrow diagnostics. */
-const uint8_t *Transient_getBuffer(void) {
+const u8 *Transient_getBuffer(void) {
     return s_transient.buffer;
 }
 #endif
@@ -805,12 +787,12 @@ MemoryLifetime Memory_getLifetime(const void *ptr) {
 
 
 /** Enumerate default-arena live slab blocks matching typeId, returning total matches found. */
-size_t Memory_findAll(uint64_t typeId, void **outArray, size_t maxCount) {
+bytes Memory_findAll(u64 typeId, void **outArray, bytes maxCount) {
     return MemoryArena_findAll(&s_default, typeId, outArray, maxCount);
 }
 
 /** Allocate, initialize, and register an independent arena with the requested capacity. */
-MemoryArena *MemoryArena_create(size_t totalBytes) {
+MemoryArena *MemoryArena_create(bytes totalBytes) {
     MemoryArena *a = (MemoryArena*) calloc(1, sizeof(MemoryArena));
     if (!a)
         return nullptr;
@@ -834,7 +816,7 @@ void MemoryArena_destroy(MemoryArena *a) {
     if (!a || a == &s_default)
         return;
     SpinLock_lock(&s_registryLock);
-    for (size_t i = 0; i < s_registryCount; i++) {
+    for (bytes i = 0; i < s_registryCount; i++) {
         if (s_registry[i] == a) {
             s_registry[i] = s_registry[--s_registryCount];
             break;
@@ -851,14 +833,14 @@ void MemoryArena_destroy(MemoryArena *a) {
 }
 
 /** Allocate a typed payload from the specified arena. */
-void *MemoryArena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
+void *MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
     if (!a)
         return nullptr;
     return arena_alloc(a, typeId, numBytes);
 }
 
 /** Allocate replacement storage in a, copy bytes from userPtr, and route old-block release by owner. */
-void *MemoryArena_realloc(MemoryArena *a, void *userPtr, size_t newBytes) {
+void *MemoryArena_realloc(MemoryArena *a, void *userPtr, bytes newBytes) {
     if (!a)
         return nullptr;
     if (!userPtr)
@@ -866,8 +848,8 @@ void *MemoryArena_realloc(MemoryArena *a, void *userPtr, size_t newBytes) {
     if (!safe_header(userPtr))
         return nullptr;
 
-    uint64_t typeId = Memory_type(userPtr);
-    size_t oldLen = Memory_length(userPtr);
+    u64 typeId = Memory_type(userPtr);
+    bytes oldLen = Memory_length(userPtr);
     void *next = arena_alloc(a, typeId, newBytes);
     if (!next)
         return nullptr;
@@ -892,17 +874,17 @@ void MemoryArena_freeAll(MemoryArena *a) {
 }
 
 /** Enumerate live slab and bump blocks; total matches may exceed output capacity. */
-size_t MemoryArena_findAll(MemoryArena *a, uint64_t typeId, void **outArray, size_t maxCount) {
-    size_t count = 0;
+bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, void **outArray, bytes maxCount) {
+    bytes count = 0;
     if (!a || !(*a).live)
         return 0;
 
-    for (size_t s = 0; s < SLAB_COUNT; s++) {
+    for (bytes s = 0; s < SLAB_COUNT; s++) {
         SlabClass *slab = &(*a).slabs[s];
         SpinLock_lock(&(*slab).lock);
-        uint32_t sz = (*slab).slot_size;
-        for (size_t i = 0; i < (*slab).capacity; i++) {
-            uint8_t *slot_ptr = (*slab).arena + i * sz;
+        u32 sz = (*slab).slot_size;
+        for (bytes i = 0; i < (*slab).capacity; i++) {
+            u8 *slot_ptr = (*slab).arena + i * sz;
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
             if (header_valid(h)) {
                 if (typeId == 0 || (*h).typeId == typeId) {
@@ -916,19 +898,19 @@ size_t MemoryArena_findAll(MemoryArena *a, uint64_t typeId, void **outArray, siz
         SpinLock_unlock(&(*slab).lock);
     }
     SpinLock_lock(&(*a).bumpLock);
-    size_t offset = 0;
+    bytes offset = 0;
     while (offset < (*a).bumpOffset) {
-        size_t remaining = (*a).bumpOffset - offset;
+        bytes remaining = (*a).bumpOffset - offset;
         MemoryHeader *h = (MemoryHeader*) ((*a).bumpArena + offset);
         if (remaining < sizeof(MemoryHeader))
             break;
-        size_t length = (*h).length;
-        size_t total = sizeof(MemoryHeader) + ((length + MEMORY_ALIGN_MASK) & ~(uint64_t) MEMORY_ALIGN_MASK);
+        bytes length = (*h).length;
+        bytes total = sizeof(MemoryHeader) + ((length + MEMORY_ALIGN_MASK) & ~(u64) MEMORY_ALIGN_MASK);
         if (total > remaining)
             break;
         if (header_valid(h) && (typeId == 0 || (*h).typeId == typeId)) {
             if (outArray && count < maxCount)
-                outArray[count] = (uint8_t*) h + sizeof(MemoryHeader);
+                outArray[count] = (u8*) h + sizeof(MemoryHeader);
             count++;
         }
         offset += total;
@@ -938,14 +920,14 @@ size_t MemoryArena_findAll(MemoryArena *a, uint64_t typeId, void **outArray, siz
 }
 
 /** Return occupied slab bytes plus the arena's current bump offset. */
-size_t MemoryArena_activeBytes(MemoryArena *a) {
-    size_t total = 0;
+bytes MemoryArena_activeBytes(MemoryArena *a) {
+    bytes total = 0;
     if (!a || !(*a).live)
         return 0;
-    for (size_t s = 0; s < SLAB_COUNT; s++) {
+    for (bytes s = 0; s < SLAB_COUNT; s++) {
         SlabClass *slab = &(*a).slabs[s];
         SpinLock_lock(&(*slab).lock);
-        total += (size_t)(*slab).count * (*slab).slot_size;
+        total += (bytes)(*slab).count * (*slab).slot_size;
         SpinLock_unlock(&(*slab).lock);
     }
     SpinLock_lock(&(*a).bumpLock);
@@ -955,18 +937,18 @@ size_t MemoryArena_activeBytes(MemoryArena *a) {
 }
 
 /** Return the backing master-arena capacity, or zero for a null arena. */
-size_t MemoryArena_capacity(MemoryArena *a) {
+bytes MemoryArena_capacity(MemoryArena *a) {
     if (!a)
         return 0;
     return (*a).masterCapacity;
 }
 
 /** Return the number of rejected requests since the arena's last init/freeAll. */
-uint64_t MemoryArena_exhaustionCount(const MemoryArena *a) {
+u64 MemoryArena_exhaustionCount(const MemoryArena *a) {
     return a ? (*a).exhaustionCount : 0;
 }
 
 /** Return the default arena's rejected-request count since the last freeAll. */
-uint64_t Memory_exhaustionCount(void) {
+u64 Memory_exhaustionCount(void) {
     return s_default.live ? s_default.exhaustionCount : 0;
 }

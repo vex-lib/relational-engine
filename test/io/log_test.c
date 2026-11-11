@@ -11,16 +11,14 @@
 //   - re-init after shutdown works;
 //   - the drained file parses back through LogParser.
 
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "io/log.h"
-#include "io/logparser.h"
-#include "io/file.h"
+#include "io/log/log.h"
+#include "io/file/file.h"
 
 static int g_failures = 0;
 
@@ -45,12 +43,11 @@ int main(void) {
     char path[300];
     snprintf(path, sizeof(path), "%s/engine.log", dir);
 
-    // Refusals before a valid open.
     CHECK(!Log_init(nullptr, path, 8));
     Log log;
     CHECK(!Log_init(&log, nullptr, 8));
 
-    CHECK(Log_init(&log, path, 8));                    // 8 -> rounded to 8
+    CHECK(Log_init(&log, path, 8));
     CHECK(Log_isEnabled(&log));
     CHECK(Log_isActive(&log));
     CHECK(strcmp(Log_path(&log), path) == 0);
@@ -63,46 +60,40 @@ int main(void) {
     Log_append(&log, 3, -1, -2, -3, -4, -5);
     CHECK(Log_appended(&log) == 3);
 
-    // Deactivation gates append.
     Log_setActive(&log, false);
     CHECK(!Log_isActive(&log));
     Log_append(&log, 9, 1, 1, 1, 1, 1);
     CHECK(Log_appended(&log) == 3);
     Log_setActive(&log, true);
 
-    // Every attempt is appended XOR dropped.
-    uint64_t before = Log_appended(&log) + Log_dropped(&log);
+    u64 before = Log_appended(&log) + Log_dropped(&log);
     enum { BURST = 2000 };
     for (int i = 0; i < BURST; i++)
         Log_append(&log, 4, i, 0, 0, 0, 0);
-    uint64_t after = Log_appended(&log) + Log_dropped(&log);
+    u64 after = Log_appended(&log) + Log_dropped(&log);
     CHECK(after - before == BURST);
 
-    // No-op on a disabled/inactive/zeroed log.
     Log dead;
     memset(&dead, 0, sizeof(dead));
-    Log_append(&dead, 1, 0, 0, 0, 0, 0);               // enabled=false -> no-op
+    Log_append(&dead, 1, 0, 0, 0, 0, 0);
     Log_append(nullptr, 1, 0, 0, 0, 0, 0);
 
     Log_shutdown(&log);
     CHECK(!Log_isEnabled(&log));
-    CHECK(Log_written(&log) == Log_appended(&log));    // fully drained
-    Log_shutdown(&log);                                // idempotent
-    Log_shutdown(nullptr);                             // null-safe
+    CHECK(Log_written(&log) == Log_appended(&log));
+    Log_shutdown(&log);
+    Log_shutdown(nullptr);
 
-    // The written file is a valid ANTI log with the right record count.
     CHECK(LogParser_isLogFile(path));
     int64_t n = LogParser_count(path);
     CHECK(n >= 0);
-    CHECK((uint64_t) n == Log_written(&log));
+    CHECK((u64) n == Log_written(&log));
 
-    // Re-init after shutdown works.
     Log again;
     CHECK(Log_init(&again, path, 4));
     CHECK(Log_isEnabled(&again));
     Log_shutdown(&again);
 
-    // A fresh zero-slot request is clamped to one slot and still functions.
     Log tiny;
     char path2[320];
     snprintf(path2, sizeof(path2), "%s/tiny.log", dir);

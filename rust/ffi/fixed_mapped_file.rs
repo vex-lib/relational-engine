@@ -41,13 +41,10 @@ pub unsafe extern "C" fn re_mmap_open(path: *const core::ffi::c_char, writable: 
     if path.is_null() || out_owner.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: caller promises a live NUL-terminated string.
     let text = match unsafe { core::ffi::CStr::from_ptr(path) }.to_str() {
         Ok(text) => text,
         Err(_) => return MMAP_INVALID,
     };
-    // SAFETY: the caller accepts the external-mutation exclusion documented in the
-    // header; nothing else can be checked from here.
     match unsafe { FixedMappedFile::open(text, writable) } {
         Ok(owner) => {
             unsafe { *out_owner = Box::into_raw(Box::new(owner)) };
@@ -62,7 +59,6 @@ pub unsafe extern "C" fn re_mmap_open(path: *const core::ffi::c_char, writable: 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn re_mmap_drop(owner: *mut FixedMappedFile) {
     if !owner.is_null() {
-        // SAFETY: caller guarantees a live owner and no further use.
         drop(unsafe { Box::from_raw(owner) });
     }
 }
@@ -74,7 +70,6 @@ pub unsafe extern "C" fn re_mmap_len(owner: *const FixedMappedFile, out_len: *mu
     if owner.is_null() || out_len.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: live owner per the caller.
     unsafe { *out_len = (&*owner).len() };
     MMAP_OK
 }
@@ -86,7 +81,6 @@ pub unsafe extern "C" fn re_mmap_is_open(owner: *const FixedMappedFile, out_open
     if owner.is_null() || out_open.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: live owner per the caller.
     unsafe { *out_open = (&*owner).is_open() };
     MMAP_OK
 }
@@ -99,7 +93,6 @@ pub unsafe extern "C" fn re_mmap_is_writable(owner: *const FixedMappedFile,
     if owner.is_null() || out_writable.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: live owner per the caller.
     unsafe { *out_writable = (&*owner).is_writable() };
     MMAP_OK
 }
@@ -115,18 +108,13 @@ pub unsafe extern "C" fn re_mmap_read(owner: *const FixedMappedFile, offset: usi
         return MMAP_INVALID;
     }
     unsafe { *out_truncated = false };
-    // The destination is checked BEFORE the view is touched, so a refusal never
-    // half-fills the caller's buffer.
     if length > capacity {
         unsafe { *out_truncated = true };
         return MMAP_TRUNCATED;
     }
-    // SAFETY: live owner per the caller.
     match unsafe { (&*owner).read(offset, length) } {
         Ok(bytes) => {
             if !bytes.is_empty() {
-                // SAFETY: dest holds `capacity >= length` bytes and the ranges cannot alias:
-                // dest is caller-owned and the mapping is this owner's file view.
                 unsafe { core::ptr::copy_nonoverlapping(bytes.as_ptr(), dest, bytes.len()) };
             }
             MMAP_OK
@@ -144,9 +132,7 @@ pub unsafe extern "C" fn re_mmap_write(owner: *mut FixedMappedFile, offset: usiz
     if owner.is_null() || source.is_null() || length > isize::MAX as usize {
         return MMAP_INVALID;
     }
-    // SAFETY: caller guarantees a readable span of `length` bytes.
     let input = unsafe { core::slice::from_raw_parts(source, length) };
-    // SAFETY: live owner, exclusively borrowed for this call.
     match unsafe { (&mut *owner).write(offset, input) } {
         Ok(()) => MMAP_OK,
         Err(error) => status(error),
@@ -183,7 +169,6 @@ pub unsafe extern "C" fn re_mmap_flush(owner: *mut FixedMappedFile) -> u32 {
     if owner.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed.
     match unsafe { (&*owner).flush() } {
         Ok(()) => MMAP_OK,
         Err(error) => status(error),
@@ -197,7 +182,6 @@ pub unsafe extern "C" fn re_mmap_sync(owner: *mut FixedMappedFile) -> u32 {
     if owner.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed.
     match unsafe { (&*owner).sync() } {
         Ok(()) => MMAP_OK,
         Err(error) => status(error),
@@ -211,7 +195,6 @@ pub unsafe extern "C" fn re_mmap_close(owner: *mut FixedMappedFile) -> u32 {
     if owner.is_null() {
         return MMAP_INVALID;
     }
-    // SAFETY: live owner, exclusively borrowed; the caller drops outstanding borrows.
     unsafe { (&mut *owner).close() };
     MMAP_OK
 }
@@ -226,7 +209,6 @@ pub unsafe extern "C" fn re_mmap_to_string(owner: *const FixedMappedFile, dest: 
         return MMAP_INVALID;
     }
     let mut truncated = false;
-    // SAFETY: caller guarantees a writable span of `capacity` bytes.
     let span = unsafe { core::slice::from_raw_parts_mut(dest, capacity) };
     let ok = unsafe { (&*owner).to_string(span, &mut truncated) };
     unsafe { *out_truncated = truncated };

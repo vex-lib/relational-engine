@@ -1,6 +1,6 @@
 #ifndef RE_ROW_POOL_H
 #define RE_ROW_POOL_H
-#include <stdbool.h>
+#include "vex.h"
 #include "relational_engine/row_handle.h"
 
 /* Runtime-selected, aligned, flat byte rows owned by Rust, not Memory_* ABI.
@@ -24,25 +24,25 @@
  * migration or live reload integration is provided by these operations. */
 typedef struct ReRowPool ReRowPool;
 
-uint32_t re_rows_new(size_t row_size, size_t alignment, size_t rows_per_chunk, ReRowPool **out_owner);
+u32 re_rows_new(bytes row_size, bytes alignment, bytes rows_per_chunk, ReRowPool **out_owner);
 void re_rows_drop(ReRowPool *owner); /* null is a quiet no-op; live owner drops once */
-uint32_t re_rows_add(ReRowPool *owner, const uint8_t *source, size_t length, ReRowHandle *out_handle);
-uint32_t re_rows_read(const ReRowPool *owner, ReRowHandle handle, uint8_t *dest, size_t capacity, bool *out_truncated);
-uint32_t re_rows_write(ReRowPool *owner, ReRowHandle handle, const uint8_t *source, size_t length);
-uint32_t re_rows_borrow(const ReRowPool *owner, ReRowHandle handle, const uint8_t **out_bytes);
-uint32_t re_rows_remove(ReRowPool *owner, ReRowHandle handle);
-uint32_t re_rows_release_empty(ReRowPool *owner, size_t *out_released);
-uint32_t re_rows_len(const ReRowPool *owner, size_t *out_len);
-uint32_t re_rows_geometry(const ReRowPool *owner, size_t *out_size, size_t *out_alignment, size_t *out_rows_per_chunk);
-uint32_t re_rows_to_string(const ReRowPool *owner, char *dest, size_t capacity, bool *out_truncated);
-uint32_t re_rows_to_string_struct(const ReRowPool *owner, char *dest, size_t capacity, bool *out_truncated);
+u32 re_rows_add(ReRowPool *owner, const u8 *source, bytes length, ReRowHandle *out_handle);
+u32 re_rows_read(const ReRowPool *owner, ReRowHandle handle, u8 *dest, bytes capacity, bool *out_truncated);
+u32 re_rows_write(ReRowPool *owner, ReRowHandle handle, const u8 *source, bytes length);
+u32 re_rows_borrow(const ReRowPool *owner, ReRowHandle handle, const u8 **out_bytes);
+u32 re_rows_remove(ReRowPool *owner, ReRowHandle handle);
+u32 re_rows_release_empty(ReRowPool *owner, bytes *out_released);
+u32 re_rows_len(const ReRowPool *owner, bytes *out_len);
+u32 re_rows_geometry(const ReRowPool *owner, bytes *out_size, bytes *out_alignment, bytes *out_rows_per_chunk);
+u32 re_rows_to_string(const ReRowPool *owner, char *dest, bytes capacity, bool *out_truncated);
+u32 re_rows_to_string_struct(const ReRowPool *owner, char *dest, bytes capacity, bool *out_truncated);
 
 /* Default geometry is a starting point, never a total row ceiling. */
-#define RE_ROWS_PER_CHUNK_DEFAULT ((size_t) 1024)
-static inline uint32_t ReRowPool_3(size_t size, size_t alignment, ReRowPool **out_owner) {
+#define RE_ROWS_PER_CHUNK_DEFAULT ((bytes) 1024)
+static inline u32 ReRowPool_3(bytes size, bytes alignment, ReRowPool **out_owner) {
     return re_rows_new(size, alignment, RE_ROWS_PER_CHUNK_DEFAULT, out_owner);
 }
-static inline uint32_t ReRowPool_4(size_t size, size_t alignment, size_t capacity, ReRowPool **out_owner) {
+static inline u32 ReRowPool_4(bytes size, bytes alignment, bytes capacity, ReRowPool **out_owner) {
     return re_rows_new(size, alignment, capacity, out_owner);
 }
 #define RE_ROW_POOL_SELECT(_1, _2, _3, _4, NAME, ...) NAME

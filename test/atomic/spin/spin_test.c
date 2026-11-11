@@ -13,12 +13,11 @@
 
 #include <pthread.h>
 #include <stdatomic.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "vex.h"
 #include <stdio.h>
 #include <sched.h>
 
-#include "atomic/spin.h"
+#include "atomic/atomic.h"
 
 static int g_failures = 0;
 
@@ -33,27 +32,27 @@ static int g_failures = 0;
 // ── nullptr safety is a first-class case ───────────────────────────────────
 /** Verifies null lock operations fail safely without acquiring or releasing state. */
 static void test_null_safety(void) {
-    SpinLock_lock(nullptr);                 // must not crash
+    SpinLock_lock(nullptr);
     CHECK(!SpinLock_tryLock(nullptr));
     CHECK(!SpinLock_tryLockTimeout(nullptr, 0));
-    SpinLock_unlock(nullptr);               // must not crash
-    CHECK(!SpinLock_isLocked(nullptr));     // nullptr reads as free (guarded)
+    SpinLock_unlock(nullptr);
+    CHECK(!SpinLock_isLocked(nullptr));
 }
 
 // ── basic acquire/release + isLocked round trip ────────────────────────────
 /** Checks zero initialization, acquisition, try-acquisition, lock state, and release. */
 static void test_basic_round_trip(void) {
-    SpinLock lock = SPIN_LOCK_INIT;         // zero-value construction
+    SpinLock lock = SPIN_LOCK_INIT;
     CHECK(!SpinLock_isLocked(&lock));
-    CHECK(SpinLock_tryLock(&lock));         // free -> acquired
+    CHECK(SpinLock_tryLock(&lock));
     CHECK(SpinLock_isLocked(&lock));
-    CHECK(!SpinLock_tryLock(&lock));        // held -> refused
+    CHECK(!SpinLock_tryLock(&lock));
     SpinLock_unlock(&lock);
     CHECK(!SpinLock_isLocked(&lock));
-    SpinLock_unlock(&lock);                 // unlock an already-free lock: no-op
+    SpinLock_unlock(&lock);
     CHECK(!SpinLock_isLocked(&lock));
 
-    SpinLock_lock(&lock);                   // blocking form on a free lock
+    SpinLock_lock(&lock);
     CHECK(SpinLock_isLocked(&lock));
     SpinLock_unlock(&lock);
     CHECK(!SpinLock_isLocked(&lock));
@@ -64,11 +63,10 @@ static void test_basic_round_trip(void) {
 static void test_timeout(void) {
     SpinLock lock = SPIN_LOCK_INIT;
     CHECK(SpinLock_tryLock(&lock));
-    // Same thread already owns it, so the CAS can never succeed.
-    CHECK(!SpinLock_tryLockTimeout(&lock, 200000));   // 0.2 ms deadline
-    CHECK(!SpinLock_tryLockTimeout(&lock, 0));        // immediate deadline
+    CHECK(!SpinLock_tryLockTimeout(&lock, 200000));
+    CHECK(!SpinLock_tryLockTimeout(&lock, 0));
     SpinLock_unlock(&lock);
-    CHECK(SpinLock_tryLockTimeout(&lock, 1000000));   // now free -> acquired
+    CHECK(SpinLock_tryLockTimeout(&lock, 1000000));
     SpinLock_unlock(&lock);
 }
 
@@ -99,13 +97,12 @@ static void test_foreign_unlock_refused(void) {
         sched_yield();
     CHECK(SpinLock_isLocked(&g_foreign));
 
-    // We are NOT the owner: this release must be refused.
     SpinLock_unlock(&g_foreign);
-    CHECK(SpinLock_isLocked(&g_foreign));       // still held by the owner
+    CHECK(SpinLock_isLocked(&g_foreign));
 
     atomic_store_explicit(&g_foreign_go, 1, memory_order_release);
     CHECK(pthread_join(t, nullptr) == 0);
-    CHECK(!SpinLock_isLocked(&g_foreign));      // owner cleared it
+    CHECK(!SpinLock_isLocked(&g_foreign));
 }
 
 // ── contention: mutual exclusion and release/acquire visibility ────────────
@@ -126,7 +123,7 @@ static void *spin_worker(void *arg) {
         sched_yield();
     for (int i = 0; i < SPIN_ITER; i++) {
         SpinLock_lock(&g_counter_lock);
-        int64_t before = g_plain_counter;      // read inside the critical section
+        int64_t before = g_plain_counter;
         g_plain_counter = before + 1;
         if (before < g_observed_min)
             g_observed_min = before;
@@ -154,10 +151,7 @@ static void test_contention(void) {
     for (int i = 0; i < SPIN_THREADS; i++)
         CHECK(pthread_join(t[i], nullptr) == 0);
 
-    // No lost updates: every increment landed exactly once.
     CHECK(g_plain_counter == (int64_t) SPIN_THREADS * SPIN_ITER);
-    // The critical section really serialized: the pre-increment snapshot never
-    // exceeded the final total, and both ends were actually exercised.
     CHECK(g_observed_min == 0);
     CHECK(g_observed_max == (int64_t) SPIN_THREADS * SPIN_ITER - 1);
     CHECK(atomic_load(&g_watchdog_ticks) == (int64_t) SPIN_THREADS * SPIN_ITER);

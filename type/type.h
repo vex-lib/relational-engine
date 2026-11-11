@@ -1,18 +1,17 @@
 #ifndef TYPE_TYPE_H
 #define TYPE_TYPE_H
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "vex.h"
 
 // type/type.h — the R2 type-id ALGEBRA (Relational Engine owner).
 //
 // The project-agnostic half of the One Type Registry Law: the 64-bit id
-// encoding, its masks, and the pure readers. Each repository keeps its OWN
-// class registry (its ID_*/TYPE_* macros) in its own *-type.h; only the
-// algebra below is shared. The 16-byte block-header contract lives with the
-// allocator in nio/mem.h (MemoryHeader); the old vexspoke TypeHeader was dead
-// and is removed. This header must never include a project registry, or the
-// registry that includes it would recurse.
+// encoding, its masks, and the pure readers. This is the Relational Engine's
+// own *-type.h: it carries the shared algebra plus this project's class
+// registry. It must never include another project's registry (for example
+// Vexspoke's oop/type.h), or the registry that includes it would recurse.
+// The 16-byte block-header contract lives with the allocator in nio/mem.h
+// (MemoryHeader); the old vexspoke TypeHeader was dead and is removed.
 //
 //     0xF'PRPR'M'W1'W2'BE6C'CCCCCC
 // Bits: 4 + 8 + 4 + 4 + 4 + 16 + 24 = 64.
@@ -34,9 +33,10 @@
 //
 // Uniform per-project numbering: every project numbers its classes starting at
 // 1; the project byte disambiguates identical local numbers across repos. Bare
-// ID_* constants carry no project byte and name VEXSPOKE's own class space
-// only — cross-project dispatch ships full type ids (PROJ_* | FORM_* | class),
-// and Type_arch reads the byte back.
+// ID_* constants carry no project byte; they are interpreted against the
+// registry that defines them. This header defines the Relational Engine's own
+// registry below. Cross-project dispatch ships full type ids
+// (PROJ_* | FORM_* | class), and Type_arch reads the byte back.
 //
 // The parent-chain resolver (Type_registerParents / Type_getParentClass /
 // Type_isA) is project-agnostic: a project registers its chain once (keyed by
@@ -96,155 +96,68 @@
 #define ARCH_DARKBASE  6u
 #define ARCH_SAMPLERATE 7u
 
-// Compose a full type id from project + form + class id. Every id carries the
-// reserved BE6C "векс" sugar (the standard encoding).
-static inline uint64_t Type_make(uint64_t proj, uint64_t form, uint32_t classId) {
-    return (proj & MASK_PROJECT) | (form & MASK_FORM) | SUGAR_VEX |
-           (classId & MASK_CLASS);
-}
+#define Type_make(proj, form, classId) (((proj) & MASK_PROJECT) | ((form) & MASK_FORM) | SUGAR_VEX | ((classId) & MASK_CLASS))
 
-static inline uint64_t Type_class(uint64_t typeId) {
-    return typeId & MASK_CLASS;
-}
+//
+// TYPES FOR RELATIONAL ENGINE SPECIFICALLY!!!
+//
+// Relational Engine class registry (project byte 0x07). The class numbers are
+// local to this project; the project byte disambiguates them from another
+// repository's registry. These replace the legacy Vexspoke ids that re used to
+// borrow for its own classes.
+//
 
-static inline uint64_t Type_form(uint64_t typeId) {
-    return typeId & MASK_FORM;
-}
+#define ID_VARIABLE_SLOT       13u
+#define ID_STRING_POOL         14u
+#define ID_VARIABLE_HASH_MAP   15u
+#define ID_VARIABLE_MINI_MAP   16u
+#define ID_SHELF               17u
+#define ID_SHELF_NODE          18u
+#define ID_VARIABLE_POOL_ORDER 19u
+#define ID_RELATIONAL_STRING    20u
 
-static inline uint64_t Type_project(uint64_t typeId) {
-    return typeId & MASK_PROJECT;
-}
+#define TYPE_VARIABLE_SLOT              Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_VARIABLE_SLOT)
+#define TYPE_STRING_POOL                Type_make(PROJ_RELATIONAL_ENGINE, FORM_ARRAY,            ID_STRING_POOL)
+#define TYPE_VARIABLE_HASH_MAP          Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_VARIABLE_HASH_MAP)
+#define TYPE_VARIABLE_MINI_MAP          Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_VARIABLE_MINI_MAP)
+#define TYPE_SHELF                      Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_SHELF)
+#define TYPE_SHELF_NODE                 Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_SHELF_NODE)
+#define TYPE_VARIABLE_POOL_ORDER        Type_make(PROJ_RELATIONAL_ENGINE, FORM_ARRAY,            ID_VARIABLE_POOL_ORDER)
+#define TYPE_RELATIONAL_STRING          Type_make(PROJ_RELATIONAL_ENGINE, FORM_ARRAY,            ID_RELATIONAL_STRING)
 
-static inline int Type_isStruct(uint64_t form) {
-    return form == FORM_STRUCT_SINGLETON || form == FORM_STRUCT_ARRAY
-        || form == FORM_STRUCT_POINTER;
-}
+#define Type_class(typeId) ((typeId) & MASK_CLASS)
 
-static inline int Type_isSingleton(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_SINGLETON;
-}
+#define Type_form(typeId) ((typeId) & MASK_FORM)
 
-static inline int Type_isArray(uint64_t typeId) {
-    uint64_t form = typeId & MASK_FORM;
-    return form == FORM_ARRAY || form == FORM_ARRAY_SOA || form == FORM_ARRAY_AOS || form == FORM_STRUCT_COEXISTENT;
-}
+#define Type_project(typeId) ((typeId) & MASK_PROJECT)
 
-static inline int Type_isPointer(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_POINTER;
-}
-
-static inline int Type_isStructSingleton(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_STRUCT_SINGLETON;
-}
-
-static inline int Type_isStructArray(uint64_t typeId) {
-    uint64_t form = typeId & MASK_FORM;
-    return form == FORM_STRUCT_ARRAY || form == FORM_ARRAY_SOA || form == FORM_ARRAY_AOS || form == FORM_STRUCT_COEXISTENT;
-}
-
-static inline int Type_isStructSOA(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_ARRAY_SOA;
-}
-
-static inline int Type_isStructAOS(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_ARRAY_AOS;
-}
-
-static inline int Type_isStructCoexistent(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_STRUCT_COEXISTENT;
-}
-
-static inline int Type_isStructPointer(uint64_t typeId) {
-    return (typeId & MASK_FORM) == FORM_STRUCT_POINTER;
-}
-
-static inline int Type_isPrimitive(uint64_t typeId) {
-    uint64_t form = typeId & MASK_FORM;
-    return form == FORM_SINGLETON || form == FORM_ARRAY || form == FORM_POINTER;
-}
-
-static inline int Type_isGlobal(uint64_t typeId) {
-    return (typeId & MASK_MODIFIER) == MOD_GLOBAL;
-}
-
-static inline int Type_isLocale(uint64_t typeId) {
-    return (typeId & MASK_MODIFIER) == MOD_LOCALE;
-}
-
-static inline int Type_isTransient(uint64_t typeId) {
-    return (typeId & MASK_MODIFIER) == MOD_TRANSIENT;
-}
-
-static inline int Type_isProactive(uint64_t typeId) {
-    return (typeId & MASK_WRAPPER_1) == WRAP_PROACTIVE;
-}
-
-static inline int Type_isReactive(uint64_t typeId) {
-    return (typeId & MASK_WRAPPER_1) == WRAP_REACTIVE;
-}
-
-static inline int Type_isProbable(uint64_t typeId) {
-    return (typeId & MASK_WRAPPER_2) == WRAP2_PROBABLE;
-}
-
-static inline int Type_isProbableObjects(uint64_t typeId) {
-    return (typeId & MASK_WRAPPER_2) == WRAP2_PROBABLE_OBJECTS;
-}
-
-static inline int Type_isFuture(uint64_t typeId) {
-    return (typeId & MASK_WRAPPER_2) == WRAP2_FUTURE;
-}
-
-static inline int Type_isChoice(uint64_t typeId) {
-    return (typeId & MASK_WRAPPER_2) == WRAP2_CHOICE;
-}
-
-// Architecture layer owning an id (reads the project byte).
-uint64_t Type_arch(uint64_t classId);
-
-static inline int Type_isVexspoke(uint64_t classId) {
-    return Type_arch(classId) == ARCH_VEXSPOKE;
-}
-
-static inline int Type_isHotcwap(uint64_t classId) {
-    return Type_arch(classId) == ARCH_HOTCWAP;
-}
-
-static inline int Type_isDarling(uint64_t classId) {
-    return Type_arch(classId) == ARCH_DARLING;
-}
-
-static inline int Type_isDarkbase(uint64_t classId) {
-    return Type_arch(classId) == ARCH_DARKBASE;
-}
-
-// Register a project's parent table: parents[i] = parent class number of class
-// number i, 0 = root (the class is its own parent). Row 0 (the entry for class
-// 0) is unused. Class number indexes the row; the project byte picks the table,
-// so the same number space means different things in every repo. Registration
-// is idempotent (re-registering replaces its table). Rejects invalid proj
-// (zero, non-project bits, PROJ_VEXSPOKE), a (nullptr, count != 0) pair, an
-// out-of-range parent entry, a CYCLIC or self-referential chain, and any
-// allocation failure; every rejection preserves the previous table.
-bool Type_registerParents(uint64_t proj, const uint32_t *parents, uint32_t count);
-
-// Register the shared BARE-id / PROJ_VEXSPOKE chain. Bare ids name vexspoke's
-// own class space; vexspoke grants its legacy chain here once so this algebra
-// never hardcodes a project's class numbers. Same validation and atomicity as
-// Type_registerParents.
-bool Type_registerBareParents(const uint32_t *parents, uint32_t count);
-
-// Parent-class walk. Bare id or PROJ_VEXSPOKE class -> the registered bare
-// chain (row 0 = root); a registered downstream project -> that project's
-// table; an unregistered project byte (or unlisted class) -> root. Returns the
-// parent class id, or the class id itself when the class is a root.
-uint64_t Type_getParentClass(uint64_t classId);
-
-// True if classId is ancestorId or any descendant of it. Walks the parent chain
-// WITH the project byte intact; the ancestor target is masked to class only, so
-// the walk stays project-invariant and full/bare ids mix freely (pinned by the
-// owner test). The walk is BOUNDED by the project's chain length, so a cyclic
-// table can never spin (the Bounded Wait Law).
-int Type_isA(uint64_t classId, uint64_t ancestorId);
-
+u32 Type_isStruct(u64 form);
+u32 Type_isSingleton(u64 typeId);
+u32 Type_isArray(u64 typeId);
+u32 Type_isPointer(u64 typeId);
+u32 Type_isStructSingleton(u64 typeId);
+u32 Type_isStructArray(u64 typeId);
+u32 Type_isStructSOA(u64 typeId);
+u32 Type_isStructAOS(u64 typeId);
+u32 Type_isStructCoexistent(u64 typeId);
+u32 Type_isStructPointer(u64 typeId);
+u32 Type_isPrimitive(u64 typeId);
+u32 Type_isGlobal(u64 typeId);
+u32 Type_isLocale(u64 typeId);
+u32 Type_isTransient(u64 typeId);
+u32 Type_isProactive(u64 typeId);
+u32 Type_isReactive(u64 typeId);
+u32 Type_isProbable(u64 typeId);
+u32 Type_isProbableObjects(u64 typeId);
+u32 Type_isFuture(u64 typeId);
+u32 Type_isChoice(u64 typeId);
+u64 Type_arch(u64 classId);
+u32 Type_isVexspoke(u64 classId);
+u32 Type_isHotcwap(u64 classId);
+u32 Type_isDarling(u64 classId);
+u32 Type_isDarkbase(u64 classId);
+bool Type_registerParents(u64 proj, const u32 *parents, u32 count);
+bool Type_registerBareParents(const u32 *parents, u32 count);
+u64 Type_getParentClass(u64 classId);
+u32 Type_isA(u64 classId, u64 ancestorId);
 #endif

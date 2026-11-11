@@ -11,15 +11,14 @@
 //     via the kind table, and reports truncation with -1;
 //   - kind names map exactly, with a "kind#N" fallback.
 
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "io/logparser.h"
-#include "io/file.h"
+#include "io/log/log.h"
+#include "io/file/file.h"
 
 static int g_failures = 0;
 
@@ -34,23 +33,23 @@ static int g_failures = 0;
 static char g_dir[256];
 
 /* Writes one 32-bit value in the log format's big-endian byte order. */
-static void put_be32(FILE *f, uint32_t v) {
-    uint8_t b[4] = { (uint8_t)(v >> 24), (uint8_t)(v >> 16), (uint8_t)(v >> 8), (uint8_t)v };
+static void put_be32(FILE *f, u32 v) {
+    u8 b[4] = { (u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8), (u8)v };
     fwrite(b, 1, 4, f);
 }
 
 /* Writes one signed timestamp/value as its 64-bit big-endian representation. */
 static void put_be64(FILE *f, int64_t v) {
-    uint8_t b[8];
+    u8 b[8];
     for (int i = 0; i < 8; i++)
-        b[i] = (uint8_t)((uint64_t)v >> (56 - 8 * i));
+        b[i] = (u8)((u64)v >> (56 - 8 * i));
     fwrite(b, 1, 8, f);
 }
 
 /* Emits the ANTI-log magic, version, and big-endian record-size header. */
-static void put_header(FILE *f, uint8_t version, uint32_t record_size) {
+static void put_header(FILE *f, u8 version, u32 record_size) {
     fwrite("ANTILOG", 1, 7, f);
-    uint8_t v = version;
+    u8 v = version;
     fwrite(&v, 1, 1, f);
     put_be32(f, record_size);
 }
@@ -82,10 +81,10 @@ static void test_valid(void) {
     FILE *f = fopen(p, "wb");
     CHECK(f != nullptr);
     put_header(f, 1, 52);
-    put_be32(f, 1);          // kind produce
+    put_be32(f, 1);
     put_be64(f, 111);
     put_be64(f, 10); put_be64(f, 11); put_be64(f, 12); put_be64(f, 13); put_be64(f, 14);
-    put_be32(f, 2);          // kind present
+    put_be32(f, 2);
     put_be64(f, 222);
     put_be64(f, 20); put_be64(f, 21); put_be64(f, 22); put_be64(f, 23); put_be64(f, 24);
     fclose(f);
@@ -99,7 +98,6 @@ static void test_valid(void) {
     CHECK(c.kinds[0] == 1 && c.ts[0] == 111 && c.v0[0] == 10);
     CHECK(c.kinds[1] == 2 && c.ts[1] == 222 && c.v0[1] == 20);
 
-    // A truncated trailing record is ignored by count and parse.
     f = fopen(p, "ab");
     CHECK(f != nullptr);
     fwrite("0123456789", 1, 10, f);
@@ -114,12 +112,11 @@ static void test_valid(void) {
 static void test_malformed(void) {
     char p[300];
 
-    // Bad magic.
     snprintf(p, sizeof(p), "%s/badmagic.log", g_dir);
     FILE *f = fopen(p, "wb");
     CHECK(f != nullptr);
     fwrite("NOTALOG", 1, 7, f);
-    uint8_t v = 1;
+    u8 v = 1;
     fwrite(&v, 1, 1, f);
     put_be32(f, 52);
     put_be32(f, 1);
@@ -131,7 +128,6 @@ static void test_malformed(void) {
     Collector c = { 0 };
     CHECK(LogParser_parse(p, collect, &c) == -1);
 
-    // Wrong version.
     snprintf(p, sizeof(p), "%s/badver.log", g_dir);
     f = fopen(p, "wb");
     CHECK(f != nullptr);
@@ -140,7 +136,6 @@ static void test_malformed(void) {
     CHECK(!LogParser_isLogFile(p));
     CHECK(LogParser_count(p) == -1);
 
-    // Wrong record size.
     snprintf(p, sizeof(p), "%s/badrec.log", g_dir);
     f = fopen(p, "wb");
     CHECK(f != nullptr);
@@ -148,7 +143,6 @@ static void test_malformed(void) {
     fclose(f);
     CHECK(!LogParser_isLogFile(p));
 
-    // Too short to hold a header.
     snprintf(p, sizeof(p), "%s/tiny.log", g_dir);
     f = fopen(p, "wb");
     CHECK(f != nullptr);
@@ -157,14 +151,12 @@ static void test_malformed(void) {
     CHECK(!LogParser_isLogFile(p));
     CHECK(LogParser_count(p) == -1);
 
-    // Missing file.
     snprintf(p, sizeof(p), "%s/absent.log", g_dir);
     remove(p);
     CHECK(!LogParser_isLogFile(p));
     CHECK(LogParser_count(p) == -1);
     CHECK(LogParser_parse(p, collect, &c) == -1);
 
-    // Null handler.
     CHECK(LogParser_parse(nullptr, nullptr, nullptr) == -1);
 }
 
@@ -179,13 +171,11 @@ static void test_format(void) {
     CHECK(strstr(out, "produce") != nullptr);
     CHECK(strstr(out, "1  2  3  4  5") != nullptr);
 
-    // base_ts <= 0 -> 0.000 ms.
     n = LogParser_formatRecord(out, sizeof(out), 2, 5, 0, "custom", 0, 0, 0, 0, 0);
     CHECK(n > 0);
     CHECK(strstr(out, "0.000 ms") != nullptr);
     CHECK(strstr(out, "custom") != nullptr);
 
-    // Truncation reports -1.
     char small[8];
     CHECK(LogParser_formatRecord(small, sizeof(small), 1, 1, 0, "x", 0, 0, 0, 0, 0) == -1);
 }

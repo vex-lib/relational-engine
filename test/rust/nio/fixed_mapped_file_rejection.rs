@@ -33,7 +33,7 @@ fn main() {
         drop(owner);
         println!("{bytes:?}");
     }
-    #[cfg(double_mut)]
+    #[cfg(f64_mut)]
     {
         let mut owner = FixedMappedFile!();
         let first = owner.as_mut_slice();

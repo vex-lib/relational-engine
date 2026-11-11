@@ -1,7 +1,7 @@
 #include "type/type.h"
-#include "util/annotation.h"
+#include "lang/annotation.h"
 
-#include <stddef.h>
+#include "vex.h"
 #include <string.h>
 
 #include "nio/mem.h"
@@ -40,9 +40,9 @@
  * Law private-helper doctrine):
  * ----------------------------------------------------------------------------
  *   TypeParentsRow {              // one registered project's parent chain
- *     uint64_t proj;              // owning project byte (0 = empty slot)
- *     const uint32_t *parents;    // parents[i] = parent class # of class # i
- *     uint32_t count;             // 0 = root; rows past count = root
+ *     u64 proj;              // owning project byte (0 = empty slot)
+ *     const u32 *parents;    // parents[i] = parent class # of class # i
+ *     u32 count;             // 0 = root; rows past count = root
  *   }
  *   g_typeTables                // growable slate, first-match, doubling on demand
  *   g_bareParents/g_bareCount   // vexspoke bare-id / PROJ_VEXSPOKE legacy chain
@@ -65,29 +65,29 @@
 // One registered project's parent chain. Private slot record: pure data, no
 // Class_* behavior of its own (all behavior hangs off Type).
 typedef struct TypeParentsRow {
-    uint64_t proj;               // owning project byte; 0 = empty slot
-    const uint32_t *parents;     // parents[i] = parent class # of class # i
-    uint32_t count;              // 0 row = root; rows past count = root
+    u64 proj;               // owning project byte; 0 = empty slot
+    const u32 *parents;     // parents[i] = parent class # of class # i
+    u32 count;              // 0 row = root; rows past count = root
 } TypeParentsRow;
 
 // Growable registration slate (the Dynamic Scalability & Anti-Hardcoding Law):
-// starts empty, doubles exponentially on demand, arena-backed. Rows beyond
+// starts empty, f64s exponentially on demand, arena-backed. Rows beyond
 // g_typeTableCount are never scanned, so stale Bytes are harmless. Allocated
 // untyped (id 0): the slate is engine-internal and carries no project identity.
 static TypeParentsRow *g_typeTables = nullptr;
-static size_t g_typeTableCount = 0;
-static size_t g_typeTableCap = 0;
+static bytes g_typeTableCount = 0;
+static bytes g_typeTableCap = 0;
 
 // Vexspoke's own bare-id / PROJ_VEXSPOKE legacy chain, granted once at startup.
-static const uint32_t *g_bareParents = nullptr;
-static uint32_t g_bareCount = 0;
+static const u32 *g_bareParents = nullptr;
+static u32 g_bareCount = 0;
 
 // Grow the slate to at least `needed` rows (doubling, cold start 8). On OOM
 // the slate is left untouched and registration fails; the caller drops.
 /** Grow the parent-chain registration table to at least needed rows. */
-static bool growSlate(size_t needed) {
+static bool growSlate(bytes needed) {
     if (needed <= g_typeTableCap) return true;
-    size_t newCap = (g_typeTableCap == 0) ? 8 : g_typeTableCap * 2;
+    bytes newCap = (g_typeTableCap == 0) ? 8 : g_typeTableCap * 2;
     while (newCap < needed) newCap *= 2;
     TypeParentsRow *nb = (TypeParentsRow*) Memory_alloc(
         0u, newCap * sizeof(TypeParentsRow));
@@ -100,8 +100,8 @@ static bool growSlate(size_t needed) {
 }
 
 /** Find a registered parent-chain row by its project identifier. */
-static const TypeParentsRow *findTable(uint64_t proj) {
-    for (size_t i = 0; i < g_typeTableCount; ++i) {
+static const TypeParentsRow *findTable(u64 proj) {
+    for (bytes i = 0; i < g_typeTableCount; ++i) {
         const TypeParentsRow *row = &g_typeTables[i];
         if ((*row).proj == proj)
             return row;
@@ -114,25 +114,21 @@ static const TypeParentsRow *findTable(uint64_t proj) {
 // mutual cycle both fail here, so Type_isA can never be handed a spinning
 // table (the Bounded Wait Law).
 /** Validate parent indices and reject multi-class cycles before chain publication. */
-static bool chainIsValid(const uint32_t *parents, uint32_t count) {
+static bool chainIsValid(const u32 *parents, u32 count) {
     if (parents == nullptr)
-        return count == 0u;                     // empty table only
+        return count == 0u;
     if (count == 0u)
-        return true;                            // empty table, non-null is fine
-    for (uint32_t i = 1u; i < count; ++i) {
+        return true;
+    for (u32 i = 1u; i < count; ++i) {
         if (parents[i] >= count)
-            return false;                       // parent out of range
+            return false;
     }
-    // A walk is legal when it reaches a root within `count` hops. A self-parent
-    // (parents[i] == i) is a ROOT encoding, not a cycle; only a loop of two or
-    // more distinct classes can spin, so only that is rejected (the Bounded Wait
-    // Law).
-    for (uint32_t i = 1u; i < count; ++i) {
-        uint32_t cur = i;
-        uint32_t hops = 0u;
+    for (u32 i = 1u; i < count; ++i) {
+        u32 cur = i;
+        u32 hops = 0u;
         while (parents[cur] != 0u && parents[cur] != cur) {
             if (++hops > count)
-                return false;                   // cycle: never roots
+                return false;
             cur = parents[cur];
         }
     }
@@ -140,7 +136,7 @@ static bool chainIsValid(const uint32_t *parents, uint32_t count) {
 }
 
 /** Return the registered parent-chain length used to bound Type_isA traversal. */
-static uint32_t chainCount(uint64_t proj) {
+static u32 chainCount(u64 proj) {
     if (proj == 0u || proj == PROJ_VEXSPOKE)
         return g_bareCount;
     const TypeParentsRow *row = findTable(proj);
@@ -148,7 +144,7 @@ static uint32_t chainCount(uint64_t proj) {
 }
 
 /** Register or replace one non-Vexspoke project's validated class-parent table. */
-bool Type_registerParents(uint64_t proj, const uint32_t *parents, uint32_t count) {
+bool Type_registerParents(u64 proj, const u32 *parents, u32 count) {
     if (proj == 0u)
         return false;
     if ((proj & MASK_PROJECT) != proj)
@@ -157,7 +153,7 @@ bool Type_registerParents(uint64_t proj, const uint32_t *parents, uint32_t count
         return false;
     if (!chainIsValid(parents, count))
         return false;
-    for (size_t i = 0; i < g_typeTableCount; ++i) {
+    for (bytes i = 0; i < g_typeTableCount; ++i) {
         TypeParentsRow *row = &g_typeTables[i];
         if ((*row).proj == proj) {
             (*row).parents = parents;
@@ -174,7 +170,7 @@ bool Type_registerParents(uint64_t proj, const uint32_t *parents, uint32_t count
 }
 
 /** Register or replace the validated parent table for bare/Vexspoke class ids. */
-bool Type_registerBareParents(const uint32_t *parents, uint32_t count) {
+bool Type_registerBareParents(const u32 *parents, u32 count) {
     if (!chainIsValid(parents, count))
         return false;
     g_bareParents = parents;
@@ -183,27 +179,27 @@ bool Type_registerBareParents(const uint32_t *parents, uint32_t count) {
 }
 
 /** Return a class's parent id, treating absent or unregistered entries as roots. */
-uint64_t Type_getParentClass(uint64_t classId) {
-    uint64_t proj = classId & MASK_PROJECT;
-    uint64_t cls = classId & MASK_CLASS;
+u64 Type_getParentClass(u64 classId) {
+    u64 proj = classId & MASK_PROJECT;
+    u64 cls = classId & MASK_CLASS;
     if (proj == 0u || proj == PROJ_VEXSPOKE) {
         if (g_bareParents != nullptr && cls != 0u && cls < g_bareCount) {
-            uint32_t parent = g_bareParents[cls];
-            return parent != 0u ? (uint64_t) parent : cls;   // table 0 row = root
+            u32 parent = g_bareParents[cls];
+            return parent != 0u ? (u64) parent : cls;
         }
-        return cls;                                    // unlisted bare class = root
+        return cls;
     }
     const TypeParentsRow *row = findTable(proj);
     if (row != nullptr && cls != 0u && cls < (*row).count) {
-        uint32_t parent = (*row).parents[cls];
-        return parent != 0u ? (uint64_t) parent : cls;   // table 0 row = root
+        u32 parent = (*row).parents[cls];
+        return parent != 0u ? (u64) parent : cls;
     }
-    return cls;                                    // unregistered project = root
+    return cls;
 }
 
 /** Map an encoded project byte to its architecture id; bare or unknown projects default to Vexspoke. */
-uint64_t Type_arch(uint64_t classId) {
-    uint64_t proj = classId & MASK_PROJECT;
+u64 Type_arch(u64 classId) {
+    const u64 proj = classId & MASK_PROJECT;
     if (proj == PROJ_VEXSPOKE)
         return ARCH_VEXSPOKE;
     if (proj == PROJ_GRAPHVEX)
@@ -218,25 +214,150 @@ uint64_t Type_arch(uint64_t classId) {
         return ARCH_DARKBASE;
     if (proj == PROJ_SAMPLERATE)
         return ARCH_SAMPLERATE;
-    // Bare ids carry no project byte: with per-project numbering they can only
-    // mean vexspoke's own class space. Cross-project code passes full ids.
     return ARCH_VEXSPOKE;
 }
 
 /** Test class ancestry within the same project using a walk bounded by its registered chain length. */
-int Type_isA(uint64_t classId, uint64_t ancestorId) {
-    uint64_t proj = classId & MASK_PROJECT;
-    uint64_t target = ancestorId & MASK_CLASS;
-    uint64_t current = classId;
-    uint32_t budget = chainCount(proj) + 2u;       // bounded walk
+u32 Type_isA(u64 classId, u64 ancestorId) {
+    u64 proj = classId & MASK_PROJECT;
+    u64 target = ancestorId & MASK_CLASS;
+    u64 current = classId;
+    u32 budget = chainCount(proj) + 2u;
     while (budget-- > 0u) {
-        uint64_t cc = current & MASK_CLASS;
+        u64 cc = current & MASK_CLASS;
         if (cc == target)
             return 1;
-        uint64_t parent = Type_getParentClass(current);
+        u64 parent = Type_getParentClass(current);
         if ((parent & MASK_CLASS) == cc)
-            return 0;                              // root reached, not target
-        current = (parent & MASK_CLASS) | proj;    // walk stays in-project
+            return 0;
+        current = (parent & MASK_CLASS) | proj;
     }
-    return 0;                                      // bounded: cycle guard fallback
+    return 0;
+}
+
+// Cold type predicates. The bit readers stay header-side as macros.
+
+u32 Type_isStruct(u64 form) {
+    return form == FORM_STRUCT_SINGLETON || form == FORM_STRUCT_ARRAY
+        || form == FORM_STRUCT_POINTER;
+}
+
+u32 Type_isSingleton(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_SINGLETON;
+}
+
+u32 Type_isArray(u64 typeId) {
+    u64 form = typeId & MASK_FORM;
+    return form == FORM_ARRAY || form == FORM_ARRAY_SOA || form == FORM_ARRAY_AOS || form == FORM_STRUCT_COEXISTENT;
+}
+
+u32 Type_isPointer(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_POINTER;
+}
+
+u32 Type_isStructSingleton(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_STRUCT_SINGLETON;
+}
+
+u32 Type_isStructArray(u64 typeId) {
+    u64 form = typeId & MASK_FORM;
+    return form == FORM_STRUCT_ARRAY || form == FORM_ARRAY_SOA || form == FORM_ARRAY_AOS || form == FORM_STRUCT_COEXISTENT;
+}
+
+u32 Type_isStructSOA(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_ARRAY_SOA;
+}
+
+u32 Type_isStructAOS(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_ARRAY_AOS;
+}
+
+u32 Type_isStructCoexistent(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_STRUCT_COEXISTENT;
+}
+
+u32 Type_isStructPointer(u64 typeId) {
+    return (typeId & MASK_FORM) == FORM_STRUCT_POINTER;
+}
+
+u32 Type_isPrimitive(u64 typeId) {
+    u64 form = typeId & MASK_FORM;
+    return form == FORM_SINGLETON || form == FORM_ARRAY || form == FORM_POINTER;
+}
+inline u32 Type_isStructSingleton(u64 typeId);
+
+inline u32 Type_isStructArray(u64 typeId);
+
+inline u32 Type_isStructSOA(u64 typeId);
+
+inline u32 Type_isStructAOS(u64 typeId);
+
+inline u32 Type_isStructCoexistent(u64 typeId);
+
+inline u32 Type_isStructPointer(u64 typeId);
+
+inline u32 Type_isPrimitive(u64 typeId);
+
+inline u32 Type_isGlobal(u64 typeId);
+
+inline u32 Type_isLocale(u64 typeId);
+
+inline u32 Type_isTransient(u64 typeId);
+
+inline u32 Type_isProactive(u64 typeId);
+
+inline u32 Type_isReactive(u64 typeId);
+
+inline u32 Type_isProbable(u64 typeId);
+
+u32 Type_isGlobal(u64 typeId) {
+    return (typeId & MASK_MODIFIER) == MOD_GLOBAL;
+}
+
+u32 Type_isLocale(u64 typeId) {
+    return (typeId & MASK_MODIFIER) == MOD_LOCALE;
+}
+
+u32 Type_isTransient(u64 typeId) {
+    return (typeId & MASK_MODIFIER) == MOD_TRANSIENT;
+}
+
+u32 Type_isProactive(u64 typeId) {
+    return (typeId & MASK_WRAPPER_1) == WRAP_PROACTIVE;
+}
+
+u32 Type_isReactive(u64 typeId) {
+    return (typeId & MASK_WRAPPER_1) == WRAP_REACTIVE;
+}
+
+u32 Type_isProbable(u64 typeId) {
+    return (typeId & MASK_WRAPPER_2) == WRAP2_PROBABLE;
+}
+
+u32 Type_isProbableObjects(u64 typeId) {
+    return (typeId & MASK_WRAPPER_2) == WRAP2_PROBABLE_OBJECTS;
+}
+
+u32 Type_isFuture(u64 typeId) {
+    return (typeId & MASK_WRAPPER_2) == WRAP2_FUTURE;
+}
+
+u32 Type_isChoice(u64 typeId) {
+    return (typeId & MASK_WRAPPER_2) == WRAP2_CHOICE;
+}
+
+u32 Type_isVexspoke(u64 classId) {
+    return Type_arch(classId) == ARCH_VEXSPOKE;
+}
+
+u32 Type_isHotcwap(u64 classId) {
+    return Type_arch(classId) == ARCH_HOTCWAP;
+}
+
+u32 Type_isDarling(u64 classId) {
+    return Type_arch(classId) == ARCH_DARLING;
+}
+
+u32 Type_isDarkbase(u64 classId) {
+    return Type_arch(classId) == ARCH_DARKBASE;
 }

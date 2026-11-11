@@ -18,7 +18,6 @@ fn snapshot_lifetime_budget_and_concurrent_publication() {
     string.set(b"").unwrap();
     assert_eq!(string.get(), b"");
     assert!(matches!(AtomicString::new(b"x", 0), Err(MemoryError::Capacity)));
-    // One record header plus one byte: the exact caller-provided budget.
     let exact_budget = std::mem::size_of::<Box<[u8]>>() + 1;
     let bounded = AtomicString::new(b"x", exact_budget).unwrap();
     assert_eq!(bounded.set(b"y"), Err(MemoryError::Capacity));

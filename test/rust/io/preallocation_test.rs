@@ -35,12 +35,12 @@ fn incremental_reservation_allocates_each_step() {
     let path: PathBuf = std::env::temp_dir().join(format!("re-reserve-step-{}", std::process::id()));
     let file = OpenOptions::new().read(true).write(true).create_new(true).open(&path).unwrap();
 
-    backend::reserve_more(&file, 0).unwrap();          // zero is a no-op, not an error
+    backend::reserve_more(&file, 0).unwrap();
     backend::reserve_more(&file, 4096).unwrap();
     let first = backend::allocated_bytes(&file).unwrap();
     assert!(first >= 4096, "first step allocated {first}");
 
-    backend::reserve_more(&file, 4096).unwrap();       // the second step adds only its delta
+    backend::reserve_more(&file, 4096).unwrap();
     let second = backend::allocated_bytes(&file).unwrap();
     assert!(second >= first + 4096, "{first} -> {second}");
 

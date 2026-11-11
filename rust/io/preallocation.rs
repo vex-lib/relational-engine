@@ -28,8 +28,6 @@ pub(crate) fn reserve(file: &File, length: u64) -> Result<(), PreallocationError
         fst_length: length,
         fst_bytesalloc: 0,
     };
-    // SAFETY: live borrowed descriptor; initialized platform fstore_t remains live
-    // for the synchronous variadic fcntl call. Length fits off_t, offset is zero.
     if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_PREALLOCATE, &mut request) } == -1 {
         return Err(std::io::Error::last_os_error().into());
     }
@@ -46,8 +44,6 @@ pub(crate) fn reserve(file: &File, length: u64) -> Result<(), PreallocationError
     use std::os::fd::AsRawFd;
     let length = libc::off_t::try_from(length).map_err(|_| PreallocationError::Length)?;
     if length == 0 { return Err(PreallocationError::Length); }
-    // SAFETY: live descriptor and representable nonnegative extent; flags zero
-    // requests reservation and lets the kernel reject unsupported filesystems.
     if unsafe { libc::fallocate(file.as_raw_fd(), 0, 0, length) } == -1 {
         return Err(std::io::Error::last_os_error().into());
     }
@@ -80,8 +76,6 @@ pub(crate) fn reserve_more(file: &File, delta: u64) -> Result<(), PreallocationE
         fst_length: length,
         fst_bytesalloc: 0,
     };
-    // SAFETY: live borrowed descriptor; initialized platform fstore_t stays live for
-    // the synchronous variadic fcntl call. Delta fits off_t.
     if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_PREALLOCATE, &mut request) } == -1 {
         return Err(std::io::Error::last_os_error().into());
     }
@@ -102,7 +96,6 @@ pub(crate) fn reserve_more(file: &File, delta: u64) -> Result<(), PreallocationE
     }
     let target = allocated_bytes(file)?.checked_add(delta).ok_or(PreallocationError::Length)?;
     let length = libc::off_t::try_from(target).map_err(|_| PreallocationError::Length)?;
-    // SAFETY: live descriptor and representable nonnegative extent; flags zero.
     if unsafe { libc::fallocate(file.as_raw_fd(), 0, 0, length) } == -1 {
         return Err(std::io::Error::last_os_error().into());
     }

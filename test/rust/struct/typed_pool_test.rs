@@ -12,7 +12,6 @@ impl Drop for Tracked { fn drop(&mut self) { self.0.set(self.0.get() + 1); } }
 /// Exercises lazy growth, reusable holes, empty-chunk release, stable rows, and formatting.
 #[test]
 fn lazy_growth_reuse_reclaim_and_stability() {
-    // Even a valid huge geometry is lazy, not a reservation/touch at construction.
     faults::fail_after(0);
     let lazy = TypedPool::<u8>::new(isize::MAX as usize);
     faults::reset();
@@ -42,7 +41,6 @@ fn lazy_growth_reuse_reclaim_and_stability() {
     assert!(pool.get(0).is_none() && pool.get_mut(0).is_none());
     assert!(pool.get(usize::MAX).is_none() && pool.get_mut(usize::MAX).is_none());
     assert!(matches!(pool.remove(usize::MAX), Err(StorageError::Bounds)));
-    // Last allocated chunk has room: use it before recreating released chunk 0.
     assert_eq!(pool.add(Row(9000)), Ok(2050));
     assert_eq!(pool.add(Row(9001)), Ok(2051));
     assert_eq!(pool.add(Row(9002)), Ok(0));
@@ -65,7 +63,6 @@ fn lazy_growth_reuse_reclaim_and_stability() {
 /// Verifies allocation failures preserve survivors and correctly drop rejected owned values.
 #[test]
 fn failure_preserves_survivors_and_incoming_ownership() {
-    // Fresh pools exercise directory, rows and bitmap failures independently.
     for stage in [0, 1, 2, 3] {
         let mut pool = TypedPool!(u64, 2).unwrap();
         faults::fail_after(stage);
@@ -118,7 +115,6 @@ fn failure_preserves_survivors_and_incoming_ownership() {
 /// Compares deterministic mixed pool operations against an owned reference model.
 #[test]
 fn seeded_mixed_operations_match_owned_model() {
-    // Reproducible xorshift sequence, not scheduler/clock-dependent fuzzing.
     let mut seed = 0x4a19_073d_94ef_71a3u64;
     println!("TypedPool model seed: {seed:#x}");
     let mut pool = TypedPool!(u64, 65).unwrap();
@@ -171,7 +167,7 @@ fn handles_reject_stale_generations() {
     assert_eq!(pool.remove_handle(first), Ok(1));
     assert!(pool.get_handle(first).is_none());
     assert!(matches!(pool.remove_handle(first), Err(StorageError::Bounds)));
-    let reused = pool.add_handle(3).unwrap(); // reuses the first slot
+    let reused = pool.add_handle(3).unwrap();
     assert_eq!(reused.index(), first.index());
     assert_ne!(reused.generation(), first.generation());
     assert!(pool.get_handle(first).is_none());
@@ -206,7 +202,7 @@ fn released_chunks_retain_history_and_recovery() {
     assert_eq!(pool.remove_handle(old), Err(StorageError::Bounds));
     assert_eq!(pool.get_handle(fresh), Some(&30));
     for value in 31..200 {
-        pool.remove_handle(fresh).ok(); // repeat stale rejection cannot affect later values
+        pool.remove_handle(fresh).ok();
         let active = pool.add_handle(value).unwrap();
         assert!(pool.get_handle(old).is_none());
         pool.remove_handle(active).unwrap();
