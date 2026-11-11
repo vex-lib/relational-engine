@@ -84,11 +84,11 @@ int main() {
     assert(re_mmap_read(owner, (bytes) -1, 2u, dest, sizeof dest, &truncated) == 3u);
     assert(re_mmap_read(owner, SIZE, 0u, dest, sizeof dest, &truncated) == 0u);
 
-    const u8 *bytes = nullptr;
+    const u8 *mapped = nullptr;
     bytes borrowed = 0u;
-    assert(re_mmap_borrow(owner, &bytes, &borrowed) == 0u);
-    assert(bytes != nullptr && borrowed == SIZE && bytes[0] == expected(0u));
-    assert(bytes[SIZE - 1u] == expected(SIZE - 1u));
+    assert(re_mmap_borrow(owner, &mapped, &borrowed) == 0u);
+    assert(mapped != nullptr && borrowed == SIZE && mapped[0] == expected(0u));
+    assert(mapped[SIZE - 1u] == expected(SIZE - 1u));
 
     assert(re_mmap_write(owner, 0u, (const u8*) "x", 1u) == 4u);
     assert(re_mmap_flush(owner) == 4u);
@@ -103,7 +103,7 @@ int main() {
     assert(re_mmap_is_open(owner, &flag) == 0u && !flag);
     assert(re_mmap_len(owner, &len) == 0u && len == 0u);
     assert(re_mmap_read(owner, 0u, 1u, dest, sizeof dest, &truncated) == 5u);
-    assert(re_mmap_borrow(owner, &bytes, &borrowed) == 5u);
+    assert(re_mmap_borrow(owner, &mapped, &borrowed) == 5u);
     assert(re_mmap_flush(owner) == 5u);
     assert(re_mmap_close(owner) == 0u);
     re_mmap_drop(owner);
@@ -132,7 +132,7 @@ int main() {
     assert(re_mmap_open(path, false, &owner) == 0u);
     assert(re_mmap_is_open(owner, &flag) == 0u && flag);
     assert(re_mmap_len(owner, &len) == 0u && len == 0u);
-    assert(re_mmap_borrow(owner, &bytes, &borrowed) == 0u && borrowed == 0u);
+    assert(re_mmap_borrow(owner, &mapped, &borrowed) == 0u && borrowed == 0u);
     assert(re_mmap_read(owner, 0u, 0u, dest, sizeof dest, &truncated) == 0u);
     assert(re_mmap_read(owner, 0u, 1u, dest, sizeof dest, &truncated) == 3u);
     re_mmap_drop(owner);
