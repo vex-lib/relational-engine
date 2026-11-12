@@ -3,7 +3,7 @@
 
 #include "vex.h"
 
-// type/type.h — the R2 type-id ALGEBRA (Relational Engine owner).
+// re_type.h — the R2 type-id ALGEBRA (Relational Engine owner).
 //
 // The project-agnostic half of the One Type Registry Law: the 64-bit id
 // encoding, its masks, and the pure readers. This is the Relational Engine's

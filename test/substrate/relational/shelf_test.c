@@ -5,7 +5,7 @@
 #include "vex.h"
 
 #include "nio/mem.h"
-#include "type/type.h"
+#include "type/re_type.h"
 #include "substrate/relational/cell.h"
 #include "substrate/relational/shelf.h"
 

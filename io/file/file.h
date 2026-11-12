@@ -7,7 +7,7 @@
 #include "lang/annotation.h"
 #include "lang/primitive.h"
 #include "nio/mem.h"
-#include "type/type.h"
+#include "type/re_type.h"
 
 #define TYPE_FILE_SINGLETON       Type_make(PROJ_RELATIONAL_ENGINE, FORM_SINGLETON, 3u)
 #define TYPE_FILEPTR_SINGLETON    Type_make(PROJ_RELATIONAL_ENGINE, FORM_SINGLETON, 10u)

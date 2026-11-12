@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "nio/mem.h"
-#include "type/type.h"
+#include "type/re_type.h"
 #include "lang/platform.h"
 #include "debug/throw.h"
 

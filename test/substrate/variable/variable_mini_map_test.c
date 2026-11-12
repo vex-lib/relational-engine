@@ -5,7 +5,7 @@
 #include "vex.h"
 
 #include "nio/mem.h"
-#include "type/type.h"
+#include "type/re_type.h"
 #include "substrate/variable/variable_mini_map.h"
 #include "substrate/variable/variable_slot.h"
 

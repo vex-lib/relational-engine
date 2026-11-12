@@ -11,7 +11,7 @@
 
 #include "lang/annotation.h"
 #include "nio/mem.h"
-#include "type/type.h"
+#include "type/re_type.h"
 
 ;;DEFINITION
 /**

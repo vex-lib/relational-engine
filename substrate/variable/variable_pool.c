@@ -4,7 +4,7 @@
 
 #include "lang/annotation.h"
 #include "atomic/atomic.h"
-#include "type/type.h"
+#include "type/re_type.h"
 
 ;;DEFINITION
 /**

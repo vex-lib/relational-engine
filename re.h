@@ -13,6 +13,6 @@
 #include "substrate/variable/variable.h"
 #include "search/search.h"
 #include "thread/thread.h"
-#include "type/type.h"
+#include "type/re_type.h"
 
 #endif //VEXGRAPH_ECOSYSTEM_RE_H

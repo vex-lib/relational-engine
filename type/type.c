@@ -1,4 +1,4 @@
-#include "type/type.h"
+#include "type/re_type.h"
 #include "lang/annotation.h"
 
 #include <string.h>
@@ -12,7 +12,7 @@
  * ============================================================================
  * The R2 type-id ALGEBRA, owned by Relational Engine. The 64-bit id encoding
  * (project byte, form nibble, per-project class number, BE6C sugar) and its
- * pure readers live in type/type.h; this file holds the parent-chain resolver.
+ * pure readers live in type/re_type.h; this file holds the parent-chain resolver.
  *
  * Each project keeps its OWN class registry in its own *-type.h and grants its
  * parent chain once here, keyed by the project byte. Vexspoke's own legacy

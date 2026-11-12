@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 
 #include "nio/mem.h"
-#include "type/type.h"
+#include "type/re_type.h"
 #include "vex.h"
 
 ;;DEFINITION

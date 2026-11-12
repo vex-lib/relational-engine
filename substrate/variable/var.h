@@ -5,7 +5,7 @@
 
 #include "nio/mem.h"
 #include "substrate/variable/variable_slot.h"
-#include "type/type.h"
+#include "type/re_type.h"
 
 // substrate/variable/var.h — an arena-owned reactive binding.
 //

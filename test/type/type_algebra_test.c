@@ -15,7 +15,7 @@
 #include "vex.h"
 #include <stdio.h>
 
-#include "type/type.h"
+#include "type/re_type.h"
 
 static int g_failures = 0;
 

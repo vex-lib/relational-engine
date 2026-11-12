@@ -8,7 +8,7 @@
 #include "vex.h"
 #include "nio/mem.h"
 #include "substrate/relational/cell.h"
-#include "type/type.h"
+#include "type/re_type.h"
 
 ;;DEFINITION
 /**
