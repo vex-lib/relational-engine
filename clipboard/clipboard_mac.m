@@ -1,3 +1,8 @@
+/* The SDK umbrella <Security/Security.h> collides with this tree's
+ * security/security.h on case-insensitive filesystems, so name exactly the
+ * framework types Foundation needs before AppKit pulls in NSURLCredential. */
+#import <Security/SecIdentity.h>
+#import <Security/SecTrust.h>
 #import <AppKit/AppKit.h>
 
 #include "vex.h"
