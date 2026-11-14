@@ -24,7 +24,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -36,7 +36,7 @@ static int g_failures = 0;
 } while (0)
 
 // Exercises strict SymbolTable rejection, class filtering, rename, and relational rebinding flows.
-int main(void) {
+int main() {
     printf("=== Running SymbolTable Strict Test Suite ===\n");
     if (!Memory_init(0u)) return 1;
     SymbolTable scope = SymbolTable();
@@ -83,11 +83,11 @@ int main(void) {
     CHECK("rename unknown", SymbolTable_rename(&scope, "nope", "alsono") == false);
     CHECK("rename bad new", SymbolTable_rename(&scope, "health", "has space") == false);
 
-    CHECK("setValue create", Relational_setValue(&scope, "score", 4, (void*) 0x600) == true);
-    CHECK("setValue rebind", Relational_setValue(&scope, "score", 4, (void*) 0x601) == true);
+    CHECK("setValue create", Relational_setValue(&scope, "score", 4, (any) 0x600) == true);
+    CHECK("setValue rebind", Relational_setValue(&scope, "score", 4, (any) 0x601) == true);
     CHECK("rebound value", (pointer) Relational_getValue(&scope, "score") == (pointer) 0x601);
-    CHECK("setFunction create", Relational_setFunction(&scope, "tick", (void*) 0x700) == true);
-    CHECK("setFunction rebind", Relational_setFunction(&scope, "tick", (void*) 0x701) == true);
+    CHECK("setFunction create", Relational_setFunction(&scope, "tick", (any) 0x700) == true);
+    CHECK("setFunction rebind", Relational_setFunction(&scope, "tick", (any) 0x701) == true);
     Relational_setString(&scope, "title", "hello");
     CHECK("setString create", Relational_getString(&scope, "title") != nullptr &&
         strcmp(Relational_getString(&scope, "title"), "hello") == 0);

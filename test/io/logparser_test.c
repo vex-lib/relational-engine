@@ -33,13 +33,13 @@ static int g_failures = 0;
 static char g_dir[256];
 
 /* Writes one 32-bit value in the log format's big-endian byte order. */
-static void put_be32(FILE *f, u32 v) {
+static fn put_be32(FILE *f, u32 v) {
     u8 b[4] = { (u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8), (u8)v };
     fwrite(b, 1, 4, f);
 }
 
 /* Writes one signed timestamp/value as its 64-bit big-endian representation. */
-static void put_be64(FILE *f, int64_t v) {
+static fn put_be64(FILE *f, int64_t v) {
     u8 b[8];
     for (int i = 0; i < 8; i++)
         b[i] = (u8)((u64)v >> (56 - 8 * i));
@@ -47,7 +47,7 @@ static void put_be64(FILE *f, int64_t v) {
 }
 
 /* Emits the ANTI-log magic, version, and big-endian record-size header. */
-static void put_header(FILE *f, u8 version, u32 record_size) {
+static fn put_header(FILE *f, u8 version, u32 record_size) {
     fwrite("ANTILOG", 1, 7, f);
     u8 v = version;
     fwrite(&v, 1, 1, f);
@@ -62,9 +62,9 @@ typedef struct Collector {
 } Collector;
 
 /* Saves selected callback fields so parsing order and values can be asserted. */
-static void collect(void *userdata, int kind, int64_t ts,
+static fn collect(any userdata, int kind, int64_t ts,
                     int64_t v0, int64_t v1, int64_t v2, int64_t v3, int64_t v4) {
-    (void) v1; (void) v2; (void) v3; (void) v4;
+    (fn) v1; (fn) v2; (fn) v3; (fn) v4;
     Collector *c = (Collector*) userdata;
     if ((*c).count < 8) {
         (*c).kinds[(*c).count] = kind;
@@ -75,7 +75,7 @@ static void collect(void *userdata, int kind, int64_t ts,
 }
 
 /* Verifies valid records, callback values, counts, and safe handling of a partial trailing record. */
-static void test_valid(void) {
+static fn test_valid() {
     char p[300];
     snprintf(p, sizeof(p), "%s/valid.log", g_dir);
     FILE *f = fopen(p, "wb");
@@ -109,7 +109,7 @@ static void test_valid(void) {
 }
 
 /* Verifies malformed headers, missing/short files, and null parse callbacks are rejected. */
-static void test_malformed(void) {
+static fn test_malformed() {
     char p[300];
 
     snprintf(p, sizeof(p), "%s/badmagic.log", g_dir);
@@ -161,7 +161,7 @@ static void test_malformed(void) {
 }
 
 /* Checks timestamp formatting, kind-name fallback, supplied labels, and truncation reporting. */
-static void test_format(void) {
+static fn test_format() {
     char out[256];
     int n = LogParser_formatRecord(out, sizeof(out), 1,
                                    1012345000LL, 1000000000LL, nullptr,
@@ -181,7 +181,7 @@ static void test_format(void) {
 }
 
 /* Checks known event names and deterministic fallback names for unknown kinds. */
-static void test_kind_names(void) {
+static fn test_kind_names() {
     CHECK(strcmp(LogParser_kindName(1), "produce") == 0);
     CHECK(strcmp(LogParser_kindName(2), "present") == 0);
     CHECK(strcmp(LogParser_kindName(3), "drop") == 0);
@@ -192,7 +192,7 @@ static void test_kind_names(void) {
 }
 
 /* Creates an isolated temporary directory, runs parser contract cases, and returns their aggregate status. */
-int main(void) {
+int main() {
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";

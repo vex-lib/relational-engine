@@ -2,7 +2,6 @@
 #define THREAD_REGISTRY_H
 
 #include "vex.h"
-
 #include "lang/primitive.h"
 
 // thread/thread.h — process-wide thread identity and opaque tag table.
@@ -23,7 +22,7 @@
 
 int ThreadRegistry_index();
 
-void ThreadRegistry_setTag(int index, u32 tag);
+fn ThreadRegistry_setTag(int index, u32 tag);
 u32 ThreadRegistry_tag(int index);
 
 #endif

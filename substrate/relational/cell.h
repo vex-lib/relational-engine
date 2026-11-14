@@ -2,7 +2,6 @@
 #define RELATIONAL_CELL_H
 
 #include "vex.h"
-
 #include "lang/constructor.h"
 
 // relational/cell.h — the identity cell.
@@ -40,15 +39,15 @@ Cell *Cell_2(u64 typeId, pointer value);
 
 #define Cell(...) CONSTRUCTOR_DISPATCH(Cell, __VA_ARGS__)
 
-void Cell_free(Cell *cell);
+fn Cell_free(Cell *cell);
 
 u64 Cell_typeId(const Cell *cell);
 bool Cell_check(const Cell *cell, u64 typeId);
 
-void Cell_setValue(Cell *cell, pointer value);
+fn Cell_setValue(Cell *cell, pointer value);
 pointer Cell_getValue(const Cell *cell);
 
-void Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated);
-void Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated);
+fn Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated);
+fn Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated);
 
 #endif

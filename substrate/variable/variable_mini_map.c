@@ -110,7 +110,7 @@ bool VariableMiniMap_init(VariableMiniMap *map) {
     return true;
 }
 
-void VariableMiniMap_shutdown(VariableMiniMap *map) {
+fn VariableMiniMap_shutdown(VariableMiniMap *map) {
     if (!map)
         return;
     for (u32 b = 0u; b < VARIABLE_MINI_BUCKETS; b++) {
@@ -123,7 +123,7 @@ void VariableMiniMap_shutdown(VariableMiniMap *map) {
     (*map).active = false;
 }
 
-VariableMiniMap *VariableMiniMap_0(void) {
+VariableMiniMap *VariableMiniMap_0() {
     VariableMiniMap *map = (VariableMiniMap*) Memory_alloc(TYPE_VARIABLE_MINI_MAP, sizeof(VariableMiniMap));
     if (!map)
         return nullptr;
@@ -134,7 +134,7 @@ VariableMiniMap *VariableMiniMap_0(void) {
     return map;
 }
 
-void VariableMiniMap_free(VariableMiniMap *map) {
+fn VariableMiniMap_free(VariableMiniMap *map) {
     if (!map)
         return;
     VariableMiniMap_shutdown(map);
@@ -201,7 +201,7 @@ bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name) {
     return list && findRow(list, name) != nullptr;
 }
 
-void VariableMiniMap_forEach(VariableMiniMap *map, VariableMiniMapVisitFn fn, void *userdata) {
+fn VariableMiniMap_forEach(VariableMiniMap *map, VariableMiniMapVisitFn fn, any userdata) {
     if (!map || !(*map).active || !fn)
         return;
     for (u32 b = 0u; b < VARIABLE_MINI_BUCKETS; b++) {
@@ -231,7 +231,7 @@ bool VariableMiniMap_isEmpty(const VariableMiniMap *map) {
 
 // STRING PROJECTIONS (the toString Law)
 
-void VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
+fn VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)
@@ -247,7 +247,7 @@ void VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap,
     }
 }
 
-void VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
+fn VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)

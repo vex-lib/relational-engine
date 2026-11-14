@@ -22,13 +22,13 @@ typedef struct SpinLock {
 // Zero-initialized lock usable as a field initializer / global.
 #define SPIN_LOCK_INIT ((SpinLock){ .word = 0 })
 
-void SpinLock_lock(SpinLock *lock);
+fn SpinLock_lock(SpinLock *lock);
 
 bool SpinLock_tryLock(SpinLock *lock);
 
 bool SpinLock_tryLockTimeout(SpinLock *lock, int64_t timeout_nanos);
 
-void SpinLock_unlock(SpinLock *lock);
+fn SpinLock_unlock(SpinLock *lock);
 
 bool SpinLock_isLocked(const SpinLock *lock);
 

@@ -19,18 +19,18 @@ static char path[512];
 static char otherPath[512];
 
 /* A path that does NOT exist yet: mkstemp reserves a unique name, then we remove it. */
-static void reservePathInto(char *dest, bytes cap) {
+static fn reservePathInto(char *dest, bytes cap) {
     const char *dir = getenv("TMPDIR");
-    (void) snprintf(dest, cap, "%s/re-gmap-XXXXXX", dir != nullptr ? dir : "/tmp");
+    (fn) snprintf(dest, cap, "%s/re-gmap-XXXXXX", dir != nullptr ? dir : "/tmp");
     int fd = mkstemp(dest);
     assert(fd >= 0);
     assert(close(fd) == 0);
     assert(unlink(dest) == 0);
 }
 
-static void reservePath(void) { reservePathInto(path, sizeof path); }
+static fn reservePath() { reservePathInto(path, sizeof path); }
 
-int main(void) {
+int main() {
     ReGrowableMappedFile *owner = nullptr;
     bytes len = 0u, reserved = 0u;
     u64 allocated = 0u;
@@ -182,7 +182,7 @@ int main(void) {
     assert(re_gmap_open(path, 64u, 65u, &owner) == 3u);
     assert(re_gmap_open(path, 0u, 0u, &owner) == 3u);
     char absent[512];
-    (void) snprintf(absent, sizeof absent, "%s/re-gmap-absent",
+    (fn) snprintf(absent, sizeof absent, "%s/re-gmap-absent",
                     getenv("TMPDIR") != nullptr ? getenv("TMPDIR") : "/tmp");
     assert(re_gmap_open(absent, 65536u, 0u, &owner) == 2u);
     reservePathInto(otherPath, sizeof otherPath);

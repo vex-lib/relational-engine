@@ -12,6 +12,7 @@
 //
 // This owner compiles against the algebra plus the Relational Engine class
 // registry, pinning the project byte and class numbers that re owns.
+
 #include "vex.h"
 #include <stdio.h>
 
@@ -32,7 +33,7 @@ static u64 projByte(u64 byte) {
     return (byte << 52) & MASK_PROJECT;
 }
 
-int main(void) {
+int main() {
     u64 id = Type_make(PROJ_VEXSPOKE, FORM_SINGLETON, 1u);
     CHECK(Type_class(id) == 1u);
     CHECK(Type_form(id) == FORM_SINGLETON);

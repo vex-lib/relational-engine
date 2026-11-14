@@ -2,7 +2,6 @@
 #define RELATIONAL_VARIABLE_MINI_MAP_H
 
 #include "vex.h"
-
 #include "lang/constructor.h"
 #include "substrate/variable/variable_slot.h"
 #include "struct/chunked_list.h"
@@ -34,23 +33,23 @@ typedef struct VariableMiniMap {
 } VariableMiniMap;
 
 bool VariableMiniMap_init(VariableMiniMap *map);
-void VariableMiniMap_shutdown(VariableMiniMap *map);
-VariableMiniMap *VariableMiniMap_0(void);
+fn VariableMiniMap_shutdown(VariableMiniMap *map);
+VariableMiniMap *VariableMiniMap_0();
 #define VariableMiniMap(...) CONSTRUCTOR_DISPATCH(VariableMiniMap, __VA_ARGS__)
-void VariableMiniMap_free(VariableMiniMap *map);
+fn VariableMiniMap_free(VariableMiniMap *map);
 
 bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer);
 pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name);
 bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name);
 
 // Visit every live entry (cold). Must not mutate the map.
-typedef void (*VariableMiniMapVisitFn)(VariableSlot *slot, void *userdata);
-void VariableMiniMap_forEach(VariableMiniMap *map, VariableMiniMapVisitFn fn, void *userdata);
+typedef fn (*VariableMiniMapVisitFn)(VariableSlot *slot, any userdata);
+fn VariableMiniMap_forEach(VariableMiniMap *map, VariableMiniMapVisitFn fn, any userdata);
 
 u32 VariableMiniMap_count(const VariableMiniMap *map);
 bool VariableMiniMap_isEmpty(const VariableMiniMap *map);
 
-void VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated);
-void VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated);
+fn VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated);
+fn VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated);
 
 #endif

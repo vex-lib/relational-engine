@@ -77,7 +77,7 @@ bool FileWriter_open(FileWriter *w, const char *path) {
 }
 
 /** Write one complete byte span when open, adding its length to the flushed-count field on success. */
-void FileWriter_write(FileWriter *w, const u8 *data, bytes len) {
+fn FileWriter_write(FileWriter *w, const u8 *data, bytes len) {
     if (!(*w).open || len == 0)
         return;
     if (fwrite(data, 1, len, (*w).out) == len)
@@ -85,13 +85,13 @@ void FileWriter_write(FileWriter *w, const u8 *data, bytes len) {
 }
 
 /** Flush the stdio buffer when the writer is open. */
-void FileWriter_flush(FileWriter *w) {
+fn FileWriter_flush(FileWriter *w) {
     if ((*w).open)
         fflush((*w).out);
 }
 
 /** Flush and close an open writer, then clear its handle and open flag. */
-void FileWriter_close(FileWriter *w) {
+fn FileWriter_close(FileWriter *w) {
     if (!(*w).open)
         return;
     fflush((*w).out);

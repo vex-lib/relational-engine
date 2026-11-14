@@ -40,7 +40,7 @@ static int g_failures = 0;
     } while (0)
 
 // Checks create-or-fail admission, case-folded lookup, class/pointer reads, and duplicate preservation.
-static void test_instant_and_lookup(SymbolTable *v) {
+static fn test_instant_and_lookup(SymbolTable *v) {
     i32 id0 = SymbolTable_instant(v, "alpha", TEST_CLASS_A, 0x10u);
     CHECK(id0 == 0);
     CHECK(SymbolTable_getId(v, "alpha") == id0);
@@ -60,7 +60,7 @@ static void test_instant_and_lookup(SymbolTable *v) {
 }
 
 // Exercises invalid/valid name boundaries and confirms rejected names do not add rows.
-static void test_name_policy(SymbolTable *v) {
+static fn test_name_policy(SymbolTable *v) {
     bytes before = SymbolTable_getActiveCount(v);
 
     CHECK(SymbolTable_instant(v, nullptr, TEST_CLASS_A, 1u) == -1);
@@ -89,7 +89,7 @@ static void test_name_policy(SymbolTable *v) {
 }
 
 // Checks successful rename identity preservation and rejection-state stability.
-static void test_rename(SymbolTable *v) {
+static fn test_rename(SymbolTable *v) {
     i32 id = SymbolTable_instant(v, "ren_old", TEST_CLASS_A, 7u);
     CHECK(id >= 0);
 
@@ -109,7 +109,7 @@ static void test_rename(SymbolTable *v) {
 }
 
 // Checks class filtering order, count-only/short output buffers, and no-match behavior.
-static void test_find_by_class(SymbolTable *v) {
+static fn test_find_by_class(SymbolTable *v) {
     const u32 cls = 0xABCDEF01u;
     i32 a = SymbolTable_instant(v, "fbc_a", cls, 1u);
     i32 b = SymbolTable_instant(v, "fbc_b", cls, 2u);
@@ -134,7 +134,7 @@ static void test_find_by_class(SymbolTable *v) {
 }
 
 // Checks pointer get/set/CAS semantics, including mismatch preservation and invalid ids.
-static void test_pointer_accessors(SymbolTable *v) {
+static fn test_pointer_accessors(SymbolTable *v) {
     i32 id = SymbolTable_instant(v, "pa_x", 0x11u, 100u);
     CHECK(id >= 0);
     CHECK(SymbolTable_getPointer(v, id) == 100u);
@@ -157,7 +157,7 @@ static void test_pointer_accessors(SymbolTable *v) {
 }
 
 // Checks direct name return and invalid-id handling.
-static void test_get_name(SymbolTable *v) {
+static fn test_get_name(SymbolTable *v) {
     i32 id = SymbolTable_instant(v, "gn_name", TEST_CLASS_A, 1u);
     CHECK(id >= 0);
 
@@ -167,7 +167,7 @@ static void test_get_name(SymbolTable *v) {
 }
 
 // Exercises null arguments and zero-initialized inactive tables across the public surface.
-static void test_null_and_inactive(void) {
+static fn test_null_and_inactive() {
     SymbolTable constructed = SymbolTable();
     CHECK(constructed.active);
     SymbolTable_shutdown(&constructed);
@@ -192,7 +192,7 @@ static void test_null_and_inactive(void) {
 }
 
 // Captures stderr to assert each rejected cold admission/rename emits one diagnostic.
-static void test_observability(SymbolTable *v) {
+static fn test_observability(SymbolTable *v) {
     FILE *capture = tmpfile();
     CHECK(capture != nullptr);
     int original = dup(fileno(stderr));
@@ -222,7 +222,7 @@ static void test_observability(SymbolTable *v) {
 }
 
 // Checks active-entry removal and safe repeated shutdown on an initialized table.
-static void test_shutdown(void) {
+static fn test_shutdown() {
     SymbolTable v = SymbolTable();
     CHECK(v.active);
     CHECK(SymbolTable_instant(&v, "sd_x", TEST_CLASS_A, 1u) >= 0);
@@ -236,7 +236,7 @@ static void test_shutdown(void) {
 }
 
 // Initializes memory and the table, runs isolated contract cases, and aggregates failures.
-int main(void) {
+int main() {
     CHECK(Memory_init(0));
 
     SymbolTable v = SymbolTable();

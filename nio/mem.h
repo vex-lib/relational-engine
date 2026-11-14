@@ -2,7 +2,6 @@
 #define NIO_MEM_H
 
 #include "vex.h"
-
 #include "lang/primitive.h"
 
 // Relational Engine owns this production ForeignMemory API and its implementation.
@@ -58,20 +57,20 @@ _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
 
 bool Memory_init(bytes totalBytes);
 
-void *Memory_alloc(u64 typeId, bytes numBytes);
+any Memory_alloc(u64 typeId, bytes numBytes);
 
-void *Memory_realloc(void *userPtr, bytes newBytes);
+any Memory_realloc(any userPtr, bytes newBytes);
 
-void Memory_free(void *userPtr);
+fn Memory_free(any userPtr);
 
-void Memory_freeAll();
+fn Memory_freeAll();
 
-bytes Memory_length(void *userPtr);
-u64 Memory_type(void *userPtr);
+bytes Memory_length(any userPtr);
+u64 Memory_type(any userPtr);
 
-bool Memory_similar(const void *a, const void *b);
+bool Memory_similar(const_any a, const_any b);
 
-bytes Memory_findAll(u64 typeId, void **outArray, bytes maxCount);
+bytes Memory_findAll(u64 typeId, any *outArray, bytes maxCount);
 
 // Phase-4 instancing (Arena-B): the process-global allocator above is the
 // DEFAULT arena. Secondary arenas are fully isolated slab sets carved from
@@ -89,13 +88,13 @@ typedef struct MemoryArena MemoryArena;
 // Private allocator seam, kept here so nio has one public header. The system
 // wrappers are the only libc allocation path; arena.c and transient.c call
 // them. Consumers may see these declarations but never call them directly.
-void *Memory_systemAlloc(bytes size);
-void *Memory_systemCalloc(bytes count, bytes size);
-void *Memory_systemRealloc(void *ptr, bytes size);
-void Memory_systemFree(void *ptr);
+any Memory_systemAlloc(bytes size);
+any Memory_systemCalloc(bytes count, bytes size);
+any Memory_systemRealloc(any ptr, bytes size);
+fn Memory_systemFree(any ptr);
 
-const MemoryHeader *Memory_safeHeader(const void *userPtr);
-MemoryArena *Memory_arenaFor(void *userPtr);
+const MemoryHeader *Memory_safeHeader(const_any userPtr);
+MemoryArena *Memory_arenaFor(any userPtr);
 
 #ifdef NIO_MEM_IMPLEMENTATION
 
@@ -126,7 +125,7 @@ static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
  * The redirect is the object's own address here; a primitive form redirects
  * to its value cell instead, which the id's form bits decide (Type_isPrimitive).
  */
-static void Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
+static fn Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
     (*h).typeId = typeId;
     (*h).length = (u64) numBytes;
     (*h).pointer = (u64) (pointer) ((u8*) h + sizeof(MemoryHeader));
@@ -138,12 +137,12 @@ static void Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
 MemoryArena *Memory_defaultArena();
 
 MemoryArena *MemoryArena_create(bytes totalBytes);
-void MemoryArena_destroy(MemoryArena *a);
-void *MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes);
-void *MemoryArena_realloc(MemoryArena *a, void *userPtr, bytes newBytes);
-void MemoryArena_free(MemoryArena *a, void *userPtr);
-void MemoryArena_freeAll(MemoryArena *a);
-bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, void **outArray, bytes maxCount);
+fn MemoryArena_destroy(MemoryArena *a);
+any MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes);
+any MemoryArena_realloc(MemoryArena *a, any userPtr, bytes newBytes);
+fn MemoryArena_free(MemoryArena *a, any userPtr);
+fn MemoryArena_freeAll(MemoryArena *a);
+bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCount);
 bytes MemoryArena_activeBytes(MemoryArena *a);
 bytes MemoryArena_capacity(MemoryArena *a);
 
@@ -158,15 +157,15 @@ typedef enum MemoryLifetime {
 } MemoryLifetime;
 
 bool Memory_initTransient(bytes capacity);
-void *Transient_alloc(u64 typeId, bytes numBytes);
-void Transient_reset(void);
-bool Transient_contains(const void *ptr);
-u32 Transient_getGeneration(void);
-u64 Transient_exhaustionCount(void);
+any Transient_alloc(u64 typeId, bytes numBytes);
+fn Transient_reset();
+bool Transient_contains(const_any ptr);
+u32 Transient_getGeneration();
+u64 Transient_exhaustionCount();
 #if defined(DEBUG_BORROW_CHECK)
 ;;VALIDATOR
-const u8 *Transient_getBuffer(void);
+const u8 *Transient_getBuffer();
 #endif
-MemoryLifetime Memory_getLifetime(const void *ptr);
+MemoryLifetime Memory_getLifetime(const_any ptr);
 
 #endif

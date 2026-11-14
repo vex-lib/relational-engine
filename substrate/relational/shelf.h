@@ -2,7 +2,6 @@
 #define RELATIONAL_SHELF_H
 
 #include "vex.h"
-
 #include "lang/constructor.h"
 #include "struct/chunked_list.h"
 
@@ -36,11 +35,11 @@ typedef struct Shelf {
 } Shelf;
 
 bool Shelf_init(Shelf *shelf);
-void Shelf_shutdown(Shelf *shelf);
+fn Shelf_shutdown(Shelf *shelf);
 
-Shelf *Shelf_0(void);
+Shelf *Shelf_0();
 #define Shelf(...) CONSTRUCTOR_DISPATCH(Shelf, __VA_ARGS__)
-void Shelf_free(Shelf *shelf);
+fn Shelf_free(Shelf *shelf);
 
 u32 Shelf_addCell(Shelf *shelf, u64 typeId, pointer value);
 u32 Shelf_addNode(Shelf *shelf, pointer cell);
@@ -56,7 +55,7 @@ u32 Shelf_getHead(const Shelf *shelf);
 u32 Shelf_count(const Shelf *shelf);
 bool Shelf_isEmpty(const Shelf *shelf);
 
-void Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated);
-void Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated);
+fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated);
+fn Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated);
 
 #endif

@@ -29,22 +29,22 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Constructors:
- *   - HotFileSys_init(void)
+ *   - HotFileSys_init()
  *
  * Core Functions:
- *   - HotFileSys_shutdown(void)
- *   - HotFileSys_pumpEvents(void)
+ *   - HotFileSys_shutdown()
+ *   - HotFileSys_pumpEvents()
  * ============================================================================
  */
 
 
-void HotFileSys_init(void) {
+fn HotFileSys_init() {
 }
 
 /** Draft stub for stopping the future file-watch service; currently does nothing. */
-void HotFileSys_shutdown(void) {
+fn HotFileSys_shutdown() {
 }
 
 /** Draft stub for draining future file-watch events; currently does nothing. */
-void HotFileSys_pumpEvents(void) {
+fn HotFileSys_pumpEvents() {
 }

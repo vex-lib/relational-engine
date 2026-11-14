@@ -19,7 +19,7 @@ typedef struct TestLabel {
 } TestLabel;
 
 /** Allocates and initializes the fallback label object from permanent memory. */
-static TestLabel *TestLabel_0(void) {
+static TestLabel *TestLabel_0() {
     TestLabel *lbl = (TestLabel*) Memory_alloc(100, sizeof(TestLabel));
     if (!lbl)
         return nullptr;
@@ -29,7 +29,7 @@ static TestLabel *TestLabel_0(void) {
 }
 
 /** Replaces label text with an owned permanent copy, releasing prior owned text. */
-static void TestLabel_setText(TestLabel *lbl, const char *text) {
+static fn TestLabel_setText(TestLabel *lbl, const char *text) {
     if (!lbl)
         return;
     if ((*lbl).text && (*lbl).ownsText)
@@ -47,7 +47,7 @@ static void TestLabel_setText(TestLabel *lbl, const char *text) {
 }
 
 /** Replaces label text with a borrowed pointer without taking ownership. */
-static void TestLabel_setTextBorrowed(TestLabel *lbl, const char *text) {
+static fn TestLabel_setTextBorrowed(TestLabel *lbl, const char *text) {
     if (!lbl)
         return;
 #if defined(DEBUG_BORROW_CHECK)
@@ -63,7 +63,7 @@ static void TestLabel_setTextBorrowed(TestLabel *lbl, const char *text) {
 }
 
 /** Releases owned text and the fallback label allocation. */
-static void TestLabel_free(TestLabel *lbl) {
+static fn TestLabel_free(TestLabel *lbl) {
     if (!lbl)
         return;
     if ((*lbl).text && (*lbl).ownsText)
@@ -78,7 +78,7 @@ static void TestLabel_free(TestLabel *lbl) {
 #define Label_free TestLabel_free
 #endif
 
-int main(void) {
+int main() {
     printf("[transient_lifetime_test] Starting lifetime verification suite...\n");
 
     const char *lit = "literal_constant_string";
@@ -88,16 +88,16 @@ int main(void) {
     strcpy(stackBuf, "stack_buffer_array");
     assert(Memory_getLifetime(stackBuf) == MEMORY_LIFETIME_UNKNOWN);
 
-    void *perm = Memory_alloc(1, 128);
+    any perm = Memory_alloc(1, 128);
     assert(perm != nullptr);
     assert(Memory_getLifetime(perm) == MEMORY_LIFETIME_PERMANENT);
 
-    void *trans = Transient_alloc(2, 128);
+    any trans = Transient_alloc(2, 128);
     assert(trans != nullptr);
     assert(Memory_getLifetime(trans) == MEMORY_LIFETIME_TRANSIENT);
 
-    Memory_free((void*) lit);
-    Memory_free((void*) stackBuf);
+    Memory_free((any) lit);
+    Memory_free((any) stackBuf);
     Memory_free(trans);
     printf("  [PASS] 1. Safe classification & free: lit/stack=UNKNOWN, safe no-op on free\n");
 

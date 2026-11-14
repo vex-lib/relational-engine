@@ -82,12 +82,12 @@ bool Memory_initTransient(bytes capacity) {
     return true;
 }
 /** Lazily initialize the transient arena using its named default capacity. */
-static void ensure_transient_initialized() {
+static fn ensure_transient_initialized() {
     if (!s_transient.live)
         Memory_initTransient(ANTI_TRANSIENT_DEFAULT_SIZE);
 }
 /** Allocate an aligned transient payload, rejecting length, arithmetic, and capacity overflow. */
-void *Transient_alloc(u64 typeId, bytes numBytes) {
+any Transient_alloc(u64 typeId, bytes numBytes) {
     if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
         s_transient.exhaustionCount++;
         if (!s_transient.exhaustionReported) {
@@ -124,10 +124,10 @@ void *Transient_alloc(u64 typeId, bytes numBytes) {
     MemoryHeader *h = (MemoryHeader*) slot;
     Memory_headerStamp(h, typeId, numBytes);
 
-    return (void*) (slot + sizeof(MemoryHeader));
+    return (any) (slot + sizeof(MemoryHeader));
 }
 /** Rewind the transient bump cursor and advance its generation, invalidating prior borrows. */
-void Transient_reset() {
+fn Transient_reset() {
     if (!s_transient.live)
         return;
 
@@ -148,7 +148,7 @@ void Transient_reset() {
 #endif
 }
 /** Return whether ptr lies in the currently used payload range of the transient arena. */
-bool Transient_contains(const void *ptr) {
+bool Transient_contains(const_any ptr) {
     if (!ptr || !s_transient.live || !s_transient.buffer)
         return false;
     u8 *p = (u8*) ptr;

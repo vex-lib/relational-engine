@@ -1,5 +1,6 @@
 #ifndef RELATIONAL_ENGINE_VARIABLE_REGISTRY_H
 #define RELATIONAL_ENGINE_VARIABLE_REGISTRY_H
+
 #include "vex.h"
 
 // One opaque owner plus its behaviorless borrowed row view. Rust owns all rows.
@@ -13,7 +14,7 @@ static_assert(offsetof(ReVariableSlot, name) == 0, "name starts at zero");
 static_assert(offsetof(ReVariableSlot, pointer) == 24, "value pointer follows name");
 
 u32 re_variables_new(bytes rowsPerChunk, ReVariableRegistry **outOwner);
-void re_variables_drop(ReVariableRegistry *owner);
+fn re_variables_drop(ReVariableRegistry *owner);
 u32 re_variables_add(ReVariableRegistry *owner, const u8 *name,
     bytes nameBytes, const u8 *valuePointer, bytes *outIndex);
 u32 re_variables_find(const ReVariableRegistry *owner, const u8 *name,

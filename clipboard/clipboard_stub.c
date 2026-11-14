@@ -35,27 +35,27 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Getters:
- *   - Clipboard_hasText(void)                    : true when text is stored
- *   - Clipboard_hasImage(void)                   : always false (no pasteboard)
+ *   - Clipboard_hasText()                    : true when text is stored
+ *   - Clipboard_hasImage()                   : always false (no pasteboard)
  *   - Clipboard_getText(dest, maxBytes)          : copy stored text, Bytes written
  *   - Clipboard_getImage(outWidth, outHeight, dest, maxBytes) : always false
  *
  * Setters:
  *   - Clipboard_setText(text)                    : store text (truncated at 4095)
  *   - Clipboard_setImage(pixels, width, height)  : always false
- *   - Clipboard_clear(void)                      : empty the text store
+ *   - Clipboard_clear()                      : empty the text store
  * ============================================================================
  */
 
 static char s_stubText[4096] = {0};
 
 /** Report whether the non-Apple stub currently contains nonempty text. */
-bool Clipboard_hasText(void) {
+bool Clipboard_hasText() {
     return s_stubText[0] != '\0';
 }
 
 /** Report that the non-Apple clipboard stub has no image format support. */
-bool Clipboard_hasImage(void) {
+bool Clipboard_hasImage() {
     return false;
 }
 
@@ -80,19 +80,19 @@ bool Clipboard_setText(const char *text) {
 }
 
 /** Report that image retrieval is unsupported by the non-Apple clipboard stub. */
-bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, void *dest, bytes maxBytes) {
-    (void) dest; (void) maxBytes; (void) outWidth; (void) outHeight;
+bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes) {
+    (fn) dest; (fn) maxBytes; (fn) outWidth; (fn) outHeight;
     return false;
 }
 
 /** Report that image publication is unsupported by the non-Apple clipboard stub. */
-bool Clipboard_setImage(const void *pixels, i32 width, i32 height) {
-    (void) pixels; (void) width; (void) height;
+bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
+    (fn) pixels; (fn) width; (fn) height;
     return false;
 }
 
 /** Empty the stub's stored text buffer. */
-void Clipboard_clear(void) {
+fn Clipboard_clear() {
     s_stubText[0] = '\0';
 }
 

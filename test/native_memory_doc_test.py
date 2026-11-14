@@ -14,11 +14,11 @@ ENGINE = WORKSPACE / "re"
 class NativeMemoryDocumentation(unittest.TestCase):
     def test_capacity_and_reset_claims_match_source(self):
         source = (ENGINE / "nio/arena.c").read_text()
-        alloc = source.split("static void *arena_alloc(", 1)[1].split(
-            "static void arena_free(", 1)[0]
+        alloc = source.split("static any arena_alloc(", 1)[1].split(
+            "static fn arena_free(", 1)[0]
         self.assertNotIn("malloc(", alloc)
         self.assertIn("return nullptr;", alloc)
-        reset = source.split("static void arena_freeAll(", 1)[1].split(
+        reset = source.split("static fn arena_freeAll(", 1)[1].split(
             "MemoryArena *Memory_arenaFor(", 1)[0]
         self.assertIn("memset((*a).bumpArena, 0, (*a).bumpOffset)", reset)
         enumerate_blocks = source.split("bytes MemoryArena_findAll(", 1)[1].split(

@@ -1,5 +1,6 @@
 #ifndef RE_FIXED_MAPPED_FILE_H
 #define RE_FIXED_MAPPED_FILE_H
+
 #include "vex.h"
 
 /* Fixed-extent, file-backed byte view owned by Rust, reached from C through this
@@ -42,7 +43,7 @@
 typedef struct ReFixedMappedFile ReFixedMappedFile;
 
 u32 re_mmap_open(const char *path, bool writable, ReFixedMappedFile **out_owner);
-void re_mmap_drop(ReFixedMappedFile *owner);
+fn re_mmap_drop(ReFixedMappedFile *owner);
 
 u32 re_mmap_len(const ReFixedMappedFile *owner, bytes *out_len);
 u32 re_mmap_is_open(const ReFixedMappedFile *owner, bool *out_open);

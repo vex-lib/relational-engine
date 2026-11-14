@@ -1,5 +1,6 @@
 #ifndef RE_ROW_POOL_H
 #define RE_ROW_POOL_H
+
 #include "vex.h"
 #include "relational_engine/row_handle.h"
 
@@ -25,7 +26,7 @@
 typedef struct ReRowPool ReRowPool;
 
 u32 re_rows_new(bytes row_size, bytes alignment, bytes rows_per_chunk, ReRowPool **out_owner);
-void re_rows_drop(ReRowPool *owner); /* null is a quiet no-op; live owner drops once */
+fn re_rows_drop(ReRowPool *owner); /* null is a quiet no-op; live owner drops once */
 u32 re_rows_add(ReRowPool *owner, const u8 *source, bytes length, ReRowHandle *out_handle);
 u32 re_rows_read(const ReRowPool *owner, ReRowHandle handle, u8 *dest, bytes capacity, bool *out_truncated);
 u32 re_rows_write(ReRowPool *owner, ReRowHandle handle, const u8 *source, bytes length);

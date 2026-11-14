@@ -17,9 +17,9 @@
 static char path[512];
 
 /* Build a regular file of `size` bytes with a known, position-dependent pattern. */
-static void makeFile(bytes size) {
+static fn makeFile(bytes size) {
     const char *dir = getenv("TMPDIR");
-    (void) snprintf(path, sizeof path, "%s/re-mmap-XXXXXX", dir != nullptr ? dir : "/tmp");
+    (fn) snprintf(path, sizeof path, "%s/re-mmap-XXXXXX", dir != nullptr ? dir : "/tmp");
     int fd = mkstemp(path);
     assert(fd >= 0);
     u8 buffer[SIZE];

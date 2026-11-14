@@ -2,7 +2,6 @@
 #define RELATIONAL_SYMBOL_TABLE_H
 
 #include "vex.h"
-
 #include "lang/constructor.h"
 
 // substrate/relational/symbol_table.h — the relational symbol registry (Legacy: substrate/variable/SymbolTable.java).
@@ -47,10 +46,10 @@ typedef struct SymbolTable {
     u32 bySlotCap;     // bySlot slots allocated
 } SymbolTable;
 
-SymbolTable SymbolTable_0(void);
+SymbolTable SymbolTable_0();
 #define SymbolTable(...) CONSTRUCTOR_DISPATCH(SymbolTable, __VA_ARGS__)
 
-void SymbolTable_shutdown(SymbolTable *v);
+fn SymbolTable_shutdown(SymbolTable *v);
 
 i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer targetPointer);
 
@@ -61,7 +60,7 @@ i32 SymbolTable_getId(SymbolTable *v, const char *name);
 bytes SymbolTable_findByClass(SymbolTable *v, u32 classId, i32 *outIds, bytes cap);
 
 pointer SymbolTable_getPointer(SymbolTable *v, i32 varId);
-void SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer);
+fn SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer);
 bool SymbolTable_compareAndSetPointer(SymbolTable *v, i32 varId, pointer expected, pointer newPointer);
 u32 SymbolTable_getClassId(SymbolTable *v, i32 varId);
 

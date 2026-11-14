@@ -1,6 +1,8 @@
 #ifndef RELATIONAL_MEMORY_H
 #define RELATIONAL_MEMORY_H
+
 #include "vex.h"
+
 /* Standalone learning ABI, NOT Vexspoke Memory_* compatibility.
  * Owner is opaque and exclusively managed; drop once, never concurrently.
  * IDs are owner-local. Pointer arguments must be live, aligned and sized;
@@ -17,8 +19,8 @@
  * Engine code/storage must remain resident across consumer hot reloads.
  * new may abort on allocator OOM. No per-frame/real-time guarantees. */
 typedef struct ReMemory ReMemory;
-ReMemory *re_memory_new(void);
-void re_memory_drop(ReMemory *owner);
+ReMemory *re_memory_new();
+fn re_memory_drop(ReMemory *owner);
 u32 re_memory_copy(ReMemory *owner, const u8 *source, bytes length, u64 *output);
 u32 re_memory_read(const ReMemory *owner, u64 id, u8 *destination, bytes capacity, bytes *output_length);
 u32 re_memory_get_byte(const ReMemory *owner, u64 id, bytes index, u8 *output);

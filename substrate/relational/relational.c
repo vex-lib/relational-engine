@@ -158,22 +158,22 @@ bool Relational_setName(SymbolTable *scope, const char *oldName, const char *new
 
 // value — store as-is, pointer is the value
 
-void *Relational_getValue(SymbolTable *scope, const char *name) {
+any Relational_getValue(SymbolTable *scope, const char *name) {
     if (!scope || !name)
         return nullptr;
     i32 varId = SymbolTable_getId(scope, name);
     if (varId < 0)
         return nullptr;
-    return (void*) SymbolTable_getPointer(scope, varId);
+    return (any) SymbolTable_getPointer(scope, varId);
 }
 
-void *Relational_getValueById(SymbolTable *scope, i32 varId) {
+any Relational_getValueById(SymbolTable *scope, i32 varId) {
     if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope))
         return nullptr;
-    return (void*) SymbolTable_getPointer(scope, varId);
+    return (any) SymbolTable_getPointer(scope, varId);
 }
 
-bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, void *ptr) {
+bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, any ptr) {
     if (!scope || !name)
         return false;
     i32 varId = SymbolTable_getId(scope, name);
@@ -184,7 +184,7 @@ bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, void
     return SymbolTable_instant(scope, name, classId, (pointer) ptr) >= 0;
 }
 
-bool Relational_setValueById(SymbolTable *scope, i32 varId, void *ptr) {
+bool Relational_setValueById(SymbolTable *scope, i32 varId, any ptr) {
     if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope))
         return false;
     SymbolTable_setPointer(scope, varId, (pointer) ptr);
@@ -213,7 +213,7 @@ const char *Relational_getString(SymbolTable *scope, const char *name) {
     return (const char*) SymbolTable_getPointer(scope, varId);
 }
 
-void Relational_setString(SymbolTable *scope, const char *name, const char *value) {
+fn Relational_setString(SymbolTable *scope, const char *name, const char *value) {
     if (!scope || !name || !value)
         return;
     u8 *newPtr = Relational_stringAlloc(value);
@@ -221,7 +221,7 @@ void Relational_setString(SymbolTable *scope, const char *name, const char *valu
         return;
     i32 varId = SymbolTable_getId(scope, name);
     if (varId >= 0) {
-        void *oldPtr = (void*) SymbolTable_getPointer(scope, varId);
+        any oldPtr = (any) SymbolTable_getPointer(scope, varId);
         SymbolTable_setPointer(scope, varId, (pointer) newPtr);
         if (oldPtr)
             Memory_free(oldPtr);
@@ -234,11 +234,11 @@ void Relational_setString(SymbolTable *scope, const char *name, const char *valu
 
 // function pointers — same as value, typed helper
 
-void *Relational_getFunction(SymbolTable *scope, const char *name) {
+any Relational_getFunction(SymbolTable *scope, const char *name) {
     return Relational_getValue(scope, name);
 }
 
-bool Relational_setFunction(SymbolTable *scope, const char *name, void *fn) {
+bool Relational_setFunction(SymbolTable *scope, const char *name, any fn) {
     if (!scope || !name || !fn)
         return false;
     i32 varId = SymbolTable_getId(scope, name);
@@ -344,7 +344,7 @@ bytes Relational_searchAll(SymbolTable *global, SymbolTable *local, const char *
     if (local) {
         bytes before = filled;
         filled = searchOne(local, query, outIds, cap, filled);
-        (void) before;
+        (fn) before;
     }
     return filled;
 }

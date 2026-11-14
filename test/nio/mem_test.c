@@ -46,7 +46,7 @@ static _Alignas(16) u8 g_foreign[64];
 // A type that asks for more than the platform allocator promises (16).
 typedef struct Over32 { _Alignas(32) u8 bytes[32]; } Over32;
 
-int main(void) {
+int main() {
     CHECK(Memory_init(0));
 
     CHECK(Memory_length(nullptr) == 0);
@@ -57,7 +57,7 @@ int main(void) {
 
     Memory_realloc(nullptr, 0);
 
-    void *p = Memory_alloc(TEST_TYPE_A, 16);
+    any p = Memory_alloc(TEST_TYPE_A, 16);
 
     CHECK(p != nullptr);
 
@@ -69,7 +69,7 @@ int main(void) {
 
     memset(p, 0xA5, 16);
 
-    void *p_next = Memory_alloc(TEST_TYPE_B, 16);
+    any p_next = Memory_alloc(TEST_TYPE_B, 16);
 
     CHECK(p_next != nullptr);
 
@@ -79,21 +79,21 @@ int main(void) {
 
     CHECK(sizeof(Over32) == 32);
 
-    void *over_slab = Memory_alloc(TEST_TYPE_B, sizeof(Over32));
+    any over_slab = Memory_alloc(TEST_TYPE_B, sizeof(Over32));
 
     CHECK(over_slab != nullptr);
 
     CHECK(((pointer) over_slab & 31) == 0);
 
     for (int i = 0; i < 3; i++) {
-        void *over_bump = Memory_alloc(TEST_TYPE_B, 5000u + (bytes) i * 16u);
+        any over_bump = Memory_alloc(TEST_TYPE_B, 5000u + (bytes) i * 16u);
 
         CHECK(over_bump != nullptr);
 
         CHECK(((pointer) over_bump & 31) == 0);
     }
 
-    void *zero = Memory_alloc(TEST_TYPE_C, 0);
+    any zero = Memory_alloc(TEST_TYPE_C, 0);
 
     CHECK(zero != nullptr);
 
@@ -115,19 +115,19 @@ int main(void) {
 
     CHECK(Memory_similar(p, nullptr) == false);
 
-    void *p2 = Memory_alloc(TEST_TYPE_A, 64);
+    any p2 = Memory_alloc(TEST_TYPE_A, 64);
 
     CHECK(p2 != nullptr);
 
     CHECK(Memory_similar(p, p2));
 
-    void *other = Memory_alloc(TEST_TYPE_B, 16);
+    any other = Memory_alloc(TEST_TYPE_B, 16);
 
     CHECK(Memory_similar(p, other) == false);
 
     CHECK(Memory_similar(p, p) == true);
 
-    void *havoc = Memory_realloc(p, (bytes) -1);
+    any havoc = Memory_realloc(p, (bytes) -1);
 
     CHECK(havoc == nullptr);
 
@@ -136,7 +136,7 @@ int main(void) {
     for (bytes i = 0; i < 16; i++)
         CHECK(((u8*) p)[i] == 0xA5);
 
-    void *grown = Memory_realloc(p, 128);
+    any grown = Memory_realloc(p, 128);
 
     CHECK(grown != nullptr);
 
@@ -151,7 +151,7 @@ int main(void) {
 
     p = grown;
 
-    (void) p;
+    (fn) p;
 
     Memory_freeAll();
 
@@ -162,7 +162,7 @@ int main(void) {
 
     CHECK(Memory_findAll(TEST_TYPE_A, nullptr, 0) == 0);
 
-    void *found[8] = {0};
+    any found[8] = {0};
 
     CHECK(Memory_findAll(0xABCDu, found, 1) == 3);
 
@@ -188,7 +188,7 @@ int main(void) {
 
     CHECK(MemoryArena_capacity(b) == 64u * 1024u * 1024u);
 
-    void *bp = MemoryArena_alloc(b, 0xB0B0u, 32);
+    any bp = MemoryArena_alloc(b, 0xB0B0u, 32);
 
     CHECK(bp != nullptr);
 
@@ -220,7 +220,7 @@ int main(void) {
 
     CHECK(Memory_initTransient(4096));
 
-    void *tp = Transient_alloc(TEST_TYPE_A, 16);
+    any tp = Transient_alloc(TEST_TYPE_A, 16);
 
     CHECK(tp != nullptr);
 
@@ -232,7 +232,7 @@ int main(void) {
 
     CHECK(Memory_getLifetime(tp) == MEMORY_LIFETIME_TRANSIENT);
 
-    void *perm = Memory_alloc(TEST_TYPE_A, 8);
+    any perm = Memory_alloc(TEST_TYPE_A, 8);
 
     CHECK(Memory_getLifetime(perm) == MEMORY_LIFETIME_PERMANENT);
 
@@ -283,9 +283,9 @@ int main(void) {
     pid_t pid = fork();
 
     if (pid == 0) {
-        Memory_free((void*) (pointer) 0x1000);
+        Memory_free((any) (pointer) 0x1000);
 
-        volatile bytes len = Memory_length((void*) (pointer) 0x1000);
+        volatile bytes len = Memory_length((any) (pointer) 0x1000);
 
         _exit(len == 0 ? 0 : 1);
     }

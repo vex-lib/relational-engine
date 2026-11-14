@@ -77,7 +77,7 @@ static u32 ticket(u64 thread_id) {
 
 // Spin until acquired. The CAS publishes with acquire so our critical section
 // sees everything the previous owner wrote before releasing.
-void SpinLock_lock(SpinLock *lock) {
+fn SpinLock_lock(SpinLock *lock) {
     if (!lock)
         return;
     u32 expected = 0;
@@ -121,7 +121,7 @@ bool SpinLock_tryLockTimeout(SpinLock *lock, int64_t timeout_nanos) {
 
 // Release with release semantics so our critical-section writes are visible
 // to the next thread that acquires.
-void SpinLock_unlock(SpinLock *lock) {
+fn SpinLock_unlock(SpinLock *lock) {
     if (!lock)
         return;
     u32 cur = atomic_load_explicit(&(*lock).word, memory_order_acquire);

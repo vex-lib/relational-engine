@@ -1,7 +1,6 @@
 #ifndef IO_CLIPBOARD_H
 #define IO_CLIPBOARD_H
 
-
 #include "vex.h"
 #include "lang/primitive.h"
 
@@ -29,10 +28,10 @@ bytes Clipboard_getText(char *dest, bytes maxBytes);
 
 bool   Clipboard_setText(const char *text);
 
-bool   Clipboard_getImage(i32 *outWidth, i32 *outHeight, void *dest, bytes maxBytes);
+bool   Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes);
 
-bool   Clipboard_setImage(const void *pixels, i32 width, i32 height);
+bool   Clipboard_setImage(const_any pixels, i32 width, i32 height);
 
-void   Clipboard_clear();
+fn   Clipboard_clear();
 
 #endif

@@ -42,7 +42,7 @@
  *     char *path;                  // watched directory, owned copy
  *     FileEventType mask;          // delivered event bits
  *     FileEventCallback callback;  // caller callback, never invoked on the OS thread
- *     void *userdata;              // callback context, caller-owned
+ *     any userdata;              // callback context, caller-owned
  *     pthread_mutex_t mutex;       // guards the queue and its growth
  *     QueuedEvent *queue;          // owned pending events (path copy + type)
  *     bytes queueCount;           // pending events
@@ -73,7 +73,7 @@ struct FileEventWatcher {
     char *path;
     FileEventType mask;
     FileEventCallback callback;
-    void *userdata;
+    any userdata;
 
     pthread_mutex_t mutex;
     QueuedEvent *queue;
@@ -88,7 +88,7 @@ struct FileEventWatcher {
     bool running;
 };
 
-static void enqueue(FileEventWatcher *watcher, const char *path, FileEventType type) {
+static fn enqueue(FileEventWatcher *watcher, const char *path, FileEventType type) {
     if (!watcher || !path)
         return;
     if (!(type & (*watcher).mask))
@@ -114,12 +114,12 @@ static void enqueue(FileEventWatcher *watcher, const char *path, FileEventType t
 }
 
 #if defined(VEX_PLATFORM_APPLE)
-static void fsCallback(ConstFSEventStreamRef streamRef, void *clientCallBackInfo,
-                       bytes numEvents, void *eventPaths,
+static fn fsCallback(ConstFSEventStreamRef streamRef, any clientCallBackInfo,
+                       bytes numEvents, any eventPaths,
                        const FSEventStreamEventFlags eventFlags[],
                        const FSEventStreamEventId eventIds[]) {
-    (void) streamRef;
-    (void) eventIds;
+    (fn) streamRef;
+    (fn) eventIds;
     FileEventWatcher *watcher = (FileEventWatcher*) clientCallBackInfo;
     char **paths = (char**) eventPaths;
     for (bytes i = 0; i < numEvents; i++) {
@@ -141,7 +141,7 @@ static void fsCallback(ConstFSEventStreamRef streamRef, void *clientCallBackInfo
 #endif
 
 FileEventWatcher *FileEventWatcher_create(const char *path, FileEventType mask,
-                                          FileEventCallback callback, void *userdata) {
+                                          FileEventCallback callback, any userdata) {
     if (!path || !callback)
         return nullptr;
     FileEventWatcher *watcher = (FileEventWatcher*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, sizeof(FileEventWatcher));
@@ -170,7 +170,7 @@ bool FileEventWatcher_start(FileEventWatcher *watcher) {
     FSEventStreamContext context = { 0, watcher, nullptr, nullptr, nullptr };
     (*watcher).stream = FSEventStreamCreate(nullptr, fsCallback, &context,
                                          (CFArrayRef) CFArrayCreate(nullptr,
-                                             (const void**) &(*watcher).path, 1,
+                                             (const_any *) &(*watcher).path, 1,
                                              &kCFTypeArrayCallBacks),
                                          kFSEventStreamEventIdSinceNow,
                                          0.25,
@@ -193,7 +193,7 @@ bool FileEventWatcher_start(FileEventWatcher *watcher) {
 #endif
 }
 
-void FileEventWatcher_stop(FileEventWatcher *watcher) {
+fn FileEventWatcher_stop(FileEventWatcher *watcher) {
     if (!watcher || !(*watcher).running)
         return;
 #if defined(VEX_PLATFORM_APPLE)
@@ -211,7 +211,7 @@ void FileEventWatcher_stop(FileEventWatcher *watcher) {
     (*watcher).running = false;
 }
 
-void FileEventWatcher_pump(FileEventWatcher *watcher) {
+fn FileEventWatcher_pump(FileEventWatcher *watcher) {
     if (!watcher)
         return;
     pthread_mutex_lock(&(*watcher).mutex);
@@ -230,7 +230,7 @@ void FileEventWatcher_pump(FileEventWatcher *watcher) {
     Memory_free(events);
 }
 
-void FileEventWatcher_destroy(FileEventWatcher *watcher) {
+fn FileEventWatcher_destroy(FileEventWatcher *watcher) {
     if (!watcher)
         return;
     FileEventWatcher_stop(watcher);

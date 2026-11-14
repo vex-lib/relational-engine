@@ -24,7 +24,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -36,7 +36,7 @@ static int g_failures = 0;
 } while (0)
 
 // Exercises static StringPool lifecycle, validation, deduplication, growth, and relinking.
-int main(void) {
+int main() {
     printf("=== Running Variable Pool Test Suite ===\n");
 
     {

@@ -38,18 +38,18 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Public Core Functions: (.h)
- *   - Clipboard_hasText(void)
- *   - Clipboard_hasImage(void)
+ *   - Clipboard_hasText()
+ *   - Clipboard_hasImage()
  *   - Clipboard_getText(dest, maxBytes)
  *   - Clipboard_setText(text)
  *   - Clipboard_getImage(outWidth, outHeight, dest, maxBytes)
  *   - Clipboard_setImage(pixels, width, height)
- *   - Clipboard_clear(void)
+ *   - Clipboard_clear()
  * ============================================================================
  */
 ;;PLATFORM_EXCLUSIVE("Mac")
 /** Report whether the system pasteboard advertises its plain-text format. */
-bool Clipboard_hasText(void) {
+bool Clipboard_hasText() {
     @autoreleasepool {
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         NSArray *types = [pb types];
@@ -58,7 +58,7 @@ bool Clipboard_hasText(void) {
 }
 
 /** Report whether the system pasteboard advertises TIFF or PNG image data. */
-bool Clipboard_hasImage(void) {
+bool Clipboard_hasImage() {
     @autoreleasepool {
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         NSArray *types = [pb types];
@@ -113,7 +113,7 @@ bool Clipboard_setText(const char *text) {
 }
 
 /** Decode pasteboard TIFF/PNG into caller RGBA storage when it fits, then return dimensions. */
-bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, void *dest, bytes maxBytes) {
+bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes) {
     if (dest == nullptr || outWidth == nullptr || outHeight == nullptr) {
         return false;
     }
@@ -152,7 +152,7 @@ bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, void *dest, bytes maxByte
 }
 
 /** Encode caller-provided RGBA pixels as TIFF and replace pasteboard image contents. */
-bool Clipboard_setImage(const void *pixels, i32 width, i32 height) {
+bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
     if (pixels == nullptr || width <= 0 || height <= 0) {
         return false;
     }
@@ -191,7 +191,7 @@ bool Clipboard_setImage(const void *pixels, i32 width, i32 height) {
 }
 
 /** Clear all items from the system pasteboard. */
-void Clipboard_clear(void) {
+fn Clipboard_clear() {
     @autoreleasepool {
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         [pb clearContents];

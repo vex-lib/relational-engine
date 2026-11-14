@@ -9,7 +9,7 @@
 #include "debug/test_support.h"
 
 /* Exercises the host clipboard round trip; execution is gated by explicit mutation permission. */
-static void test_clipboard(void) {
+static fn test_clipboard() {
     printf("Testing clipboard bridge...\n");
     const char *test_str = "VexGraph Ecosystem Clipboard Payload";
 
@@ -24,7 +24,7 @@ static void test_clipboard(void) {
     Clipboard_clear();
 }
 
-int main(void) {
+int main() {
     const char *permission = getenv("RE_TEST_SYSTEM_CLIPBOARD");
     if (!permission || strcmp(permission, "1") != 0) {
         fputs("SKIP: system clipboard mutation requires RE_TEST_SYSTEM_CLIPBOARD=1\n", stderr);

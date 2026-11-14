@@ -17,7 +17,7 @@ typedef struct ExampleRow {
 } ExampleRow;
 
 /* Proves the C handle matches Rust's target ABI and cannot hide uninitialized padding. */
-static void layout(void) {
+static fn layout() {
     _Static_assert(sizeof(ReRowHandle) == 24, "64-bit handle ABI");
     _Static_assert(offsetof(ReRowHandle, owner) == 0, "owner offset");
     _Static_assert(offsetof(ReRowHandle, index) == 8, "index offset");
@@ -26,7 +26,7 @@ static void layout(void) {
 }
 
 /* Rejects geometry before publication; retains output owner on failure. */
-static void geometry_rejections(void) {
+static fn geometry_rejections() {
     ReRowPool *pool = nullptr;
     assert(re_rows_new(0, 8, 1, &pool) == 1 && pool == nullptr);
     assert(re_rows_new(8, 0, 1, &pool) == 1 && pool == nullptr);
@@ -50,7 +50,7 @@ static void geometry_rejections(void) {
 }
 
 /* Exercises copied rows, all null/output rejection paths, wrong owners and stable pointers. */
-static void storage_contract(void) {
+static fn storage_contract() {
     ReRowPool *pool = nullptr;
     ReRowPool *other = nullptr;
     assert(ReRowPool(sizeof(ExampleRow), 256, 2, &pool) == 0);
@@ -168,7 +168,7 @@ static void storage_contract(void) {
 }
 
 /* Executes all deterministic owner scenarios with assertions retained. */
-int main(void) {
+int main() {
     layout();
     geometry_rejections();
     storage_contract();

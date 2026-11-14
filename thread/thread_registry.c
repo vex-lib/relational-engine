@@ -76,7 +76,7 @@ int ThreadRegistry_index() {
     }
 }
 
-void ThreadRegistry_setTag(int index, u32 tag) {
+fn ThreadRegistry_setTag(int index, u32 tag) {
     if (index < 0 || index >= THREAD_REGISTRY_DEFAULT_SIZE) return;
     atomic_store_explicit(&s_tags[index], tag, memory_order_release);
 }

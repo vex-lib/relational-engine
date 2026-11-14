@@ -24,7 +24,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -41,7 +41,7 @@ static int g_checks = 0;
     } while (0)
 
 // Checks map initialization, empty/missing lookup, basic insertion, null safety, and shutdown.
-static void testLifecycle(void) {
+static fn testLifecycle() {
     printf("[1] init / empty / count / null-safety\n");
 
     VariableMiniMap map;
@@ -70,7 +70,7 @@ static void testLifecycle(void) {
 }
 
 // Covers all buckets, case-folded dotted keys, and in-place upsert behavior.
-static void testBucketsAndFold(void) {
+static fn testBucketsAndFold() {
     printf("[2] 39 buckets + folding + dotted names + upsert\n");
 
     VariableMiniMap map;
@@ -101,7 +101,7 @@ static void testBucketsAndFold(void) {
 }
 
 // Checks malformed and overlong key rejection without changing the entry count.
-static void testRejection(void) {
+static fn testRejection() {
     printf("[3] illegal names rejected\n");
 
     VariableMiniMap map;
@@ -118,7 +118,7 @@ static void testRejection(void) {
 }
 
 // Checks constructor/free forms, bounded projections, and safe no-op iteration inputs.
-static void testForEachAndStrings(void) {
+static fn testForEachAndStrings() {
     printf("[4] forEach + string projections + arity ctor\n");
 
     VariableMiniMap *map = VariableMiniMap();
@@ -152,7 +152,7 @@ static void testForEachAndStrings(void) {
 }
 
 // Runs map lifecycle, key policy, projection, and iteration cases.
-int main(void) {
+int main() {
     printf("=== VariableMiniMap (scoped) Test Suite ===\n\n");
 
     testLifecycle();

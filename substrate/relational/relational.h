@@ -2,7 +2,6 @@
 #define RELATIONAL_RELATIONAL_H
 
 #include "vex.h"
-
 #include "substrate/relational/symbol_table.h"
 
 // substrate/relational/relational.h — spotlight relational facade over SymbolTable (Legacy: relational/RelationalEngine.java).
@@ -69,16 +68,16 @@ i32 Relational_getId(SymbolTable *scope, const char *name);
 const char *Relational_getName(const SymbolTable *scope, i32 varId);
 bool Relational_setName(SymbolTable *scope, const char *oldName, const char *newName);
 
-void *Relational_getValue(SymbolTable *scope, const char *name);
-void *Relational_getValueById(SymbolTable *scope, i32 varId);
-bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, void *ptr);
-bool Relational_setValueById(SymbolTable *scope, i32 varId, void *ptr);
+any Relational_getValue(SymbolTable *scope, const char *name);
+any Relational_getValueById(SymbolTable *scope, i32 varId);
+bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, any ptr);
+bool Relational_setValueById(SymbolTable *scope, i32 varId, any ptr);
 
 const char *Relational_getString(SymbolTable *scope, const char *name);
-void Relational_setString(SymbolTable *scope, const char *name, const char *value);
+fn Relational_setString(SymbolTable *scope, const char *name, const char *value);
 
-void *Relational_getFunction(SymbolTable *scope, const char *name);
-bool Relational_setFunction(SymbolTable *scope, const char *name, void *fn);
+any Relational_getFunction(SymbolTable *scope, const char *name);
+bool Relational_setFunction(SymbolTable *scope, const char *name, any fn);
 
 bytes Relational_search(SymbolTable *scope, const char *query, i32 *outIds, bytes cap);
 bytes Relational_searchAll(SymbolTable *global, SymbolTable *local, const char *query, i32 *outIds, bytes cap);

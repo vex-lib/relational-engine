@@ -2,7 +2,6 @@
 #define RELATIONAL_VARIABLE_SLOT_H
 
 #include "vex.h"
-
 #include "lang/constructor.h"
 
 // substrate/variable/variable_slot.h — the 32-byte name box (the variable slot atom).
@@ -42,23 +41,23 @@ bool VariableSlot_foldName(const char *name, char *out);
 
 int VariableSlot_bucketOf(char c);
 
-VariableSlot *VariableSlot_0(void);
+VariableSlot *VariableSlot_0();
 VariableSlot *VariableSlot_1(const char *name);
 VariableSlot *VariableSlot_2(const char *name, pointer pointer);
 
 #define VariableSlot(...) CONSTRUCTOR_DISPATCH(VariableSlot, __VA_ARGS__)
 
-void VariableSlot_free(VariableSlot *self);
+fn VariableSlot_free(VariableSlot *self);
 
 bool VariableSlot_setName(VariableSlot *self, const char *name);
-void VariableSlot_setPointer(VariableSlot *self, pointer pointer);
+fn VariableSlot_setPointer(VariableSlot *self, pointer pointer);
 
 const char *VariableSlot_getName(const VariableSlot *self);
 pointer VariableSlot_getPointer(const VariableSlot *self);
 bool VariableSlot_isEmpty(const VariableSlot *self);
 bool VariableSlot_nameEquals(const VariableSlot *self, const char *name);
 
-void VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated);
-void VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated);
+fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated);
+fn VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated);
 
 #endif

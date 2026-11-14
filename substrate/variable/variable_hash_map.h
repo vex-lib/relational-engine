@@ -2,7 +2,6 @@
 #define RELATIONAL_VARIABLE_HASH_MAP_H
 
 #include "vex.h"
-
 #include "lang/constructor.h"
 #include "substrate/variable/variable_slot.h"
 #include "struct/chunked_list.h"
@@ -49,13 +48,13 @@ typedef struct VariableHashMap {
 
 bool VariableHashMap_init(VariableHashMap *map);
 
-void VariableHashMap_shutdown(VariableHashMap *map);
+fn VariableHashMap_shutdown(VariableHashMap *map);
 
-VariableHashMap *VariableHashMap_0(void);
+VariableHashMap *VariableHashMap_0();
 
 #define VariableHashMap(...) CONSTRUCTOR_DISPATCH(VariableHashMap, __VA_ARGS__)
 
-void VariableHashMap_free(VariableHashMap *map);
+fn VariableHashMap_free(VariableHashMap *map);
 
 bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer);
 
@@ -66,13 +65,13 @@ bool VariableHashMap_contains(const VariableHashMap *map, const char *name);
 // Visit every live entry (cold iteration; bands and slots spelled in order).
 // The visitor receives the row (name + pointer); it must not mutate the map. A
 // null map/fn is a no-op.
-typedef void (*VariableHashMapVisitFn)(VariableSlot *slot, void *userdata);
-void VariableHashMap_forEach(VariableHashMap *map, VariableHashMapVisitFn fn, void *userdata);
+typedef fn (*VariableHashMapVisitFn)(VariableSlot *slot, any userdata);
+fn VariableHashMap_forEach(VariableHashMap *map, VariableHashMapVisitFn fn, any userdata);
 
 u32 VariableHashMap_count(const VariableHashMap *map);
 bool VariableHashMap_isEmpty(const VariableHashMap *map);
 
-void VariableHashMap_toString(const VariableHashMap *map, char *dest, bytes cap, bool *outTruncated);
-void VariableHashMap_toStringStruct(const VariableHashMap *map, char *dest, bytes cap, bool *outTruncated);
+fn VariableHashMap_toString(const VariableHashMap *map, char *dest, bytes cap, bool *outTruncated);
+fn VariableHashMap_toStringStruct(const VariableHashMap *map, char *dest, bytes cap, bool *outTruncated);
 
 #endif

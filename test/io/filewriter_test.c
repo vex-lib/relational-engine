@@ -29,7 +29,7 @@ static int g_failures = 0;
 static char g_dir[256];
 
 /** Builds a bounded path for a leaf inside the test's temporary directory. */
-static void path_of(char *out, bytes cap, const char *leaf) {
+static fn path_of(char *out, bytes cap, const char *leaf) {
     snprintf(out, cap, "%s/%s", g_dir, leaf);
 }
 
@@ -44,7 +44,7 @@ static long read_file_size(const char *p) {
     return n;
 }
 
-int main(void) {
+int main() {
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";

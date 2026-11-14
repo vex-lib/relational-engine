@@ -74,21 +74,21 @@ typedef struct Log {
 
 bool Log_init(Log *log, const char *path, bytes slot_count);
 
-void Log_shutdown(Log *log);
+fn Log_shutdown(Log *log);
 
 bool Log_isEnabled(const Log *log);
 bool Log_isActive(const Log *log);
-void Log_setActive(Log *log, bool on);
+fn Log_setActive(Log *log, bool on);
 const char *Log_path(const Log *log);
 
 u64 Log_appended(const Log *log);
 u64 Log_dropped(const Log *log);
 u64 Log_written(const Log *log);
 
-void Log_append(Log *log, int kind, int64_t v0, int64_t v1, int64_t v2,
+fn Log_append(Log *log, int kind, int64_t v0, int64_t v1, int64_t v2,
                 int64_t v3, int64_t v4);
 
-void Log_appendKind(Log *log, int kind);
+fn Log_appendKind(Log *log, int kind);
 
 // io/log/log.h — the LogParser class, ported from io/LogParser.java.
 //
@@ -101,7 +101,7 @@ void Log_appendKind(Log *log, int kind);
 #define LOGPARSER_HEADER_BYTES 12
 
 // Per-record callback. userdata is whatever was passed to LogParser_parse.
-typedef void (*LogRecordFn)(void *userdata, int kind, int64_t ts,
+typedef fn (*LogRecordFn)(any userdata, int kind, int64_t ts,
                             int64_t v0, int64_t v1, int64_t v2,
                             int64_t v3, int64_t v4);
 
@@ -109,7 +109,7 @@ bool LogParser_isLogFile(const char *path);
 
 int64_t LogParser_count(const char *path);
 
-int64_t LogParser_parse(const char *path, LogRecordFn handler, void *userdata);
+int64_t LogParser_parse(const char *path, LogRecordFn handler, any userdata);
 
 int LogParser_formatRecord(char *out, bytes out_cap, int kind, int64_t ts,
                            int64_t base_ts, const char *name,

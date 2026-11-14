@@ -1,5 +1,6 @@
 #ifndef RE_GROWABLE_MAPPED_FILE_H
 #define RE_GROWABLE_MAPPED_FILE_H
+
 #include "vex.h"
 
 /* Reservation-backed, file-backed byte view owned by Rust, reached from C through
@@ -43,7 +44,7 @@ u32 re_gmap_create(const char *path, bytes reserved, bytes committed,
                         ReGrowableMappedFile **out_owner);
 u32 re_gmap_open(const char *path, bytes reserved, bytes committed,
                       ReGrowableMappedFile **out_owner);
-void re_gmap_drop(ReGrowableMappedFile *owner);
+fn re_gmap_drop(ReGrowableMappedFile *owner);
 
 u32 re_gmap_len(const ReGrowableMappedFile *owner, bytes *out_len);
 u32 re_gmap_reserved(const ReGrowableMappedFile *owner, bytes *out_reserved);

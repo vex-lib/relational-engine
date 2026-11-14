@@ -30,7 +30,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main(void) {
+int main() {
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";

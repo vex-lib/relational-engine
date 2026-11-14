@@ -156,7 +156,7 @@ bool File_close(File *f) {
 }
 
 /** Read up to max_len bytes at the current cursor, returning bytes read or -1 on error. */
-int64_t File_read(File *f, void *dest, int64_t max_len) {
+int64_t File_read(File *f, any dest, int64_t max_len) {
     if (!f || !(*f).handle || !dest)
         return -1;
     if (max_len < 0)
@@ -171,7 +171,7 @@ int64_t File_read(File *f, void *dest, int64_t max_len) {
 }
 
 /** Write up to len bytes at the current cursor and update tracked position and size. */
-int64_t File_write(File *f, const void *src, int64_t len) {
+int64_t File_write(File *f, const_any src, int64_t len) {
     if (!f || !(*f).handle || !src)
         return -1;
     if (len < 0)
@@ -328,7 +328,7 @@ bool File_delete(const char *path) {
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Constructors:
- *   - FilePtr_from(void *base, u64 offset, u64 length)
+ *   - FilePtr_from(any base, u64 offset, u64 length)
  *
  * Accessors:
  *   - FilePtr_data(FilePtr self) -> u8 *
@@ -338,7 +338,7 @@ bool File_delete(const char *path) {
  * ============================================================================
  */
 
-FilePtr FilePtr_from(void *base, u64 offset, u64 length) {
+FilePtr FilePtr_from(any base, u64 offset, u64 length) {
     FilePtr self;
 
     self.base = (u8*) base;
@@ -453,14 +453,14 @@ static bytes findexCapacity(bytes requested) {
 }
 
 /** Allocate one table from the index's arena, or the default arena. */
-static void *findexAlloc(FIndex *self, bytes bytesCount) {
+static any findexAlloc(FIndex *self, bytes bytesCount) {
     if ((*self).arena)
         return MemoryArena_alloc((*self).arena, TYPE_FINDEX_SINGLETON, bytesCount);
     return Memory_alloc(TYPE_FINDEX_SINGLETON, bytesCount);
 }
 
 /** Release a table through the same owner that allocated it. */
-static void findexRelease(FIndex *self, void *ptr) {
+static fn findexRelease(FIndex *self, any ptr) {
     if (!ptr)
         return;
     if ((*self).arena)
@@ -556,7 +556,7 @@ FIndex FIndex_createArena(bytes initialCapacity, MemoryArena *arena) {
     return self;
 }
 
-void FIndex_shutdown(FIndex *self) {
+fn FIndex_shutdown(FIndex *self) {
     if (!self)
         return;
     findexRelease(self, (*self).slots);
@@ -616,7 +616,7 @@ bool FIndex_insert(FIndex *self, u64 keyHash, u64 offset, u64 length) {
     return true;
 }
 
-void FIndex_remove(FIndex *self, u64 keyHash) {
+fn FIndex_remove(FIndex *self, u64 keyHash) {
     if (!self || !FIndex_live(self))
         return;
 

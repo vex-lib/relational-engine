@@ -86,7 +86,7 @@ Cell *Cell_2(u64 typeId, pointer value) {
     return cell;
 }
 
-Cell *Cell_0(void) {
+Cell *Cell_0() {
     return Cell_2(0u, 0u);
 }
 
@@ -94,7 +94,7 @@ Cell *Cell_1(u64 typeId) {
     return Cell_2(typeId, 0u);
 }
 
-void Cell_free(Cell *cell) {
+fn Cell_free(Cell *cell) {
     if (cell)
         Memory_free(cell);
 }
@@ -104,18 +104,18 @@ void Cell_free(Cell *cell) {
 u64 Cell_typeId(const Cell *cell) {
     if (!cell)
         return 0u;
-    return Memory_type((void*) cell);
+    return Memory_type((any) cell);
 }
 
 bool Cell_check(const Cell *cell, u64 typeId) {
     if (!cell)
         return false;
-    return Memory_type((void*) cell) == typeId;
+    return Memory_type((any) cell) == typeId;
 }
 
 // SETTERS
 
-void Cell_setValue(Cell *cell, pointer value) {
+fn Cell_setValue(Cell *cell, pointer value) {
     if (!cell)
         return;
     (*cell).value = value;
@@ -131,7 +131,7 @@ pointer Cell_getValue(const Cell *cell) {
 
 // STRING PROJECTIONS (the toString Law)
 
-void Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
+fn Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)
@@ -149,7 +149,7 @@ void Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) 
     }
 }
 
-void Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
+fn Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)

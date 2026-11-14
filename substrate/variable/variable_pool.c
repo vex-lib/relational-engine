@@ -117,7 +117,7 @@ static i32 search_order(const char key[24]) {
 
 // f64s the slot + index arrays (cold path only, lock held). Copies slots
 // verbatim then rewrites every self link — absolute addresses change on move.
-static bool grow(void) {
+static bool grow() {
     u32 cap = s_pool.capacity * 2;
     if (cap < s_pool.capacity)
         return false;
@@ -169,7 +169,7 @@ bool StringPool_init(MemoryArena *arena) {
     return ok;
 }
 
-void StringPool_shutdown(void) {
+fn StringPool_shutdown() {
     SpinLock_lock(&s_lock);
     s_pool.magic = 0;
     if (s_pool.arena) {
@@ -262,14 +262,14 @@ const char *StringPool_name(u32 index) {
     return slot ? (*slot).name : nullptr;
 }
 
-u32 StringPool_count(void) {
+u32 StringPool_count() {
     SpinLock_lock(&s_lock);
     u32 n = s_pool.magic == STRING_POOL_MAGIC ? s_pool.count : 0;
     SpinLock_unlock(&s_lock);
     return n;
 }
 
-bool StringPool_isSlot(const void *ptr) {
+bool StringPool_isSlot(const_any ptr) {
     if (!ptr)
         return false;
     SpinLock_lock(&s_lock);

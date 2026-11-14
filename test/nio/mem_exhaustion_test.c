@@ -39,18 +39,18 @@ static bool failHeap() {
     failAfter--;
     return false;
 }
-void *MemTest_malloc(bytes size) { return failHeap() ? nullptr : malloc(size); }
-void *MemTest_calloc(bytes count, bytes elementBytes) { return failHeap() ? nullptr : calloc(count, elementBytes); }
-void *MemTest_realloc(void *ptr, bytes size) { return failHeap() ? nullptr : realloc(ptr, size); }
+any MemTest_malloc(bytes size) { return failHeap() ? nullptr : malloc(size); }
+any MemTest_calloc(bytes count, bytes elementBytes) { return failHeap() ? nullptr : calloc(count, elementBytes); }
+any MemTest_realloc(any ptr, bytes size) { return failHeap() ? nullptr : realloc(ptr, size); }
 
 /** Assert every byte, not merely byte zero, survives a rejection or relocation. */
-static void checkBytes(const u8 *ptr, bytes length, u8 value) {
+static fn checkBytes(const u8 *ptr, bytes length, u8 value) {
     for (bytes i = 0; i < length; i++)
         assert(ptr[i] == value);
 }
 
 /** Reject partial construction and registry growth, preserving existing owners. */
-static void construction() {
+static fn construction() {
 #if defined(MEM_TEST_FAULTS)
     for (int stage = 0; stage < 2; stage++) {
         failAfter = stage;
@@ -79,7 +79,7 @@ static void construction() {
 }
 
 /** Exhaust both slab and spill; repeat rejection, preserve bytes and reclaim safely. */
-static void exhaustion() {
+static fn exhaustion() {
     MemoryArena *a = MemoryArena_create(SLAB_BYTES + BUMP_BYTES);
     assert(a != nullptr);
     assert(MemoryArena_exhaustionCount(a) == 0);
@@ -98,10 +98,10 @@ static void exhaustion() {
     assert(MemoryArena_exhaustionCount(a) == rejects + 32);
     assert(heapCalls == calls);
     assert(MemoryArena_findAll(a, TYPE_A, nullptr, 0) == SMALL_SLOTS + SPILL_SLOTS);
-    void *found[3] = { nullptr, (void*) blocks[0], (void*) blocks[1] };
+    any found[3] = { nullptr, (any) blocks[0], (any) blocks[1] };
     assert(MemoryArena_findAll(a, TYPE_A, found, 1) == SMALL_SLOTS + SPILL_SLOTS);
     assert(found[1] == blocks[0] && found[2] == blocks[1]);
-    void *grown = MemoryArena_realloc(a, blocks[0], 128);
+    any grown = MemoryArena_realloc(a, blocks[0], 128);
     assert(grown != nullptr);
     Memory_free(grown);
     blocks[0] = nullptr;
@@ -128,7 +128,7 @@ static void exhaustion() {
 }
 
 /** Exercise exact bump capacity, failed realloc, shrink and true owner transfer. */
-static void boundaries() {
+static fn boundaries() {
     MemoryArena *a = MemoryArena_create(SLAB_BYTES + BUMP_BYTES);
     MemoryArena *b = MemoryArena_create(SLAB_BYTES + BUMP_BYTES);
     assert(a && b);
@@ -161,7 +161,7 @@ static void boundaries() {
 }
 
 /** Exhaust every physical size class independently, then free/reuse its last slot. */
-static void allClasses() {
+static fn allClasses() {
     const bytes payloads[] = {64 - MEMORY_HEADER_SIZE, 128 - MEMORY_HEADER_SIZE,
                                256 - MEMORY_HEADER_SIZE, 512 - MEMORY_HEADER_SIZE,
                                1024 - MEMORY_HEADER_SIZE, 2048 - MEMORY_HEADER_SIZE,
@@ -193,7 +193,7 @@ static void allClasses() {
 }
 
 /** Reject ordinary hostile metadata/pointers while preserving unrelated state. */
-static void hostile() {
+static fn hostile() {
     MemoryArena *a = MemoryArena_create(SLAB_BYTES);
     assert(a);
     u8 *p = MemoryArena_alloc(a, TYPE_A, 48);
@@ -232,7 +232,7 @@ static void hostile() {
 }
 
 /** Fixed seeded mixed-size histories assert bytes/type/length after every change. */
-static void model() {
+static fn model() {
     const bytes sizes[] = {0, 1, 15, 16, 47, 48, 49, 111, 112, 113,
                            239, 240, 241, 495, 496, 497, 1007, 1008, 1009,
                            2031, 2032, 2033, 4079, 4080, 4081, 8192};
@@ -280,7 +280,7 @@ static atomic_uint ready;
 static atomic_bool start;
 
 /** Disjoint worker ownership with an explicit synchronized start, never sleeps. */
-static void *worker(void *context) {
+static any worker(any context) {
     bytes identity = (bytes) (pointer) context;
     atomic_fetch_add_explicit(&ready, 1, memory_order_release);
     while (!atomic_load_explicit(&start, memory_order_acquire))
@@ -296,12 +296,12 @@ static void *worker(void *context) {
 }
 
 /** Concurrent alloc/free only: registry and resets remain externally excluded. */
-static void concurrent() {
+static fn concurrent() {
     threadArena = MemoryArena_create(SLAB_BYTES + BUMP_BYTES);
     assert(threadArena);
     pthread_t threads[WORKERS];
     for (bytes i = 0; i < WORKERS; i++)
-        assert(pthread_create(&threads[i], nullptr, worker, (void*) (pointer) i) == 0);
+        assert(pthread_create(&threads[i], nullptr, worker, (any) (pointer) i) == 0);
     while (atomic_load_explicit(&ready, memory_order_acquire) != WORKERS)
         ;
     atomic_store_explicit(&start, true, memory_order_release);

@@ -25,7 +25,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -37,7 +37,7 @@ static int g_failures = 0;
 } while (0)
 
 // Checks VariableSlot layout, name grammar/folding, accessors, constructors, strings, and null safety.
-int main(void) {
+int main() {
     printf("=== Running Variable Slot Test Suite ===\n");
 
     CHECK("sizeof slot is 32", sizeof(VariableSlot) == 32u);

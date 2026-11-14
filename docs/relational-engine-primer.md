@@ -142,7 +142,7 @@ A concrete example, from `rust/include/relational_engine/memory.h` and
 ```c
 /* C sees this. The owner is opaque; the bytes are copied in/out. */
 typedef struct ReMemory ReMemory;
-ReMemory *re_memory_new(void);
+ReMemory *re_memory_new();
 u32  re_memory_copy(ReMemory *owner, const u8 *source, bytes length, u64 *output);
 u32  re_memory_read(const ReMemory *owner, u64 id, u8 *dest, bytes cap, bytes *out_len);
 ```

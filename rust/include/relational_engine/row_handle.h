@@ -1,5 +1,6 @@
 #ifndef RE_ROW_HANDLE_H
 #define RE_ROW_HANDLE_H
+
 #include "vex.h"
 
 /* Process-local identity, not an address/type ID/serialized record. Do not change

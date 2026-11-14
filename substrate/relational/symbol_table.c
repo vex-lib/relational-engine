@@ -138,7 +138,7 @@ static bool ensure_byslot(SymbolTable *v, u32 need) {
     return true;
 }
 
-SymbolTable SymbolTable_0(void) {
+SymbolTable SymbolTable_0() {
     SymbolTable v;
     memset(&v, 0, sizeof v);
     MemoryArena *arena = Memory_defaultArena();
@@ -154,7 +154,7 @@ SymbolTable SymbolTable_0(void) {
     return v;
 }
 
-void SymbolTable_shutdown(SymbolTable *v) {
+fn SymbolTable_shutdown(SymbolTable *v) {
     if (!v || !(*v).active)
         return;
     Memory_free((*v).rows);
@@ -298,7 +298,7 @@ pointer SymbolTable_getPointer(SymbolTable *v, i32 varId) {
     return row ? (*row).pointer : 0;
 }
 
-void SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer) {
+fn SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer) {
     SymbolRow *row = row_at(v, varId);
     if (!row)
         return;

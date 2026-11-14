@@ -113,7 +113,7 @@ bool Shelf_init(Shelf *shelf) {
     return true;
 }
 
-void Shelf_shutdown(Shelf *shelf) {
+fn Shelf_shutdown(Shelf *shelf) {
     if (!shelf)
         return;
     ChunkedList *nodes = (*shelf).nodes;
@@ -132,7 +132,7 @@ void Shelf_shutdown(Shelf *shelf) {
     (*shelf).active = false;
 }
 
-Shelf *Shelf_0(void) {
+Shelf *Shelf_0() {
     Shelf *shelf = Memory_alloc(TYPE_SHELF, sizeof(Shelf));
     if (!shelf)
         return nullptr;
@@ -143,7 +143,7 @@ Shelf *Shelf_0(void) {
     return shelf;
 }
 
-void Shelf_free(Shelf *shelf) {
+fn Shelf_free(Shelf *shelf) {
     if (!shelf)
         return;
     Shelf_shutdown(shelf);
@@ -233,7 +233,7 @@ bool Shelf_isEmpty(const Shelf *shelf) {
 
 // STRING PROJECTIONS (the toString Law)
 
-void Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated) {
+fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)
@@ -249,7 +249,7 @@ void Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncate
     }
 }
 
-void Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated) {
+fn Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)

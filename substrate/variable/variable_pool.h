@@ -2,7 +2,6 @@
 #define RELATIONAL_VARIABLE_POOL_H
 
 #include "vex.h"
-
 #include "nio/mem.h"
 
 // substrate/variable/variable_pool.h — process-wide interned string pool.
@@ -34,7 +33,7 @@ typedef struct StringSlot {
 
 bool StringPool_init(MemoryArena *arena);
 
-void StringPool_shutdown(void);
+fn StringPool_shutdown();
 
 i32 StringPool_intern(const char *str);
 
@@ -43,8 +42,8 @@ i32 StringPool_find(const char *str);
 const StringSlot *StringPool_slot(u32 index);
 const char *StringPool_name(u32 index);
 
-u32 StringPool_count(void);
+u32 StringPool_count();
 
-bool StringPool_isSlot(const void *ptr);
+bool StringPool_isSlot(const_any ptr);
 
 #endif

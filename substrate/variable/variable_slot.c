@@ -143,7 +143,7 @@ int VariableSlot_bucketOf(char c) {
 
 // Store a validated folded name into the slot, zero-padding the tail so the
 // 24-byte buffer has no stale Bytes.
-static void storeName(VariableSlot *self, const char *folded) {
+static fn storeName(VariableSlot *self, const char *folded) {
     char *dest = (*self).name;
     memset(dest, 0, VARIABLE_SLOT_NAME_BYTES);
     memcpy(dest, folded, strlen(folded) + 1);
@@ -162,7 +162,7 @@ bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer) {
     return true;
 }
 
-VariableSlot *VariableSlot_0(void) {
+VariableSlot *VariableSlot_0() {
     VariableSlot *self = (VariableSlot*) Memory_alloc(TYPE_VARIABLE_SLOT, sizeof(VariableSlot));
     if (self == nullptr)
         return nullptr;
@@ -185,7 +185,7 @@ VariableSlot *VariableSlot_2(const char *name, pointer pointer) {
     return self;
 }
 
-void VariableSlot_free(VariableSlot *self) {
+fn VariableSlot_free(VariableSlot *self) {
     if (self != nullptr)
         Memory_free(self);
 }
@@ -202,7 +202,7 @@ bool VariableSlot_setName(VariableSlot *self, const char *name) {
     return true;
 }
 
-void VariableSlot_setPointer(VariableSlot *self, pointer pointer) {
+fn VariableSlot_setPointer(VariableSlot *self, pointer pointer) {
     if (self == nullptr)
         return;
     (*self).pointer = pointer;
@@ -238,7 +238,7 @@ bool VariableSlot_nameEquals(const VariableSlot *self, const char *name) {
 // STRING PROJECTIONS (the toString Law)
 
 // The name charset cannot contain '"' or '\', so a quoted name needs no escape.
-void VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated) {
+fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated != nullptr)
         *outTruncated = false;
     if (dest == nullptr || cap == 0)
@@ -258,7 +258,7 @@ void VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool
     }
 }
 
-void VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated) {
+fn VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated != nullptr)
         *outTruncated = false;
     if (dest == nullptr || cap == 0)

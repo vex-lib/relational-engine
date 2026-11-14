@@ -10,7 +10,7 @@ static int g_failures = 0;
 #define CHECK(cond) do{ if(!(cond)){ printf("FAIL %s:%d %s\n",__FILE__,__LINE__,#cond); g_failures++; } }while(0)
 
 // Exercises relational name/value/function lookup, ranked scopes, and rename behavior.
-static void testRelationalSpotlight(void){
+static fn testRelationalSpotlight(){
     SymbolTable global = SymbolTable();
     SymbolTable local = SymbolTable();
     CHECK(global.active);
@@ -35,10 +35,10 @@ static void testRelationalSpotlight(void){
     n = Relational_search(&global, "HEALTH", out, 10);
     CHECK(n==3);
 
-    void *p = Relational_getValue(&global, "health_ui");
+    any p = Relational_getValue(&global, "health_ui");
     CHECK(p != nullptr);
     CHECK(strcmp(Relational_getString(&global, "health_ui"), "panel")==0);
-    void *fn = (void*) 0x12345;
+    any fn = (any) 0x12345;
     Relational_setFunction(&global, "onUpdate", fn);
     CHECK(Relational_getFunction(&global, "onUpdate")==fn);
 
@@ -51,7 +51,7 @@ static void testRelationalSpotlight(void){
 }
 
 // Runs the relational spotlight scenario and returns its accumulated result.
-int main(void){
+int main(){
     if (!Memory_init(0u)) return 1;
     testRelationalSpotlight();
     if(g_failures==0) printf("class_relational_test: all checks passed\n");

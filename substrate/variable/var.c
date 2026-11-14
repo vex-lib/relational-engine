@@ -75,7 +75,7 @@ bool var_set(var *self, pointer value) {
     return true;
 }
 
-bool var_subscribe(var *self, VarObserver observer, void *context) {
+bool var_subscribe(var *self, VarObserver observer, any context) {
     if (!self || !observer)
         return false;
     if ((*self).observerCount >= VAR_MAX_OBSERVERS)
@@ -88,7 +88,7 @@ bool var_subscribe(var *self, VarObserver observer, void *context) {
     return true;
 }
 
-void var_unsubscribe(var *self, VarObserver observer, void *context) {
+fn var_unsubscribe(var *self, VarObserver observer, any context) {
     if (!self || !observer)
         return;
 
@@ -109,7 +109,7 @@ void var_unsubscribe(var *self, VarObserver observer, void *context) {
     (*self).observerCount = write;
 }
 
-void var_unsubscribeAll(var *self) {
+fn var_unsubscribeAll(var *self) {
     if (!self)
         return;
 
@@ -134,7 +134,7 @@ MemoryArena *var_arena(const var *self) {
     return self ? (*self).arena : nullptr;
 }
 
-void var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
+fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)
@@ -154,7 +154,7 @@ void var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
     }
 }
 
-void var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated) {
+fn var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated) {
     if (outTruncated)
         *outTruncated = false;
     if (!dest || cap == 0u)

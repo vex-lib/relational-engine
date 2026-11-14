@@ -125,7 +125,7 @@ static int find_slab(bytes payload_bytes) {
     return -1;
 }
 /** Initialize a slab descriptor from its fixed class-size and capacity tables. */
-static void slab_template(SlabClass *slab, u32 idx) {
+static fn slab_template(SlabClass *slab, u32 idx) {
     (*slab).slot_size = s_slabSizes[idx];
     (*slab).capacity = s_slabCaps[idx];
     (*slab).count = 0;
@@ -190,7 +190,7 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
 }
 /** Allocate from owner storage only; exhaustion is reported loudly, once per epoch. */
 ;;INTENTION("exhaustion is a cold, terminal detection reached from a hot allocator: it reports once per epoch (never per call) and counts the rest, so the Cold-Strict hot-minimal contract holds for the success path while a failure can never be silent -- the Exhaustion Loudness Law's hot-path clause under the Conflict Triage Law")
-static void *arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
+static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
     if (!a || !(*a).live)
         return nullptr;
     if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
@@ -231,7 +231,7 @@ static void *arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
 
         MemoryHeader *h = (MemoryHeader*) slot_ptr;
         Memory_headerStamp(h, typeId, numBytes);
-        return (void*) (slot_ptr + sizeof(MemoryHeader));
+        return (any) (slot_ptr + sizeof(MemoryHeader));
     }
     SpinLock_unlock(&(*a).bumpLock);
 
@@ -244,7 +244,7 @@ static void *arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
     return nullptr;
 }
 /** Validate an in-arena payload header and recycle its slab slot when applicable. */
-static void arena_free(MemoryArena *a, void *userPtr) {
+static fn arena_free(MemoryArena *a, any userPtr) {
     if (!a || !userPtr)
         return;
 
@@ -290,7 +290,7 @@ static void arena_free(MemoryArena *a, void *userPtr) {
     SpinLock_unlock(&(*slab).lock);
 }
 /** Reset slab freelists and the bump cursor, invalidating all arena payloads. */
-static void arena_freeAll(MemoryArena *a) {
+static fn arena_freeAll(MemoryArena *a) {
     if (!a || !(*a).live)
         return;
 
@@ -323,7 +323,7 @@ static void arena_freeAll(MemoryArena *a) {
 // owner is whoever's master range contains the header. Registry writes happen at
 // create/destroy (pre-threads); reads are lock-free.
 /** Find the live registered arena whose address range contains a valid payload. */
-MemoryArena *Memory_arenaFor(void *userPtr) {
+MemoryArena *Memory_arenaFor(any userPtr) {
     if (!userPtr)
         return nullptr;
     pointer u = (pointer) userPtr;
@@ -347,7 +347,7 @@ MemoryArena *Memory_arenaFor(void *userPtr) {
 }
 
 /** Resolve a validated header only after range-checking transient and registered arenas. */
-const MemoryHeader *Memory_safeHeader(const void *userPtr) {
+const MemoryHeader *Memory_safeHeader(const_any userPtr) {
     if (!userPtr)
         return nullptr;
     pointer u = (pointer) userPtr;
@@ -377,7 +377,7 @@ const MemoryHeader *Memory_safeHeader(const void *userPtr) {
 }
 
 /** Lazily initialize the default arena with its named default size. */
-static void ensure_initialized() {
+static fn ensure_initialized() {
     if (!s_default.live)
         Memory_init(ANTI_ARENA_DEFAULT_SIZE);
 }
@@ -398,11 +398,11 @@ MemoryArena *Memory_defaultArena() {
     return &s_default;
 }
 /** Reset all allocations in the default arena; dependent users must already be stopped. */
-void Memory_freeAll() {
+fn Memory_freeAll() {
     arena_freeAll(&s_default);
 }
 /** Enumerate default-arena live slab blocks matching typeId, returning total matches found. */
-bytes Memory_findAll(u64 typeId, void **outArray, bytes maxCount) {
+bytes Memory_findAll(u64 typeId, any *outArray, bytes maxCount) {
     return MemoryArena_findAll(&s_default, typeId, outArray, maxCount);
 }
 /** Allocate, initialize, and register an independent arena with the requested capacity. */
@@ -425,7 +425,7 @@ MemoryArena *MemoryArena_create(bytes totalBytes) {
     return a;
 }
 /** Unregister and destroy a non-default arena and its backing storage. */
-void MemoryArena_destroy(MemoryArena *a) {
+fn MemoryArena_destroy(MemoryArena *a) {
     if (!a || a == &s_default)
         return;
     SpinLock_lock(&s_registryLock);
@@ -445,13 +445,13 @@ void MemoryArena_destroy(MemoryArena *a) {
     Memory_systemFree(a);
 }
 /** Allocate a typed payload from the specified arena. */
-void *MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
+any MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
     if (!a)
         return nullptr;
     return arena_alloc(a, typeId, numBytes);
 }
 /** Allocate replacement storage in a, copy bytes from userPtr, and route old-block release by owner. */
-void *MemoryArena_realloc(MemoryArena *a, void *userPtr, bytes newBytes) {
+any MemoryArena_realloc(MemoryArena *a, any userPtr, bytes newBytes) {
     if (!a)
         return nullptr;
     if (!userPtr)
@@ -461,7 +461,7 @@ void *MemoryArena_realloc(MemoryArena *a, void *userPtr, bytes newBytes) {
 
     u64 typeId = Memory_type(userPtr);
     bytes oldLen = Memory_length(userPtr);
-    void *next = arena_alloc(a, typeId, newBytes);
+    any next = arena_alloc(a, typeId, newBytes);
     if (!next)
         return nullptr;
 
@@ -470,19 +470,19 @@ void *MemoryArena_realloc(MemoryArena *a, void *userPtr, bytes newBytes) {
     return next;
 }
 /** Attempt to recycle a validated payload within the specified arena. */
-void MemoryArena_free(MemoryArena *a, void *userPtr) {
+fn MemoryArena_free(MemoryArena *a, any userPtr) {
     if (!a)
         return;
     arena_free(a, userPtr);
 }
 /** Reset every slab and bump allocation in the specified arena. */
-void MemoryArena_freeAll(MemoryArena *a) {
+fn MemoryArena_freeAll(MemoryArena *a) {
     if (!a)
         return;
     arena_freeAll(a);
 }
 /** Enumerate live slab and bump blocks; total matches may exceed output capacity. */
-bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, void **outArray, bytes maxCount) {
+bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCount) {
     bytes count = 0;
     if (!a || !(*a).live)
         return 0;
@@ -497,7 +497,7 @@ bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, void **outArray, bytes max
             if (header_valid(h)) {
                 if (typeId == 0 || (*h).typeId == typeId) {
                     if (outArray && count < maxCount) {
-                        outArray[count] = (void*) (slot_ptr + sizeof(MemoryHeader));
+                        outArray[count] = (any) (slot_ptr + sizeof(MemoryHeader));
                     }
                     count++;
                 }

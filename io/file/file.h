@@ -46,9 +46,9 @@ File *File_open(const char *path, u32 mode);
 
 bool File_close(File *f);
 
-int64_t File_read(File *f, void *dest, int64_t max_len);
+int64_t File_read(File *f, any dest, int64_t max_len);
 
-int64_t File_write(File *f, const void *src, int64_t len);
+int64_t File_write(File *f, const_any src, int64_t len);
 
 bool File_seek(File *f, int64_t position);
 
@@ -77,7 +77,7 @@ typedef struct FilePtr {
     u64 length;    // byte length of this view
 } FilePtr;
 
-FilePtr FilePtr_from(void *base, u64 offset, u64 length);
+FilePtr FilePtr_from(any base, u64 offset, u64 length);
 u8      *FilePtr_data(FilePtr self);
 u64      FilePtr_length(FilePtr self);
 u64      FilePtr_offset(FilePtr self);
@@ -98,10 +98,10 @@ typedef struct FIndex {
 
 FIndex FIndex_create(bytes initialCapacity);
 FIndex FIndex_createArena(bytes initialCapacity, MemoryArena *arena);
-void     FIndex_shutdown(FIndex *self);
+fn     FIndex_shutdown(FIndex *self);
 bool     FIndex_find(FIndex *self, u64 keyHash, u64 *outOffset, u64 *outLength);
 bool     FIndex_insert(FIndex *self, u64 keyHash, u64 offset, u64 length);
-void     FIndex_remove(FIndex *self, u64 keyHash);
+fn     FIndex_remove(FIndex *self, u64 keyHash);
 u64      FIndex_count(const FIndex *self);
 bool     FIndex_live(const FIndex *self);
 
@@ -124,10 +124,10 @@ typedef struct FileWriter {
 
 bool FileWriter_open(FileWriter *w, const char *path);
 
-void FileWriter_write(FileWriter *w, const u8 *data, bytes len);
+fn FileWriter_write(FileWriter *w, const u8 *data, bytes len);
 
-void FileWriter_flush(FileWriter *w);
-void FileWriter_close(FileWriter *w);
+fn FileWriter_flush(FileWriter *w);
+fn FileWriter_close(FileWriter *w);
 
 u64 FileWriter_bytesWritten(const FileWriter *w);
 
@@ -150,25 +150,25 @@ typedef enum FileEventType {
     FILE_EVENT_ALL      = 15
 } FileEventType;
 
-typedef void (*FileEventCallback)(const char *path, FileEventType type, void *userdata);
+typedef fn (*FileEventCallback)(const char *path, FileEventType type, any userdata);
 
 ;;CLASSNAME("FileEventWatcher")
 typedef struct FileEventWatcher FileEventWatcher;
 
 FileEventWatcher *FileEventWatcher_create(const char *path, FileEventType mask,
-                                          FileEventCallback callback, void *userdata);
+                                          FileEventCallback callback, any userdata);
 
 bool FileEventWatcher_start(FileEventWatcher *watcher);
 
-void FileEventWatcher_stop(FileEventWatcher *watcher);
+fn FileEventWatcher_stop(FileEventWatcher *watcher);
 
-void FileEventWatcher_pump(FileEventWatcher *watcher);
+fn FileEventWatcher_pump(FileEventWatcher *watcher);
 
-void FileEventWatcher_destroy(FileEventWatcher *watcher);
+fn FileEventWatcher_destroy(FileEventWatcher *watcher);
 
 
-void HotFileSys_init(void);
-void HotFileSys_shutdown(void);
-void HotFileSys_pumpEvents(void);
+fn HotFileSys_init();
+fn HotFileSys_shutdown();
+fn HotFileSys_pumpEvents();
 
 #endif

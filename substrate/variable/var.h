@@ -2,7 +2,6 @@
 #define RELATIONAL_VAR_H
 
 #include "vex.h"
-
 #include "nio/mem.h"
 #include "substrate/variable/variable_slot.h"
 #include "type/re_type.h"
@@ -27,7 +26,7 @@
 
 typedef struct var var;
 
-typedef void (*VarObserver)(var *self, pointer value, void *context);
+typedef fn (*VarObserver)(var *self, pointer value, any context);
 
 ;;CLASSNAME("var")
 struct var {
@@ -35,7 +34,7 @@ struct var {
     pointer value;
     MemoryArena *arena;
     VarObserver observers[VAR_MAX_OBSERVERS];
-    void *observerContext[VAR_MAX_OBSERVERS];
+    any observerContext[VAR_MAX_OBSERVERS];
     bytes observerCount;
 };
 
@@ -43,16 +42,16 @@ var *var_2(const char *name, MemoryArena *arena);
 #define var(...) var_2(__VA_ARGS__)
 
 bool var_set(var *self, pointer value);
-bool var_subscribe(var *self, VarObserver observer, void *context);
-void var_unsubscribe(var *self, VarObserver observer, void *context);
-void var_unsubscribeAll(var *self);
+bool var_subscribe(var *self, VarObserver observer, any context);
+fn var_unsubscribe(var *self, VarObserver observer, any context);
+fn var_unsubscribeAll(var *self);
 
 const char *var_name(const var *self);
 pointer var_value(const var *self);
 bytes var_observerCount(const var *self);
 MemoryArena *var_arena(const var *self);
 
-void var_toString(const var *self, char *dest, bytes cap, bool *outTruncated);
-void var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated);
+fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated);
+fn var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated);
 
 #endif

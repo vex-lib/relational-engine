@@ -25,7 +25,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -42,7 +42,7 @@ static int g_checks = 0;
     } while (0)
 
 // Checks Cell layout, header identity, value storage, and null-safe destruction.
-static void testCell(void) {
+static fn testCell() {
     printf("[1] identity cell: 32 B block, header identity, value slot\n");
 
     CHECK(sizeof(Cell) == 16u);
@@ -72,7 +72,7 @@ static void testCell(void) {
 }
 
 // Checks Cell value and structure projections, including truncation and nullptr rendering.
-static void testCellStrings(void) {
+static fn testCellStrings() {
     printf("[2] cell string projections\n");
 
     Cell *c = Cell_2(0x2Cu, 0x1Fu);
@@ -93,7 +93,7 @@ static void testCellStrings(void) {
 }
 
 // Exercises shelf insertion, linked traversal, invalid indices, and head updates.
-static void testShelfBasics(void) {
+static fn testShelfBasics() {
     printf("[3] shelf: node pool, cells, u32 edges, head walk\n");
 
     Shelf *shelf = Shelf_0();
@@ -142,7 +142,7 @@ static void testShelfBasics(void) {
 }
 
 // Verifies cell addresses and values remain stable as the shelf grows to 500 entries.
-static void testShelfStability(void) {
+static fn testShelfStability() {
     printf("[4] node/cell addresses stay stable across growth\n");
 
     Shelf *shelf = Shelf_0();
@@ -174,7 +174,7 @@ static void testShelfStability(void) {
 }
 
 // Checks Shelf null-safe operations, lifecycle idempotence, and bounded projections.
-static void testShelfNullAndStrings(void) {
+static fn testShelfNullAndStrings() {
     printf("[5] shelf null-safety + string projections\n");
 
     CHECK(Shelf_count(nullptr) == 0u);
@@ -215,7 +215,7 @@ static void testShelfNullAndStrings(void) {
 }
 
 // Runs Cell and Shelf identity, collection, growth, projection, and null-safety checks.
-int main(void) {
+int main() {
     printf("=== Cell + Shelf Test Suite ===\n\n");
 
     testCell();

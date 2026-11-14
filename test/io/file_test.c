@@ -32,12 +32,12 @@ static int g_failures = 0;
 static char g_dir[256];
 
 /* Joins a scratch-root path and leaf into the caller's bounded output buffer. */
-static void path_of(char *out, bytes cap, const char *leaf) {
+static fn path_of(char *out, bytes cap, const char *leaf) {
     snprintf(out, cap, "%s/%s", g_dir, leaf);
 }
 
 /* Checks directory/file operations, nested creation, idempotence, and null paths. */
-static void test_path_ops(void) {
+static fn test_path_ops() {
     char nested[300];
     path_of(nested, sizeof(nested), "a/b.sh/c");
     CHECK(!File_isDirectory(nested));
@@ -56,7 +56,7 @@ static void test_path_ops(void) {
 }
 
 /* Verifies file creation, write/read/seek/EOF, truncate, and deletion behavior. */
-static void test_write_read(void) {
+static fn test_write_read() {
     char p[300];
     path_of(p, sizeof(p), "data.bin");
 
@@ -108,7 +108,7 @@ static void test_write_read(void) {
 }
 
 /* Confirms append mode preserves existing bytes and begins writing at EOF. */
-static void test_append(void) {
+static fn test_append() {
     char p[300];
     path_of(p, sizeof(p), "append.bin");
 
@@ -134,7 +134,7 @@ static void test_append(void) {
 }
 
 /* Exercises invalid paths, missing files, bad lengths, null handles, and safe failures. */
-static void test_errors(void) {
+static fn test_errors() {
     CHECK(File_open(nullptr, FILE_MODE_READ) == nullptr);
     char p[300];
     path_of(p, sizeof(p), "missing.bin");
@@ -161,7 +161,7 @@ static void test_errors(void) {
 }
 
 /* Initializes memory and a scratch directory, then runs the File owner cases. */
-int main(void) {
+int main() {
     CHECK(Memory_init(0));
 
     const char *base = getenv("TMPDIR");

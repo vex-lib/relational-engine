@@ -103,7 +103,7 @@ int64_t LogParser_count(const char *path) {
 }
 
 /** Stream complete decoded records to the callback and return the number delivered. */
-int64_t LogParser_parse(const char *path, LogRecordFn handler, void *userdata) {
+int64_t LogParser_parse(const char *path, LogRecordFn handler, any userdata) {
     if (!handler)
         return -1;
     File *f = File_open(path, FILE_MODE_READ);
