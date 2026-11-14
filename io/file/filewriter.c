@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "io/file/file.h"
 // Production R2 I/O owner: Relational Engine; existing FileWriter ABI preserved.
 

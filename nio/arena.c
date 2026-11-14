@@ -1,4 +1,6 @@
 #define NIO_MEM_IMPLEMENTATION
+
+#include "vex.h"
 #include "nio/mem.h"
 
 #include "atomic/atomic.h"

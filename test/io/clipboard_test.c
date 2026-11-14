@@ -1,3 +1,4 @@
+#include "vex.h"
 #include <assert.h>
 // Relational Engine owner test for the migrated production clipboard seam.
 #include <stdio.h>

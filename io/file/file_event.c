@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "io/file/file.h"
 
 #include <pthread.h>

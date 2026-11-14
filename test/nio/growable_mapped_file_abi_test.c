@@ -6,6 +6,8 @@
  * exercised here: this host has a backend, so create succeeds.
  * Not a Hotcwap loader test and not a second mapping implementation. */
 #define POSIX_C_SOURCE 200809L
+
+#include "vex.h"
 #include "relational_engine/growable_mapped_file.h"
 #include <assert.h>
 #include <fcntl.h>

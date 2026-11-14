@@ -3,12 +3,12 @@
  * growth and reclaim stability, a named-registry binding, and reverse borrower /
  * storage teardown. No unsafe stale-pointer dereferences or concurrent mutation.
  * This is a consumer seam, NOT proof of any R3-R5 application or live Hot loader. */
+
+#include "vex.h"
 #include "relational_engine/row_pool.h"
 #include "relational_engine/variable_registry.h"
 #include <assert.h>
-#include <stdalign.h>
 #include <string.h>
-#include "vex.h"
 
 /* Plain C record stored as initialized bytes, never as a Rust object. */
 typedef struct ExampleRow {

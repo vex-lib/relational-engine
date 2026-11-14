@@ -3,6 +3,7 @@
 
 // search/primitives/primitives.h — the native search primitive door.
 
+#include "vex.h"
 #include "search/primitives/name_search.h"
 
 #endif

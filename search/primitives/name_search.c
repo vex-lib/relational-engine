@@ -1,6 +1,6 @@
+#include "vex.h"
 #include "search/primitives/name_search.h"
 #include "debug/throw.h"
-#include "vex.h"
 #include <string.h>
 
 ;;DEFINITION

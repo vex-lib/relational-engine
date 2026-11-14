@@ -1,9 +1,10 @@
 // Owner: engine C strided-name primitive. No allocator or Rust atomic layout.
 // Assert normal/empty/missing, exact/short keys, nulls and overflowing spans;
 // rejection leaves output intact. Runner asserts exactly one diagnostic per bad call.
+
+#include "vex.h"
 #include "search/primitives/name_search.h"
 #include <assert.h>
-#include "vex.h"
 #include <string.h>
 
 int main() {

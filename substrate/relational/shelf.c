@@ -3,9 +3,9 @@
 // Nodes are never-moved ChunkedList rows; edges are u32 indices; each node
 // references one separately-allocated identity Cell. Cold path only.
 
+#include "vex.h"
 #include "substrate/relational/shelf.h"
 
-#include "vex.h"
 #include "nio/mem.h"
 #include "substrate/relational/cell.h"
 #include "type/re_type.h"

@@ -1,8 +1,8 @@
+#include "vex.h"
 #include "lang/annotation.h"
 
 #include <stdio.h>
 #include <string.h>
-#include "vex.h"
 
 #include "nio/mem.h"
 #include "type/re_type.h"

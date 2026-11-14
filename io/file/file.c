@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "io/file/file.h"
 // Production R2 I/O owner: Relational Engine; existing File ABI preserved.
 
@@ -7,7 +8,6 @@
 
 #include "nio/mem.h"
 #include "type/re_type.h"
-#include "vex.h"
 
 ;;DEFINITION
 /**

@@ -1,10 +1,12 @@
 // re/test/io/findex_test.c — FIndex owner test.
+
+#include "vex.h"
 #include <assert.h>
 
 #include "io/file/file.h"
 #include "nio/mem.h"
 
-int main(void) {
+int main() {
     FIndex index = FIndex_create(4);
     assert(FIndex_live(&index));
     assert(FIndex_count(&index) == 0);

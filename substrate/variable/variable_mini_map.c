@@ -3,6 +3,7 @@
 // One bucket level: first folded char -> a lazily-minted ChunkedList of
 // VariableSlot rows. Cold path only.
 
+#include "vex.h"
 #include "substrate/variable/variable_mini_map.h"
 
 #include <stdio.h>

@@ -4,6 +4,7 @@
 // goes pool-first, then one sparse hop (slot -> var id). Typed queries
 // filter rows by classId — one structure, no segregated lists.
 
+#include "vex.h"
 #include "substrate/relational/symbol_table.h"
 
 #include <stdio.h>

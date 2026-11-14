@@ -1,9 +1,8 @@
 #ifndef IO_LOG_LOG_H
 #define IO_LOG_LOG_H
 
-#include <pthread.h>
-#include <stdatomic.h>
 #include "vex.h"
+#include <pthread.h>
 
 #include "io/file/file.h"
 

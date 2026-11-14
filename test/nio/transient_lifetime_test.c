@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "nio/mem.h"
 // Relational Engine production transient allocation owner.
 

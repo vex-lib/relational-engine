@@ -5,6 +5,7 @@
 #ifndef VEXGRAPH_ECOSYSTEM_RE_H
 #define VEXGRAPH_ECOSYSTEM_RE_H
 
+#include "vex.h"
 #include "atomic/atomic.h"
 #include "clipboard/clipboard.h"
 #include "io/io.h"

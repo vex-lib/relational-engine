@@ -4,6 +4,7 @@
 // value pointer opaque. No allocation on the read path; the arity constructors
 // are the only allocators.
 
+#include "vex.h"
 #include "substrate/variable/variable_slot.h"
 
 #include <stdio.h>

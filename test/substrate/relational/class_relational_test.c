@@ -1,4 +1,6 @@
 // class_relational_test/test.c — verify the Relational spotlight (SymbolTable).
+
+#include "vex.h"
 #include <stdio.h>
 #include <string.h>
 

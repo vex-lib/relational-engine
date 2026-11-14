@@ -3,6 +3,7 @@
 
 // substrate/substrate.h — the relational substrate directory door.
 
+#include "vex.h"
 #include "substrate/relational/cell.h"
 #include "substrate/relational/relational.h"
 #include "substrate/relational/shelf.h"

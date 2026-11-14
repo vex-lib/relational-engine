@@ -10,12 +10,11 @@
 // acquire on the successful CAS and release on the store in unlock. Relaxed
 // would "work" on x86 and corrupt on Apple Silicon.
 
+#include "vex.h"
 #include "atomic/atomic.h"
 
 #include <pthread.h>
-#include <stdatomic.h>
 #include <time.h>
-#include "vex.h"
 
 ;;DEFINITION
 /**

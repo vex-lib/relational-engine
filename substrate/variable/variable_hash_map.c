@@ -4,6 +4,7 @@
 // 1023); each occupied slot is a lazily-minted ChunkedList of VariableSlot rows.
 // Bands are minted lazily too. Cold path only.
 
+#include "vex.h"
 #include "substrate/variable/variable_hash_map.h"
 
 #include <stdio.h>

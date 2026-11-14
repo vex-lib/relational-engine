@@ -1,10 +1,10 @@
+#include "vex.h"
 #include "io/log/log.h"
 // Production R2 I/O owner: Relational Engine; existing LogParser ABI preserved.
 
 #include <stdio.h>
 #include <string.h>
 
-#include "vex.h"
 
 ;;DEFINITION
 /**

@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "io/log/log.h"
 // Production R2 I/O owner: Relational Engine; existing Log ABI preserved.
 
@@ -6,7 +7,6 @@
 #include <time.h>
 
 #include "nio/mem.h"
-#include "vex.h"
 
 ;;DEFINITION
 /**

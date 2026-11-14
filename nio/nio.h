@@ -7,6 +7,7 @@
 
 // nio/nio.h — the storage substrate directory door.
 
+#include "vex.h"
 #include "nio/mem.h"
 
 #endif //VEXGRAPH_ECOSYSTEM_NIO_H

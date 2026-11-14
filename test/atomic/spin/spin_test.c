@@ -11,9 +11,8 @@
 //     with an external bounded watchdog (the Concurrency and Bounded Progress
 //     Law): N threads hammer one counter, final value is exact.
 
-#include <pthread.h>
-#include <stdatomic.h>
 #include "vex.h"
+#include <pthread.h>
 #include <stdio.h>
 #include <sched.h>
 

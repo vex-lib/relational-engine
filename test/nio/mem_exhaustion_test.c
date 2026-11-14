@@ -7,10 +7,11 @@
 // registry changes, reset, enumeration and shared-block mutation require exclusion.
 // No generational pointer identity, hostile forged checksum rejection, OS OOM,
 // downstream lifetime, Windows, or full allocator readiness is claimed.
+
+#include "vex.h"
 #include "nio/mem.h"
 #include <assert.h>
 #include <pthread.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

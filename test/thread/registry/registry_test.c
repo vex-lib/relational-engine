@@ -11,9 +11,8 @@
 //
 // Role names are policy, owned and proven by Vexspoke's thread test.
 
-#include <pthread.h>
-#include <stdatomic.h>
 #include "vex.h"
+#include <pthread.h>
 #include <stdio.h>
 #include <sched.h>
 

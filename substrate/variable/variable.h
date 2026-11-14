@@ -5,6 +5,7 @@
 //
 // This is the directory door, not the var class: substrate/variable/var.h is the class.
 
+#include "vex.h"
 #include "substrate/variable/var.h"
 #include "substrate/variable/variable_hash_map.h"
 #include "substrate/variable/variable_mini_map.h"

@@ -10,11 +10,10 @@
 // once by the owning thread and read by anyone; plain atomics keep it simple.
 // The tag's meaning is policy and belongs to the behavior owner, never here.
 
+#include "vex.h"
 #include "thread.h"
 
 #include <pthread.h>
-#include <stdatomic.h>
-#include "vex.h"
 
 ;;DEFINITION
 /**

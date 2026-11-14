@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "type/re_type.h"
 #include "lang/annotation.h"
 

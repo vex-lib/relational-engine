@@ -1,9 +1,9 @@
+#include "vex.h"
 #include "lang/annotation.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "vex.h"
 
 #include "substrate/relational/symbol_table.h"
 #include "substrate/substrate.h"

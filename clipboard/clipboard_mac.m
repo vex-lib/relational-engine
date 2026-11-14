@@ -1,4 +1,6 @@
 #import <AppKit/AppKit.h>
+
+#include "vex.h"
 #include "clipboard/clipboard.h"
 // Production R2 I/O owner: Relational Engine; native pasteboard ABI preserved.
 #include "lang/annotation.h"

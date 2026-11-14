@@ -1,8 +1,7 @@
 #ifndef ATOMIC_ATOMIC_H
 #define ATOMIC_ATOMIC_H
 
-#include <stdatomic.h>
-#include "vex.h"
+
 
 // atomic/atomic.h — spinlock API (Legacy: thread/SpinLock.java).
 //
@@ -13,6 +12,8 @@
 // Ordering: the successful CAS is memory_order_acquire, unlock is
 // memory_order_release. On ARM the hardware reorders, so relaxed would be
 // wrong (see Lesson 20).
+
+#include "vex.h"
 
 ;;CLASSNAME("SpinLock")
 typedef struct SpinLock {

@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "substrate/variable/variable_pool.h"
 
 #include <string.h>

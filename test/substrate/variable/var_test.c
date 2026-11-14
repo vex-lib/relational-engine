@@ -1,20 +1,20 @@
+#include "vex.h"
 #include <assert.h>
 #include <string.h>
 
 #include "substrate/variable/var.h"
-#include "vex.h"
 
 static int g_calls;
 static pointer g_last;
 
-static void observer(var *self, pointer value, void *context) {
-    (void) self;
+static fn observer(var *self, pointer value, any context) {
+    (fn) self;
     g_calls += 1;
     g_last = value;
     assert(context == &g_calls);
 }
 
-int main(void) {
+int main() {
     MemoryArena *arena = MemoryArena_create(64u * 1024u * 1024u);
     assert(arena);
 

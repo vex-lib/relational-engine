@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "relational.h"
 
 #include <string.h>
@@ -5,7 +6,6 @@
 
 #include "nio/mem.h"
 #include "type/re_type.h"
-#include "vex.h"
 
 ;;DEFINITION
 /**

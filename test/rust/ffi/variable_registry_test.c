@@ -1,10 +1,12 @@
 // Real C client of Rust stable variable rows and engine-owned C name search.
+
+#include "vex.h"
 #include "relational_engine/variable_registry.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
-int main(void) {
+int main() {
     ReVariableRegistry *owner = nullptr;
     assert(re_variables_new(0, &owner) == 1 && owner == nullptr);
     assert(re_variables_new(2, &owner) == 0);

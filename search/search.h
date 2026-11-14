@@ -3,6 +3,7 @@
 
 // search/search.h — the native search directory door.
 
+#include "vex.h"
 #include "search/primitives/primitives.h"
 
 #endif

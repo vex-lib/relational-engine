@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "clipboard/clipboard.h"
 #include "lang/platform.h"
 // Production R2 I/O owner: Relational Engine; existing Clipboard ABI preserved.

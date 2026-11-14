@@ -4,6 +4,8 @@
  * and drop — plus the refusals that must never half-fill a caller's buffer.
  * Not a Hotcwap loader test, not a second mapping implementation. */
 #define POSIX_C_SOURCE 200809L
+
+#include "vex.h"
 #include "relational_engine/fixed_mapped_file.h"
 #include <assert.h>
 #include <fcntl.h>
