@@ -136,8 +136,9 @@ The rules:
    aligned. "Everything is a pointer" means the engine trusts the pointer you hand
    it, exactly as C does — it cannot prove an address is mapped.
 
-A concrete example, from `rust/include/relational_engine/memory.h` and
-`rust/src/ffi/memory.rs`:
+Rust storage lives in `rangoon` (`../../../rust/`); `re` keeps the C allocator.
+A concrete example, from `rangoon/include/relational_engine/memory.h` and
+`rangoon/ffi/memory.rs`:
 
 ```c
 /* C sees this. The owner is opaque; the bytes are copied in/out. */
@@ -277,10 +278,10 @@ if (status == 0)
 re_rows_drop(rows);
 ```
 
-Supply both `src` and `rust/include` include paths and link Cargo's resident
-`librelational_engine_scratchpad.a`. The owner runner does this with a real C
-client. Ordinary `./tools/b build relational_engine` still builds native C IO/NIO,
-not the Rust static library; automatic downstream build wiring is not delivered.
+Supply the `rangoon/include` and C floor include paths, and link Cargo's resident
+`librangoon.a`. The owner runner does this with a real C client. Ordinary
+`./tools/b build relational_engine` still builds native C IO/NIO, not the Rust
+static library; automatic downstream build wiring is not delivered.
 C consumers keep their language and logic. Rust only owns the selected storage.
 The C client also binds a row address into VariableRegistry and detaches that
 borrower before dropping storage. It is not an R3–R5 application migration.
@@ -334,7 +335,7 @@ Rust memory bridge, registry and typed-handle implementations. Other native IO
 owners need their own current proof; this document does not certify the whole
 family or clipboard behavior.
 
-**Mapping status:** `rust/src/nio/fixed_mapped_file.rs` now owns fixed-extent regular-file
+**Mapping status:** `rangoon/nio/fixed_mapped_file.rs` now owns fixed-extent regular-file
 byte views through memmap2. `fixed_mapped_file_test.rs` and `mapping_error_test.rs` pass
 on macOS arm64 in debug/release, with intended unsafe/arity/type/borrow compiler
 rejections in the registered runner. Rust lifetimes protect our own borrowers;
@@ -342,7 +343,7 @@ the caller still prevents external mutation/truncation. No resize, mapped C ABI,
 database transaction or crash-durability claim follows. Broader planned areas
 remain unimplemented unless established by their own source and owner proof.
 
-**Evidence boundary:** `../../../tests/relational-engine/rust/run.py` exercises registered
+**Evidence boundary:** `../../../rust/test/run.py` exercises registered
 debug/release owners, real C clients and C-side ASan/UBSan. C-client ASan/UBSan does
 not instrument Rust. The separate Rust sanitizer runner skips on this host: the
 installed Apple runtime lacks Rust's ASan v8 version symbol. Windows execution,
@@ -367,7 +368,7 @@ Honest pressure points, so you can push on them:
    leaves a footgun. If you want identity everywhere, the raw index API could be
    demoted to `pub(crate)`.
 4. **One header, one truth.** The 32-byte block header lives with the allocator; the
-   type algebra lives in `src/type`. They are related but separate — worth deciding
+   type algebra lives in `type`. They are related but separate — worth deciding
    whether the header should carry more self-description.
 5. **Mapping is a choice, not a readiness badge.** Rust FixedMappedFile now implements
    fixed-extent regular-file bytes with checked offset/count access. Unsafe open
