@@ -144,8 +144,9 @@ writes. Graphics compute (GPU shaders/dispatch) remains Graphvex-owned.
   production native target or a source of shadow consumer headers.
 - `rangoon` (`rust/`): the Rust vocabulary and storage surface, its C ABI, the
   storage/mapping/reservation laws and the owner suite. See `../../rust/README.md`.
-- `docs/relational-engine-primer.md`: a plain-English primer on the engine, the
-  C/Rust ABI and the data model. Its Rust sections now describe `rangoon`.
+- `docs/relational-engine-primer.md`: the C-boundary primer — the allocator, the
+  native IO seams, the type algebra and the C/Rust ABI. The Rust half has its own
+  primer in `rangoon`: `../../rust/docs/rangoon-primer.md`.
 - Owner and tooling tests live in `test/`.
 
 The imported C reference retains Vexspoke's Boost Software License; the
