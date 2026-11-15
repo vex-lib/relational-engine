@@ -137,6 +137,7 @@ static fn Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
 MemoryArena *Memory_defaultArena();
 
 MemoryArena *MemoryArena_create(bytes totalBytes);
+bytes MemoryArena_capacityFor(bytes payloadBytes);
 fn MemoryArena_destroy(MemoryArena *a);
 any MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes);
 any MemoryArena_realloc(MemoryArena *a, any userPtr, bytes newBytes);

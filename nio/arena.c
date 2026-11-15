@@ -407,6 +407,21 @@ fn Memory_freeAll() {
 bytes Memory_findAll(u64 typeId, any *outArray, bytes maxCount) {
     return MemoryArena_findAll(&s_default, typeId, outArray, maxCount);
 }
+/** Total capacity a fresh arena needs to serve one payload of this length.
+ *
+ * An arena carves its slab classes from the front of its backing before the
+ * bump region starts, so an owner that wants one large block asks for the
+ * payload plus that carve. The geometry stays private to the allocator instead
+ * of being copied into every owner that needs a big scratch block.
+ */
+bytes MemoryArena_capacityFor(bytes payloadBytes) {
+    bytes slabBytes = 0;
+    for (bytes s = 0; s < SLAB_COUNT; s++)
+        slabBytes += (bytes) s_slabCaps[s] * s_slabSizes[s];
+    if (payloadBytes > SIZE_MAX - slabBytes - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK)
+        return 0;
+    return slabBytes + payloadBytes + sizeof(MemoryHeader) + MEMORY_ALIGN_MASK;
+}
 /** Allocate, initialize, and register an independent arena with the requested capacity. */
 MemoryArena *MemoryArena_create(bytes totalBytes) {
     MemoryArena *a = (MemoryArena*) Memory_systemCalloc(1, sizeof(MemoryArena));
