@@ -76,7 +76,7 @@ static atomic_int g_foreign_go;
 
 /** Holds the shared lock until the test permits its owning thread to release it. */
 static any foreign_owner(any arg) {
-    (fn) arg;
+    (discard) arg;
     SpinLock_lock(&g_foreign);
     atomic_store_explicit(&g_foreign_ready, 1, memory_order_release);
     while (!atomic_load_explicit(&g_foreign_go, memory_order_acquire))
@@ -117,7 +117,7 @@ static atomic_int g_spin_start;
 
 /** Contends on the shared lock while updating the protected counter and watchdog progress count. */
 static any spin_worker(any arg) {
-    (fn) arg;
+    (discard) arg;
     while (!atomic_load_explicit(&g_spin_start, memory_order_acquire))
         sched_yield();
     for (int i = 0; i < SPIN_ITER; i++) {

@@ -64,7 +64,7 @@ typedef struct Collector {
 /* Saves selected callback fields so parsing order and values can be asserted. */
 static fn collect(any userdata, int kind, int64_t ts,
                     int64_t v0, int64_t v1, int64_t v2, int64_t v3, int64_t v4) {
-    (fn) v1; (fn) v2; (fn) v3; (fn) v4;
+    (discard) v1; (discard) v2; (discard) v3; (discard) v4;
     Collector *c = (Collector*) userdata;
     if ((*c).count < 8) {
         (*c).kinds[(*c).count] = kind;

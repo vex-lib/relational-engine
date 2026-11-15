@@ -82,13 +82,13 @@ bool Clipboard_setText(const char *text) {
 
 /** Report that image retrieval is unsupported by the non-Apple clipboard stub. */
 bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes) {
-    (fn) dest; (fn) maxBytes; (fn) outWidth; (fn) outHeight;
+    (discard) dest; (discard) maxBytes; (discard) outWidth; (discard) outHeight;
     return false;
 }
 
 /** Report that image publication is unsupported by the non-Apple clipboard stub. */
 bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
-    (fn) pixels; (fn) width; (fn) height;
+    (discard) pixels; (discard) width; (discard) height;
     return false;
 }
 

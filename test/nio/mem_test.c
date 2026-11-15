@@ -151,7 +151,7 @@ int main() {
 
     p = grown;
 
-    (fn) p;
+    (discard) p;
 
     Memory_freeAll();
 

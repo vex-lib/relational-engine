@@ -119,8 +119,8 @@ static fn fsCallback(ConstFSEventStreamRef streamRef, any clientCallBackInfo,
                        bytes numEvents, any eventPaths,
                        const FSEventStreamEventFlags eventFlags[],
                        const FSEventStreamEventId eventIds[]) {
-    (fn) streamRef;
-    (fn) eventIds;
+    (discard) streamRef;
+    (discard) eventIds;
     FileEventWatcher *watcher = (FileEventWatcher*) clientCallBackInfo;
     char **paths = (char**) eventPaths;
     for (bytes i = 0; i < numEvents; i++) {

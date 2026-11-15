@@ -8,7 +8,7 @@ static int g_calls;
 static pointer g_last;
 
 static fn observer(var *self, pointer value, any context) {
-    (fn) self;
+    (discard) self;
     g_calls += 1;
     g_last = value;
     assert(context == &g_calls);

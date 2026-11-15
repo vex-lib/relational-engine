@@ -344,7 +344,7 @@ bytes Relational_searchAll(SymbolTable *global, SymbolTable *local, const char *
     if (local) {
         bytes before = filled;
         filled = searchOne(local, query, outIds, cap, filled);
-        (fn) before;
+        (discard) before;
     }
     return filled;
 }
