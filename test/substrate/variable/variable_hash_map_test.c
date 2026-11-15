@@ -30,8 +30,8 @@
  * ============================================================================
  */
 
-static int g_fail = 0;
-static int g_checks = 0;
+static i32 g_fail = 0;
+static i32 g_checks = 0;
 
 #define CHECK(cond)                                                       \
     do {                                                                  \
@@ -308,7 +308,7 @@ static fn testForEach() {
 }
 
 // Runs lifecycle, key policy, collision/growth, projection, constructor, and iteration checks.
-int main() {
+i32 main() {
     printf("=== VariableHashMap Test Suite ===\n\n");
 
     testLifecycle();

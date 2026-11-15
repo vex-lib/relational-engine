@@ -28,7 +28,7 @@
  * ============================================================================
  */
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(name, cond) do { \
     if (cond) { printf("[variable_pool_test] PASS %s\n", name); } \
@@ -36,7 +36,7 @@ static int g_failures = 0;
 } while (0)
 
 // Exercises static StringPool lifecycle, validation, deduplication, growth, and relinking.
-int main() {
+i32 main() {
     printf("=== Running Variable Pool Test Suite ===\n");
 
     {
@@ -95,18 +95,18 @@ int main() {
         MemoryArena *arena = MemoryArena_create(64u << 20);
         StringPool_init(arena);
         const char *words[] = { "delta", "alpha", "charlie", "bravo" };
-        for (int i = 0; i < 4; i++)
+        for (i32 i = 0; i < 4; i++)
             StringPool_intern(words[i]);
         CHECK("count four", StringPool_count() == 4);
         bool allFound = true;
-        for (int i = 0; i < 4; i++) {
+        for (i32 i = 0; i < 4; i++) {
             i32 idx = StringPool_find(words[i]);
             if (idx < 0 || strcmp(StringPool_name((u32) idx), words[i]) != 0)
                 allFound = false;
         }
         CHECK("all found by name", allFound);
         char buf[8];
-        for (int i = 0; i < 200; i++) {
+        for (i32 i = 0; i < 200; i++) {
             snprintf(buf, sizeof(buf), "k%d", i);
             if (StringPool_intern(buf) < 0)
                 break;

@@ -116,7 +116,7 @@ bool VariableSlot_foldName(const char *name, char *out) {
             segLen = 0u;
             continue;
         }
-        unsigned char u = (unsigned char) c;
+        u8 u = (u8) c;
         bool ok = (u >= 'a' && u <= 'z') || (u >= 'A' && u <= 'Z') ||
                   (u >= '0' && u <= '9') || u == '_' || u == '$' || u == '-';
         if (!ok)
@@ -128,7 +128,7 @@ bool VariableSlot_foldName(const char *name, char *out) {
     }
 }
 
-int VariableSlot_bucketOf(char c) {
+i32 VariableSlot_bucketOf(char c) {
     if (c >= 'a' && c <= 'z')
         return c - 'a';
     if (c >= '0' && c <= '9')
@@ -251,8 +251,8 @@ fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *
     const char *name = (*self).name;
     if (name[0] == '\0')
         name = "?";
-    int written = snprintf(dest, cap, "VariableSlot(%s => 0x%llx)", name,
-                           (unsigned long long) (*self).pointer);
+    i32 written = snprintf(dest, cap, "VariableSlot(%s => 0x%llx)", name,
+                           (u64) (*self).pointer);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated != nullptr)
             *outTruncated = true;
@@ -268,8 +268,8 @@ fn VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, 
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "VariableSlot { name=\"%s\", pointer=0x%llx }", (*self).name,
-                           (unsigned long long) (*self).pointer);
+    i32 written = snprintf(dest, cap, "VariableSlot { name=\"%s\", pointer=0x%llx }", (*self).name,
+                           (u64) (*self).pointer);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated != nullptr)
             *outTruncated = true;

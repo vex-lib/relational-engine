@@ -29,7 +29,7 @@
  * ============================================================================
  */
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(name, cond) do { \
     if (cond) { printf("[variable_slot_test] PASS %s\n", name); } \
@@ -37,7 +37,7 @@ static int g_failures = 0;
 } while (0)
 
 // Checks VariableSlot layout, name grammar/folding, accessors, constructors, strings, and null safety.
-int main() {
+i32 main() {
     printf("=== Running Variable Slot Test Suite ===\n");
 
     CHECK("sizeof slot is 32", sizeof(VariableSlot) == 32u);

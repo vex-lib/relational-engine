@@ -29,8 +29,8 @@
  * ============================================================================
  */
 
-static int g_fail = 0;
-static int g_checks = 0;
+static i32 g_fail = 0;
+static i32 g_checks = 0;
 
 #define CHECK(cond)                                                       \
     do {                                                                  \
@@ -215,7 +215,7 @@ static fn testShelfNullAndStrings() {
 }
 
 // Runs Cell and Shelf identity, collection, growth, projection, and null-safety checks.
-int main() {
+i32 main() {
     printf("=== Cell + Shelf Test Suite ===\n\n");
 
     testCell();

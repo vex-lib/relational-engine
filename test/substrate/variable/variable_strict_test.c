@@ -28,7 +28,7 @@
  * ============================================================================
  */
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(name, cond) do { \
     if (cond) { printf("[variable_strict_test] PASS %s\n", name); } \
@@ -36,7 +36,7 @@ static int g_failures = 0;
 } while (0)
 
 // Exercises strict SymbolTable rejection, class filtering, rename, and relational rebinding flows.
-int main() {
+i32 main() {
     printf("=== Running SymbolTable Strict Test Suite ===\n");
     if (!Memory_init(0u)) return 1;
     SymbolTable scope = SymbolTable();

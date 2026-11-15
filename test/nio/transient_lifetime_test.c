@@ -79,7 +79,7 @@ static fn TestLabel_free(TestLabel *lbl) {
 #define Label_free TestLabel_free
 #endif
 
-int main() {
+i32 main() {
     printf("[transient_lifetime_test] Starting lifetime verification suite...\n");
 
     const char *lit = "literal_constant_string";
@@ -154,7 +154,7 @@ int main() {
         exit(0);
     }
 
-    int status = 0;
+    i32 status = 0;
     waitpid(pid, &status, 0);
     assert(WIFSIGNALED(status));
     assert(WTERMSIG(status) == SIGABRT);

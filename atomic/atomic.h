@@ -27,7 +27,7 @@ fn SpinLock_lock(SpinLock *lock);
 
 bool SpinLock_tryLock(SpinLock *lock);
 
-bool SpinLock_tryLockTimeout(SpinLock *lock, int64_t timeout_nanos);
+bool SpinLock_tryLockTimeout(SpinLock *lock, i64 timeout_nanos);
 
 fn SpinLock_unlock(SpinLock *lock);
 

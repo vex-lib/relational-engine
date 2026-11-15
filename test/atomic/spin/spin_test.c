@@ -18,7 +18,7 @@
 
 #include "atomic/atomic.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -109,9 +109,9 @@ static fn test_foreign_unlock_refused() {
 #define SPIN_ITER 50000
 
 static SpinLock g_counter_lock;
-static int64_t g_plain_counter;               // guarded ONLY by g_counter_lock
-static int64_t g_observed_min;
-static int64_t g_observed_max;
+static i64 g_plain_counter;               // guarded ONLY by g_counter_lock
+static i64 g_observed_min;
+static i64 g_observed_max;
 static atomic_long g_watchdog_ticks;
 static atomic_int g_spin_start;
 
@@ -120,9 +120,9 @@ static any spin_worker(any arg) {
     (discard) arg;
     while (!atomic_load_explicit(&g_spin_start, memory_order_acquire))
         sched_yield();
-    for (int i = 0; i < SPIN_ITER; i++) {
+    for (i32 i = 0; i < SPIN_ITER; i++) {
         SpinLock_lock(&g_counter_lock);
-        int64_t before = g_plain_counter;
+        i64 before = g_plain_counter;
         g_plain_counter = before + 1;
         if (before < g_observed_min)
             g_observed_min = before;
@@ -144,21 +144,21 @@ static fn test_contention() {
     atomic_store(&g_spin_start, 0);
 
     pthread_t t[SPIN_THREADS];
-    for (int i = 0; i < SPIN_THREADS; i++)
+    for (i32 i = 0; i < SPIN_THREADS; i++)
         CHECK(pthread_create(&t[i], nullptr, spin_worker, nullptr) == 0);
     atomic_store_explicit(&g_spin_start, 1, memory_order_release);
-    for (int i = 0; i < SPIN_THREADS; i++)
+    for (i32 i = 0; i < SPIN_THREADS; i++)
         CHECK(pthread_join(t[i], nullptr) == 0);
 
-    CHECK(g_plain_counter == (int64_t) SPIN_THREADS * SPIN_ITER);
+    CHECK(g_plain_counter == (i64) SPIN_THREADS * SPIN_ITER);
     CHECK(g_observed_min == 0);
-    CHECK(g_observed_max == (int64_t) SPIN_THREADS * SPIN_ITER - 1);
-    CHECK(atomic_load(&g_watchdog_ticks) == (int64_t) SPIN_THREADS * SPIN_ITER);
+    CHECK(g_observed_max == (i64) SPIN_THREADS * SPIN_ITER - 1);
+    CHECK(atomic_load(&g_watchdog_ticks) == (i64) SPIN_THREADS * SPIN_ITER);
     CHECK(!SpinLock_isLocked(&g_counter_lock));
 }
 
 /** Runs the SpinLock owner scenarios and returns failure if any assertion was violated. */
-int main() {
+i32 main() {
     test_null_safety();
     test_basic_round_trip();
     test_timeout();

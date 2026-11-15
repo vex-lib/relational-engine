@@ -150,7 +150,7 @@ bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer
     char folded[VARIABLE_SLOT_NAME_BYTES];
     if (!VariableSlot_foldName(name, folded))
         return false;
-    int bucket = VariableSlot_bucketOf(folded[0]);
+    i32 bucket = VariableSlot_bucketOf(folded[0]);
     if (bucket < 0)
         return false;
     ChunkedList *list = ensureBucket(map, (u32) bucket);
@@ -177,7 +177,7 @@ pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
     char folded[VARIABLE_SLOT_NAME_BYTES];
     if (!VariableSlot_foldName(name, folded))
         return 0u;
-    int bucket = VariableSlot_bucketOf(folded[0]);
+    i32 bucket = VariableSlot_bucketOf(folded[0]);
     if (bucket < 0)
         return 0u;
     ChunkedList *list = (*map).buckets[bucket];
@@ -195,7 +195,7 @@ bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name) {
     char folded[VARIABLE_SLOT_NAME_BYTES];
     if (!VariableSlot_foldName(name, folded))
         return false;
-    int bucket = VariableSlot_bucketOf(folded[0]);
+    i32 bucket = VariableSlot_bucketOf(folded[0]);
     if (bucket < 0)
         return false;
     ChunkedList *list = (*map).buckets[bucket];
@@ -241,7 +241,7 @@ fn VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, b
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "VariableMiniMap(count=%u)", (*map).count);
+    i32 written = snprintf(dest, cap, "VariableMiniMap(count=%u)", (*map).count);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;
@@ -257,7 +257,7 @@ fn VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes 
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "VariableMiniMap { active=%s, count=%u, buckets=<array[%u]> }",
+    i32 written = snprintf(dest, cap, "VariableMiniMap { active=%s, count=%u, buckets=<array[%u]> }",
                            (*map).active ? "true" : "false", (*map).count, VARIABLE_MINI_BUCKETS);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)

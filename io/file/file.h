@@ -37,8 +37,8 @@
 typedef struct File {
     char name[FILE_PATH_MAX];
     FILE *handle;
-    int64_t size;
-    int64_t position;
+    i64 size;
+    i64 position;
     u32 mode;
 } File;
 
@@ -46,20 +46,20 @@ File *File_open(const char *path, u32 mode);
 
 bool File_close(File *f);
 
-int64_t File_read(File *f, any dest, int64_t max_len);
+i64 File_read(File *f, any dest, i64 max_len);
 
-int64_t File_write(File *f, const_any src, int64_t len);
+i64 File_write(File *f, const_any src, i64 len);
 
-bool File_seek(File *f, int64_t position);
+bool File_seek(File *f, i64 position);
 
-int64_t File_refreshSize(File *f);
+i64 File_refreshSize(File *f);
 
 bool File_flush(File *f);
 
 FILE *File_handle(const File *f);
 const char *File_name(const File *f);
-int64_t File_size(const File *f);
-int64_t File_pos(const File *f);
+i64 File_size(const File *f);
+i64 File_pos(const File *f);
 u32 File_mode(const File *f);
 bool File_eof(const File *f);
 

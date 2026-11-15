@@ -16,7 +16,7 @@
 
 #include "io/file/file.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -34,17 +34,17 @@ static fn path_of(char *out, bytes cap, const char *leaf) {
 }
 
 /* Reads a file's size for verifying the writer's on-disk result. */
-static long read_file_size(const char *p) {
+static i64 read_file_size(const char *p) {
     FILE *f = fopen(p, "rb");
     if (!f)
         return -1;
     fseek(f, 0, SEEK_END);
-    long n = ftell(f);
+    i64 n = ftell(f);
     fclose(f);
     return n;
 }
 
-int main() {
+i32 main() {
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";
@@ -74,7 +74,7 @@ int main() {
     enum { BIG = 200000 };
     u8 *big = (u8*) malloc(BIG);
     CHECK(big != nullptr);
-    for (int i = 0; i < BIG; i++)
+    for (i32 i = 0; i < BIG; i++)
         big[i] = (u8) (i * 31 + 7);
     FileWriter_write(&w, big, BIG);
     CHECK(FileWriter_bytesWritten(&w) == (u64) (5 + BIG));

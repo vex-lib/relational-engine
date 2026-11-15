@@ -20,9 +20,9 @@
 #define THREAD_REGISTRY_DEFAULT_SIZE 256
 #define THREAD_TAG_NONE 0u
 
-int ThreadRegistry_index();
+i32 ThreadRegistry_index();
 
-fn ThreadRegistry_setTag(int index, u32 tag);
-u32 ThreadRegistry_tag(int index);
+fn ThreadRegistry_setTag(i32 index, u32 tag);
+u32 ThreadRegistry_tag(i32 index);
 
 #endif

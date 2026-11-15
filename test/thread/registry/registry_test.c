@@ -18,7 +18,7 @@
 
 #include "thread/thread.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -29,14 +29,14 @@ static int g_failures = 0;
     } while (0)
 
 static fn test_self_index() {
-    int a = ThreadRegistry_index();
-    int b = ThreadRegistry_index();
+    i32 a = ThreadRegistry_index();
+    i32 b = ThreadRegistry_index();
     CHECK(a == b);
     CHECK(a >= 0 && a < THREAD_REGISTRY_DEFAULT_SIZE);
 }
 
 static fn test_tags() {
-    int idx = ThreadRegistry_index();
+    i32 idx = ThreadRegistry_index();
     CHECK(ThreadRegistry_tag(idx) == THREAD_TAG_NONE);
 
     static const u32 tags[] = {
@@ -66,16 +66,16 @@ static fn test_bounds() {
 #define REG_REPEAT 200
 
 static atomic_int g_reg_start;
-static int g_reg_index[REG_THREADS];
-static int g_reg_stable_flags[REG_THREADS];     // 1 if all repeats agreed
+static i32 g_reg_index[REG_THREADS];
+static i32 g_reg_stable_flags[REG_THREADS];     // 1 if all repeats agreed
 
 static any reg_worker(any arg) {
-    int id = (int) (intptr_t) arg;
+    i32 id = (i32) (pointer) arg;
     while (!atomic_load_explicit(&g_reg_start, memory_order_acquire))
         sched_yield();
-    int first = ThreadRegistry_index();
-    int stable = 1;
-    for (int i = 0; i < REG_REPEAT; i++)
+    i32 first = ThreadRegistry_index();
+    i32 stable = 1;
+    for (i32 i = 0; i < REG_REPEAT; i++)
         if (ThreadRegistry_index() != first)
             stable = 0;
     ThreadRegistry_setTag(first, 42u);
@@ -89,40 +89,40 @@ static any reg_worker(any arg) {
 static fn test_concurrent_distinct() {
     atomic_store(&g_reg_start, 0);
     pthread_t t[REG_THREADS];
-    for (int i = 0; i < REG_THREADS; i++) {
+    for (i32 i = 0; i < REG_THREADS; i++) {
         g_reg_index[i] = -1;
         g_reg_stable_flags[i] = 0;
-        CHECK(pthread_create(&t[i], nullptr, reg_worker, (any) (intptr_t) i) == 0);
+        CHECK(pthread_create(&t[i], nullptr, reg_worker, (any) (pointer) i) == 0);
     }
     atomic_store_explicit(&g_reg_start, 1, memory_order_release);
     bool all_published = false;
     while (!all_published) {
         all_published = true;
-        for (int i = 0; i < REG_THREADS; i++)
+        for (i32 i = 0; i < REG_THREADS; i++)
             if (g_reg_index[i] < 0)
                 all_published = false;
         sched_yield();
     }
-    int idx[REG_THREADS];
-    for (int i = 0; i < REG_THREADS; i++) {
+    i32 idx[REG_THREADS];
+    for (i32 i = 0; i < REG_THREADS; i++) {
         idx[i] = g_reg_index[i];
         CHECK(g_reg_stable_flags[i] == 1);
         CHECK(idx[i] >= 0 && idx[i] < THREAD_REGISTRY_DEFAULT_SIZE);
     }
-    for (int i = 0; i < REG_THREADS; i++)
-        for (int j = i + 1; j < REG_THREADS; j++)
+    for (i32 i = 0; i < REG_THREADS; i++)
+        for (i32 j = i + 1; j < REG_THREADS; j++)
             CHECK(idx[i] != idx[j]);
 
     atomic_store_explicit(&g_reg_start, 2, memory_order_release);
-    for (int i = 0; i < REG_THREADS; i++)
+    for (i32 i = 0; i < REG_THREADS; i++)
         CHECK(pthread_join(t[i], nullptr) == 0);
 
-    int me = ThreadRegistry_index();
+    i32 me = ThreadRegistry_index();
     CHECK(me == ThreadRegistry_index());
     CHECK(me >= 0 && me < THREAD_REGISTRY_DEFAULT_SIZE);
 }
 
-int main() {
+i32 main() {
     test_self_index();
     test_tags();
     test_bounds();

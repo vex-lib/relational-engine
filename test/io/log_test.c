@@ -20,7 +20,7 @@
 #include "io/log/log.h"
 #include "io/file/file.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -30,7 +30,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main() {
+i32 main() {
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";
@@ -68,7 +68,7 @@ int main() {
 
     u64 before = Log_appended(&log) + Log_dropped(&log);
     enum { BURST = 2000 };
-    for (int i = 0; i < BURST; i++)
+    for (i32 i = 0; i < BURST; i++)
         Log_append(&log, 4, i, 0, 0, 0, 0);
     u64 after = Log_appended(&log) + Log_dropped(&log);
     CHECK(after - before == BURST);
@@ -85,7 +85,7 @@ int main() {
     Log_shutdown(nullptr);
 
     CHECK(LogParser_isLogFile(path));
-    int64_t n = LogParser_count(path);
+    i64 n = LogParser_count(path);
     CHECK(n >= 0);
     CHECK((u64) n == Log_written(&log));
 

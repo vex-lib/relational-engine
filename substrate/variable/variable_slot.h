@@ -39,7 +39,7 @@ bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer);
 
 bool VariableSlot_foldName(const char *name, char *out);
 
-int VariableSlot_bucketOf(char c);
+i32 VariableSlot_bucketOf(char c);
 
 VariableSlot *VariableSlot_0();
 VariableSlot *VariableSlot_1(const char *name);

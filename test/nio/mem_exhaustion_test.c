@@ -26,7 +26,7 @@ enum { MIB = 1024 * 1024, SLAB_BYTES = 30 * MIB, BUMP_BYTES = 4096,
 static const u64 TYPE_A = UINT64_C(0x1200000000000041);
 static const u64 TYPE_B = UINT64_C(0x1300000000000041);
 static bytes heapCalls;
-static int failAfter = -1;
+static i32 failAfter = -1;
 
 /** Inject a failure at a chosen allocation stage, otherwise call actual libc. */
 static bool failHeap() {
@@ -53,7 +53,7 @@ static fn checkBytes(const u8 *ptr, bytes length, u8 value) {
 /** Reject partial construction and registry growth, preserving existing owners. */
 static fn construction() {
 #if defined(MEM_TEST_FAULTS)
-    for (int stage = 0; stage < 2; stage++) {
+    for (i32 stage = 0; stage < 2; stage++) {
         failAfter = stage;
         assert(MemoryArena_create(SLAB_BYTES + BUMP_BYTES) == nullptr);
     }
@@ -289,7 +289,7 @@ static any worker(any context) {
     for (bytes i = 0; i < WORKER_STEPS; i++) {
         u8 *p = MemoryArena_alloc(threadArena, TYPE_A, 49 + identity);
         assert(p);
-        memset(p, (int) identity, 49 + identity);
+        memset(p, (i32) identity, 49 + identity);
         checkBytes(p, 49 + identity, (u8) identity);
         Memory_free(p);
     }
@@ -313,7 +313,7 @@ static fn concurrent() {
     MemoryArena_destroy(threadArena);
 }
 
-int main() {
+i32 main() {
 #if !defined(MEM_TEST_FAULTS)
     puts("Scoped native target: use native_run.py for libc fault/no-heap instrumentation");
 #endif

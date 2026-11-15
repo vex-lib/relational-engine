@@ -149,7 +149,7 @@ bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes)
         *outWidth = w;
         *outHeight = h;
 
-        unsigned char *bitmapData = [rep bitmapData];
+        u8 *bitmapData = [rep bitmapData];
         if (bitmapData != nullptr) {
             memcpy(dest, bitmapData, needed);
             return true;
@@ -180,7 +180,7 @@ bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
             return false;
         }
 
-        unsigned char *destData = [rep bitmapData];
+        u8 *destData = [rep bitmapData];
         if (destData == nullptr) {
             return false;
         }

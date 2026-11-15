@@ -6,7 +6,7 @@
 #include "io/file/file.h"
 #include "nio/mem.h"
 
-int main() {
+i32 main() {
     FIndex index = FIndex_create(4);
     assert(FIndex_live(&index));
     assert(FIndex_count(&index) == 0);

@@ -242,7 +242,7 @@ fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated)
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "Shelf(count=%u)", (*shelf).count);
+    i32 written = snprintf(dest, cap, "Shelf(count=%u)", (*shelf).count);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;
@@ -258,9 +258,9 @@ fn Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTrun
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "Shelf { active=%s, count=%u, head=%d, nodes=0x%llx }",
+    i32 written = snprintf(dest, cap, "Shelf { active=%s, count=%u, head=%d, nodes=0x%llx }",
                            (*shelf).active ? "true" : "false", (*shelf).count,
-                           (int) (*shelf).head, (unsigned long long) (pointer) (*shelf).nodes);
+                           (i32) (*shelf).head, (u64) (pointer) (*shelf).nodes);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;

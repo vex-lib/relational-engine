@@ -84,7 +84,7 @@ fn SpinLock_lock(SpinLock *lock) {
     while (!atomic_compare_exchange_weak_explicit(&(*lock).word, &expected, tk,
                                                   memory_order_acquire, memory_order_relaxed)) {
         expected = 0;
-        for (int i = 0; i < 16; i++) {
+        for (i32 i = 0; i < 16; i++) {
             SPIN_PAUSE();
         }
     }
@@ -102,16 +102,16 @@ bool SpinLock_tryLock(SpinLock *lock) {
 
 // Try until timeout_nanos elapses (or forever if negative). Never returns
 // falsely-successful; the deadline is a hard stop.
-bool SpinLock_tryLockTimeout(SpinLock *lock, int64_t timeout_nanos) {
+bool SpinLock_tryLockTimeout(SpinLock *lock, i64 timeout_nanos) {
     struct timespec start, now;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     while (!SpinLock_tryLock(lock)) {
         clock_gettime(CLOCK_MONOTONIC, &now);
-        int64_t elapsed = (now.tv_sec - start.tv_sec) * 1000000000LL
+        i64 elapsed = (now.tv_sec - start.tv_sec) * 1000000000LL
                         + (now.tv_nsec - start.tv_nsec);
         if (timeout_nanos >= 0 && elapsed >= timeout_nanos) return false;
-        for (int i = 0; i < 16; i++) {
+        for (i32 i = 0; i < 16; i++) {
             SPIN_PAUSE();
         }
     }

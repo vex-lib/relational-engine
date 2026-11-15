@@ -25,7 +25,7 @@ static fn test_clipboard() {
     Clipboard_clear();
 }
 
-int main() {
+i32 main() {
     const char *permission = getenv("RE_TEST_SYSTEM_CLIPBOARD");
     if (!permission || strcmp(permission, "1") != 0) {
         fputs("SKIP: system clipboard mutation requires RE_TEST_SYSTEM_CLIPBOARD=1\n", stderr);

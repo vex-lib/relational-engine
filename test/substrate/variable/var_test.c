@@ -4,7 +4,7 @@
 
 #include "substrate/variable/var.h"
 
-static int g_calls;
+static i32 g_calls;
 static pointer g_last;
 
 static fn observer(var *self, pointer value, any context) {
@@ -14,7 +14,7 @@ static fn observer(var *self, pointer value, any context) {
     assert(context == &g_calls);
 }
 
-int main() {
+i32 main() {
     MemoryArena *arena = MemoryArena_create(64u * 1024u * 1024u);
     assert(arena);
 

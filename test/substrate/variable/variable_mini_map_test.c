@@ -28,8 +28,8 @@
  * ============================================================================
  */
 
-static int g_fail = 0;
-static int g_checks = 0;
+static i32 g_fail = 0;
+static i32 g_checks = 0;
 
 #define CHECK(cond)                                                       \
     do {                                                                  \
@@ -152,7 +152,7 @@ static fn testForEachAndStrings() {
 }
 
 // Runs map lifecycle, key policy, projection, and iteration cases.
-int main() {
+i32 main() {
     printf("=== VariableMiniMap (scoped) Test Suite ===\n\n");
 
     testLifecycle();

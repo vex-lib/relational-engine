@@ -5,7 +5,7 @@
 //   - count is (size - header) / 52; parse streams every record with the exact
 //     big-endian kind/timestamp/values;
 //   - a truncated trailing record is ignored, not read past;
-//   - malformed magic, wrong version, short file, and a missing file are all
+//   - malformed magic, wrong version, i16 file, and a missing file are all
 //     refused (-1 / false);
 //   - formatRecord renders "<ms>.<mmm> ms  <name>  v0..v4", honors a null name
 //     via the kind table, and reports truncation with -1;
@@ -20,7 +20,7 @@
 #include "io/log/log.h"
 #include "io/file/file.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -39,9 +39,9 @@ static fn put_be32(FILE *f, u32 v) {
 }
 
 /* Writes one signed timestamp/value as its 64-bit big-endian representation. */
-static fn put_be64(FILE *f, int64_t v) {
+static fn put_be64(FILE *f, i64 v) {
     u8 b[8];
-    for (int i = 0; i < 8; i++)
+    for (i32 i = 0; i < 8; i++)
         b[i] = (u8)((u64)v >> (56 - 8 * i));
     fwrite(b, 1, 8, f);
 }
@@ -55,15 +55,15 @@ static fn put_header(FILE *f, u8 version, u32 record_size) {
 }
 
 typedef struct Collector {
-    int count;
-    int kinds[8];
-    int64_t v0[8];
-    int64_t ts[8];
+    i32 count;
+    i32 kinds[8];
+    i64 v0[8];
+    i64 ts[8];
 } Collector;
 
 /* Saves selected callback fields so parsing order and values can be asserted. */
-static fn collect(any userdata, int kind, int64_t ts,
-                    int64_t v0, int64_t v1, int64_t v2, int64_t v3, int64_t v4) {
+static fn collect(any userdata, i32 kind, i64 ts,
+                    i64 v0, i64 v1, i64 v2, i64 v3, i64 v4) {
     (discard) v1; (discard) v2; (discard) v3; (discard) v4;
     Collector *c = (Collector*) userdata;
     if ((*c).count < 8) {
@@ -108,7 +108,7 @@ static fn test_valid() {
     CHECK(c2.count == 2);
 }
 
-/* Verifies malformed headers, missing/short files, and null parse callbacks are rejected. */
+/* Verifies malformed headers, missing/i16 files, and null parse callbacks are rejected. */
 static fn test_malformed() {
     char p[300];
 
@@ -163,7 +163,7 @@ static fn test_malformed() {
 /* Checks timestamp formatting, kind-name fallback, supplied labels, and truncation reporting. */
 static fn test_format() {
     char out[256];
-    int n = LogParser_formatRecord(out, sizeof(out), 1,
+    i32 n = LogParser_formatRecord(out, sizeof(out), 1,
                                    1012345000LL, 1000000000LL, nullptr,
                                    1, 2, 3, 4, 5);
     CHECK(n > 0);
@@ -192,7 +192,7 @@ static fn test_kind_names() {
 }
 
 /* Creates an isolated temporary directory, runs parser contract cases, and returns their aggregate status. */
-int main() {
+i32 main() {
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";

@@ -141,9 +141,9 @@ fn Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "Cell(typeId=0x%llx, value=0x%llx)",
-                           (unsigned long long) Cell_typeId(cell),
-                           (unsigned long long) (*cell).value);
+    i32 written = snprintf(dest, cap, "Cell(typeId=0x%llx, value=0x%llx)",
+                           (u64) Cell_typeId(cell),
+                           (u64) (*cell).value);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;
@@ -159,9 +159,9 @@ fn Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncat
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "Cell { value=0x%llx, pad=0x%llx }",
-                           (unsigned long long) (*cell).value,
-                           (unsigned long long) (*cell).pad);
+    i32 written = snprintf(dest, cap, "Cell { value=0x%llx, pad=0x%llx }",
+                           (u64) (*cell).value,
+                           (u64) (*cell).pad);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;

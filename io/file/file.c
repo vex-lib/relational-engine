@@ -36,8 +36,8 @@
  *   File {
  *     char name[FILE_PATH_MAX]; // field/entry name
  *     FILE *handle; // OS file handle
- *     int64_t size; // file cursor/size state
- *     int64_t position; // file cursor/size state
+ *     i64 size; // file cursor/size state
+ *     i64 position; // file cursor/size state
  *     u32 mode; // open mode flags
  *   }
  *
@@ -130,12 +130,12 @@ File *File_open(const char *path, u32 mode) {
     bool append = (mode & FILE_MODE_APPEND) != 0;
 
     fseek(handle, 0, SEEK_END);
-    long sz = ftell(handle);
+    i64 sz = ftell(handle);
     if (sz < 0)
         sz = 0;
-    (*f).size = (int64_t)sz;
+    (*f).size = (i64)sz;
     if (append) {
-        (*f).position = (int64_t)sz;
+        (*f).position = (i64)sz;
         fseek(handle, 0, SEEK_END);
     } else {
         (*f).position = 0;
@@ -156,7 +156,7 @@ bool File_close(File *f) {
 }
 
 /** Read up to max_len bytes at the current cursor, returning bytes read or -1 on error. */
-int64_t File_read(File *f, any dest, int64_t max_len) {
+i64 File_read(File *f, any dest, i64 max_len) {
     if (!f || !(*f).handle || !dest)
         return -1;
     if (max_len < 0)
@@ -166,12 +166,12 @@ int64_t File_read(File *f, any dest, int64_t max_len) {
     bytes n = fread(dest, 1, (bytes) max_len, (*f).handle);
     if (n == 0 && ferror((*f).handle))
         return -1;
-    (*f).position += (int64_t) n;
-    return (int64_t) n;
+    (*f).position += (i64) n;
+    return (i64) n;
 }
 
 /** Write up to len bytes at the current cursor and update tracked position and size. */
-int64_t File_write(File *f, const_any src, int64_t len) {
+i64 File_write(File *f, const_any src, i64 len) {
     if (!f || !(*f).handle || !src)
         return -1;
     if (len < 0)
@@ -181,14 +181,14 @@ int64_t File_write(File *f, const_any src, int64_t len) {
     bytes n = fwrite(src, 1, (bytes) len, (*f).handle);
     if (n == 0 && ferror((*f).handle))
         return -1;
-    (*f).position += (int64_t) n;
+    (*f).position += (i64) n;
     if ((*f).position > (*f).size)
         (*f).size = (*f).position;
-    return (int64_t)n;
+    return (i64)n;
 }
 
 /** Seek to an absolute nonnegative byte offset and update the tracked cursor on success. */
-bool File_seek(File *f, int64_t position) {
+bool File_seek(File *f, i64 position) {
     if (!f || !(*f).handle || position < 0)
         return false;
     if (fseek((*f).handle, position, SEEK_SET) != 0)
@@ -198,14 +198,14 @@ bool File_seek(File *f, int64_t position) {
 }
 
 /** Refresh the tracked file size from the open handle, returning -1 on failure. */
-int64_t File_refreshSize(File *f) {
+i64 File_refreshSize(File *f) {
     if (!f || !(*f).handle)
         return -1;
     fseek((*f).handle, 0, SEEK_END);
-    long sz = ftell((*f).handle);
+    i64 sz = ftell((*f).handle);
     if (sz < 0)
         return -1;
-    (*f).size = (int64_t)sz;
+    (*f).size = (i64)sz;
     return (*f).size;
 }
 
@@ -227,12 +227,12 @@ const char *File_name(const File *f) {
 }
 
 /** Return the object's tracked file size. */
-int64_t File_size(const File *f) {
+i64 File_size(const File *f) {
     return (*f).size;
 }
 
 /** Return the object's tracked cursor position. */
-int64_t File_pos(const File *f) {
+i64 File_pos(const File *f) {
     return (*f).position;
 }
 

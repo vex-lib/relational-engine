@@ -105,7 +105,7 @@ static i32 search_order(const char key[24]) {
     while (lo < hi) {
         i32 mid = lo + (hi - lo) / 2;
         u32 s = order[mid];
-        int c = memcmp(slots[s].name, key, 24);
+        i32 c = memcmp(slots[s].name, key, 24);
         if (c < 0)
             lo = mid + 1;
         else if (c > 0)

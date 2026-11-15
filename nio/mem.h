@@ -112,8 +112,8 @@ static u8 *Memory_alignUp(const u8 *raw) {
 static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
     u64 hash = 1469598103934665603ull;
     const u64 words[3] = { typeId, length, pointer };
-    for (int w = 0; w < 3; w++) {
-        for (int i = 0; i < 8; i++) {
+    for (i32 w = 0; w < 3; w++) {
+        for (i32 i = 0; i < 8; i++) {
             hash ^= (words[w] >> (i * 8)) & 0xFFull;
             hash *= 1099511628211ull;
         }

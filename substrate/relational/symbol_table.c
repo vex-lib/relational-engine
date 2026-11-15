@@ -89,7 +89,7 @@ static bool clean_name(const char *name, char *lowered) {
     if (len > STRING_POOL_NAME_MAX)
         return false;
     for (bytes i = 0; i < len; i++) {
-        unsigned char c = (unsigned char) name[i];
+        u8 c = (u8) name[i];
         bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') || c == '_' || c == '.';
         if (!ok)

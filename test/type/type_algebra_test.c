@@ -18,7 +18,7 @@
 
 #include "type/re_type.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -33,7 +33,7 @@ static u64 projByte(u64 byte) {
     return (byte << 52) & MASK_PROJECT;
 }
 
-int main() {
+i32 main() {
     u64 id = Type_make(PROJ_VEXSPOKE, FORM_SINGLETON, 1u);
     CHECK(Type_class(id) == 1u);
     CHECK(Type_form(id) == FORM_SINGLETON);

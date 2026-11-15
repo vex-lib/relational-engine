@@ -97,7 +97,7 @@
 static bool locate(const char *name, u32 *outBucket, u32 *outSlot, char *outFolded) {
     if (!VariableSlot_foldName(name, outFolded))
         return false;
-    int bucket = VariableSlot_bucketOf(outFolded[0]);
+    i32 bucket = VariableSlot_bucketOf(outFolded[0]);
     if (bucket < 0)
         return false;
     const char *tail = outFolded + 1;
@@ -300,7 +300,7 @@ fn VariableHashMap_toString(const VariableHashMap *map, char *dest, bytes cap, b
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "VariableHashMap(count=%u)", (*map).count);
+    i32 written = snprintf(dest, cap, "VariableHashMap(count=%u)", (*map).count);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)
             *outTruncated = true;
@@ -316,7 +316,7 @@ fn VariableHashMap_toStringStruct(const VariableHashMap *map, char *dest, bytes 
         snprintf(dest, cap, "nullptr");
         return;
     }
-    int written = snprintf(dest, cap, "VariableHashMap { active=%s, count=%u, bands=<array[%u]> }",
+    i32 written = snprintf(dest, cap, "VariableHashMap { active=%s, count=%u, bands=<array[%u]> }",
                            (*map).active ? "true" : "false", (*map).count, VARIABLE_HASH_BUCKETS);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated)

@@ -19,7 +19,7 @@
 #include "io/file/file.h"
 #include "nio/mem.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -161,7 +161,7 @@ static fn test_errors() {
 }
 
 /* Initializes memory and a scratch directory, then runs the File owner cases. */
-int main() {
+i32 main() {
     CHECK(Memory_init(0));
 
     const char *base = getenv("TMPDIR");

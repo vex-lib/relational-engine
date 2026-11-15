@@ -84,10 +84,10 @@ u64 Log_appended(const Log *log);
 u64 Log_dropped(const Log *log);
 u64 Log_written(const Log *log);
 
-fn Log_append(Log *log, int kind, int64_t v0, int64_t v1, int64_t v2,
-                int64_t v3, int64_t v4);
+fn Log_append(Log *log, i32 kind, i64 v0, i64 v1, i64 v2,
+                i64 v3, i64 v4);
 
-fn Log_appendKind(Log *log, int kind);
+fn Log_appendKind(Log *log, i32 kind);
 
 // io/log/log.h — the LogParser class, ported from io/LogParser.java.
 //
@@ -100,21 +100,21 @@ fn Log_appendKind(Log *log, int kind);
 #define LOGPARSER_HEADER_BYTES 12
 
 // Per-record callback. userdata is whatever was passed to LogParser_parse.
-typedef fn (*LogRecordFn)(any userdata, int kind, int64_t ts,
-                            int64_t v0, int64_t v1, int64_t v2,
-                            int64_t v3, int64_t v4);
+typedef fn (*LogRecordFn)(any userdata, i32 kind, i64 ts,
+                            i64 v0, i64 v1, i64 v2,
+                            i64 v3, i64 v4);
 
 bool LogParser_isLogFile(const char *path);
 
-int64_t LogParser_count(const char *path);
+i64 LogParser_count(const char *path);
 
-int64_t LogParser_parse(const char *path, LogRecordFn handler, any userdata);
+i64 LogParser_parse(const char *path, LogRecordFn handler, any userdata);
 
-int LogParser_formatRecord(char *out, bytes out_cap, int kind, int64_t ts,
-                           int64_t base_ts, const char *name,
-                           int64_t v0, int64_t v1, int64_t v2,
-                           int64_t v3, int64_t v4);
+i32 LogParser_formatRecord(char *out, bytes out_cap, i32 kind, i64 ts,
+                           i64 base_ts, const char *name,
+                           i64 v0, i64 v1, i64 v2,
+                           i64 v3, i64 v4);
 
-const char *LogParser_kindName(int kind);
+const char *LogParser_kindName(i32 kind);
 
 #endif

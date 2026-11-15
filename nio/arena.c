@@ -115,7 +115,7 @@ static bool registry_ensureDefault() {
     return true;
 }
 /** Select the smallest slab class that can hold a header and payload, or -1 for bump storage. */
-static int find_slab(bytes payload_bytes) {
+static i32 find_slab(bytes payload_bytes) {
     bytes needed = payload_bytes + sizeof(MemoryHeader);
     if (needed <= 64)   return 0;
     if (needed <= 128)  return 1;
@@ -204,7 +204,7 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
         return nullptr;
     }
 
-    int s_idx = find_slab(numBytes);
+    i32 s_idx = find_slab(numBytes);
     if (s_idx >= 0) {
         SlabClass *slab = &(*a).slabs[s_idx];
         SpinLock_lock(&(*slab).lock);

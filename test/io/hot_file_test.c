@@ -3,10 +3,10 @@
 
 #include "vex.h"
 #include "io/file/file.h"
-int main() {
+i32 main() {
     HotFileSys_pumpEvents();
     HotFileSys_shutdown();
-    for (int i = 0; i < 2; ++i) {
+    for (i32 i = 0; i < 2; ++i) {
         HotFileSys_init();
         HotFileSys_pumpEvents();
         HotFileSys_shutdown();

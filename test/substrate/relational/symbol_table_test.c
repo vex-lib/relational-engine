@@ -9,7 +9,7 @@
 //   - rename moves both the name and the row identity, and rejects unknown
 //     olds, collisions, and bad new names;
 //   - findByClass returns matches in insertion order and reports the total
-//     even when the caller's buffer is short;
+//     even when the caller's buffer is i16;
 //   - pointer get/set/compareAndSet semantics, including failure atomicity;
 //   - getName buffer sizing, bad ids, and nullptr out;
 //   - failure observability: every promised cold rejection writes one
@@ -29,7 +29,7 @@ enum {
     TEST_CLASS_B = 2u,
 };
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -108,7 +108,7 @@ static fn test_rename(SymbolTable *v) {
     CHECK(SymbolTable_getId(v, "ren_other") == id);
 }
 
-// Checks class filtering order, count-only/short output buffers, and no-match behavior.
+// Checks class filtering order, count-only/i16 output buffers, and no-match behavior.
 static fn test_find_by_class(SymbolTable *v) {
     const u32 cls = 0xABCDEF01u;
     i32 a = SymbolTable_instant(v, "fbc_a", cls, 1u);
@@ -195,7 +195,7 @@ static fn test_null_and_inactive() {
 static fn test_observability(SymbolTable *v) {
     FILE *capture = tmpfile();
     CHECK(capture != nullptr);
-    int original = dup(fileno(stderr));
+    i32 original = dup(fileno(stderr));
     CHECK(original >= 0);
     CHECK(dup2(fileno(capture), fileno(stderr)) >= 0);
 
@@ -211,7 +211,7 @@ static fn test_observability(SymbolTable *v) {
     close(original);
     rewind(capture);
 
-    int lines = 0;
+    i32 lines = 0;
     char line[512];
     while (fgets(line, sizeof(line), capture) != nullptr) {
         CHECK(strstr(line, "[variable]") != nullptr);
@@ -236,7 +236,7 @@ static fn test_shutdown() {
 }
 
 // Initializes memory and the table, runs isolated contract cases, and aggregates failures.
-int main() {
+i32 main() {
     CHECK(Memory_init(0));
 
     SymbolTable v = SymbolTable();

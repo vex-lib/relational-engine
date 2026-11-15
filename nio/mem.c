@@ -31,15 +31,15 @@
 // The only libc allocation calls in the ecosystem: arena.c and transient.c use
 // this seam, never malloc/calloc/realloc/free directly.
 any Memory_systemAlloc(bytes size) {
-    return malloc((size_t) size);
+    return malloc((bytes) size);
 }
 
 any Memory_systemCalloc(bytes count, bytes size) {
-    return calloc((size_t) count, (size_t) size);
+    return calloc((bytes) count, (bytes) size);
 }
 
 any Memory_systemRealloc(any ptr, bytes size) {
-    return realloc(ptr, (size_t) size);
+    return realloc(ptr, (bytes) size);
 }
 
 fn Memory_systemFree(any ptr) {

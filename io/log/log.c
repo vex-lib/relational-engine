@@ -79,10 +79,10 @@
 static const u8 LOG_MAGIC[7] = { 0x41, 0x4E, 0x54, 0x49, 0x4C, 0x4F, 0x47 };
 
 /** Return monotonic time as nanoseconds for event timestamps. */
-static int64_t monotonic_nanos() {
+static i64 monotonic_nanos() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (int64_t)ts.tv_sec * 1000000000L + (int64_t)ts.tv_nsec;
+    return (i64)ts.tv_sec * 1000000000L + (i64)ts.tv_nsec;
 }
 
 /** Encode a 32-bit value in big-endian byte order at the requested offset. */
@@ -94,8 +94,8 @@ static fn put_be32(u8 *b, bytes off, u32 v) {
 }
 
 /** Encode a 64-bit value in big-endian byte order at the requested offset. */
-static fn put_be64(u8 *b, bytes off, int64_t v) {
-    for (int i = 0; i < 8; i++)
+static fn put_be64(u8 *b, bytes off, i64 v) {
+    for (i32 i = 0; i < 8; i++)
         b[off + (bytes)i] = (u8)((u64)v >> (56 - 8 * i));
 }
 
@@ -110,15 +110,15 @@ static bool write_header(Log *log) {
 }
 
 /** Atomically reserve the next producer slot, returning -1 when the ring is full. */
-static int64_t claim_slot(Log *log) {
-    _Atomic int64_t *head = (_Atomic int64_t*) ((*log).arena + LOG_HEAD_OFF);
-    _Atomic int64_t *tail = (_Atomic int64_t*) ((*log).arena + LOG_TAIL_OFF);
-    int64_t h;
-    int64_t t;
+static i64 claim_slot(Log *log) {
+    _Atomic i64 *head = (_Atomic i64*) ((*log).arena + LOG_HEAD_OFF);
+    _Atomic i64 *tail = (_Atomic i64*) ((*log).arena + LOG_TAIL_OFF);
+    i64 h;
+    i64 t;
     do {
         h = atomic_load_explicit(head, memory_order_acquire);
         t = atomic_load_explicit(tail, memory_order_acquire);
-        if (h - t >= (int64_t)(*log).slot_count)
+        if (h - t >= (i64)(*log).slot_count)
             return -1;
     } while (!atomic_compare_exchange_strong_explicit(head, &h, h + 1,
                                                       memory_order_acq_rel,
@@ -130,13 +130,13 @@ static int64_t claim_slot(Log *log) {
 static fn write_slot(Log *log, const u8 *slot) {
     u8 rec[LOG_RECORD_BYTES];
     u32 kind;
-    int64_t ts;
+    i64 ts;
     memcpy(&kind, slot, 4);
     memcpy(&ts, slot + 8, 8);
     put_be32(rec, 0, kind);
     put_be64(rec, 4, ts);
-    for (int i = 0; i < 5; i++) {
-        int64_t v;
+    for (i32 i = 0; i < 5; i++) {
+        i64 v;
         memcpy(&v, slot + 16 + (bytes)i * 8, 8);
         put_be64(rec, 12 + (bytes)i * 8, v);
     }
@@ -145,10 +145,10 @@ static fn write_slot(Log *log, const u8 *slot) {
 
 /** Drain consecutive published records from the ring to the file writer. */
 static u64 drain_and_write(Log *log) {
-    _Atomic int64_t *head = (_Atomic int64_t*) ((*log).arena + LOG_HEAD_OFF);
-    _Atomic int64_t *tail = (_Atomic int64_t*) ((*log).arena + LOG_TAIL_OFF);
-    int64_t h = atomic_load_explicit(head, memory_order_acquire);
-    int64_t t = atomic_load_explicit(tail, memory_order_acquire);
+    _Atomic i64 *head = (_Atomic i64*) ((*log).arena + LOG_HEAD_OFF);
+    _Atomic i64 *tail = (_Atomic i64*) ((*log).arena + LOG_TAIL_OFF);
+    i64 h = atomic_load_explicit(head, memory_order_acquire);
+    i64 t = atomic_load_explicit(tail, memory_order_acquire);
     u64 wrote = 0;
     while (t < h) {
         bytes slot_idx = (bytes)t & (*log).slot_mask;
@@ -297,11 +297,11 @@ u64 Log_written(const Log *log) {
 }
 
 /** Publish a timestamped event and five values, or increment dropped when the ring has no slot. */
-fn Log_append(Log *log, int kind, int64_t v0, int64_t v1, int64_t v2,
-                int64_t v3, int64_t v4) {
+fn Log_append(Log *log, i32 kind, i64 v0, i64 v1, i64 v2,
+                i64 v3, i64 v4) {
     if (!log || !(*log).enabled || !(*log).active || !(*log).arena)
         return;
-    int64_t index = claim_slot(log);
+    i64 index = claim_slot(log);
     if (index < 0) {
         atomic_fetch_add_explicit(&(*log).dropped, 1, memory_order_relaxed);
         return;
@@ -311,7 +311,7 @@ fn Log_append(Log *log, int kind, int64_t v0, int64_t v1, int64_t v2,
 
     u32 k = (u32)kind;
     memcpy(slot, &k, 4);
-    int64_t ts = monotonic_nanos();
+    i64 ts = monotonic_nanos();
     memcpy(slot + 8, &ts, 8);
     memcpy(slot + 16, &v0, 8);
     memcpy(slot + 24, &v1, 8);
@@ -325,6 +325,6 @@ fn Log_append(Log *log, int kind, int64_t v0, int64_t v1, int64_t v2,
 }
 
 /** Append an event kind with all five value fields set to zero. */
-fn Log_appendKind(Log *log, int kind) {
+fn Log_appendKind(Log *log, i32 kind) {
     Log_append(log, kind, 0, 0, 0, 0, 0);
 }

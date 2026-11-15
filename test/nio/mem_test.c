@@ -25,7 +25,7 @@ enum {
     TEST_TYPE_C = 3u,
 };
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -46,7 +46,7 @@ static _Alignas(16) u8 g_foreign[64];
 // A type that asks for more than the platform allocator promises (16).
 typedef struct Over32 { _Alignas(32) u8 bytes[32]; } Over32;
 
-int main() {
+i32 main() {
     CHECK(Memory_init(0));
 
     CHECK(Memory_length(nullptr) == 0);
@@ -85,7 +85,7 @@ int main() {
 
     CHECK(((pointer) over_slab & 31) == 0);
 
-    for (int i = 0; i < 3; i++) {
+    for (i32 i = 0; i < 3; i++) {
         any over_bump = Memory_alloc(TEST_TYPE_B, 5000u + (bytes) i * 16u);
 
         CHECK(over_bump != nullptr);
@@ -155,7 +155,7 @@ int main() {
 
     Memory_freeAll();
 
-    for (int i = 0; i < 3; i++)
+    for (i32 i = 0; i < 3; i++)
         CHECK(Memory_alloc(0xABCDu, 8) != nullptr);
 
     CHECK(Memory_findAll(0xABCDu, nullptr, 0) == 3);
@@ -292,7 +292,7 @@ int main() {
 
     CHECK(pid > 0);
 
-    int status = 0;
+    i32 status = 0;
 
     CHECK(waitpid(pid, &status, 0) == pid);
 

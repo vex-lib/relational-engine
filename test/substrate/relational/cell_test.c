@@ -24,7 +24,7 @@ enum {
     TEST_CLASS_D = 4u,
 };
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -80,7 +80,7 @@ static fn test_value_slot() {
     Cell_setValue(c, UINTPTR_MAX);
     CHECK(Cell_getValue(c) == UINTPTR_MAX);
 
-    int local = 7;
+    i32 local = 7;
     Cell_setValue(c, (pointer) &local);
     CHECK(Cell_getValue(c) == (pointer) &local);
 
@@ -138,7 +138,7 @@ static fn test_null_safety() {
 }
 
 // Initializes memory, runs Cell contract cases, and reports aggregate assertion failures.
-int main() {
+i32 main() {
     CHECK(Memory_init(0));
 
     test_construction();
