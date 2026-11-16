@@ -108,41 +108,52 @@
 // helpers — one level only, dest last where it matters
 
 static bool containsCaseInsensitive(const char *haystack, const char *needle) {
-    if (!haystack || !needle)
+    if (!haystack || !needle) 
         return false;
+
     bytes nLen = strlen(needle);
-    if (nLen == 0)
+
+    if (nLen == 0) 
         return true;
+
     bytes hLen = strlen(haystack);
-    if (nLen > hLen)
+
+    if (nLen > hLen) 
         return false;
+
     for (bytes i = 0; i + nLen <= hLen; i++) {
-        if (strncasecmp(haystack + i, needle, nLen) == 0)
+        if (strncasecmp(haystack + i, needle, nLen) == 0) 
             return true;
     }
+
     return false;
 }
 
 static bool equalsCaseInsensitive(const char *a, const char *b) {
-    if (!a || !b)
+    if (!a || !b) 
         return false;
+
     return strcasecmp(a, b) == 0;
 }
 
 static bool prefixCaseInsensitive(const char *haystack, const char *needle) {
-    if (!haystack || !needle)
+    if (!haystack || !needle) 
         return false;
+
     bytes nLen = strlen(needle);
-    if (nLen == 0)
+
+    if (nLen == 0) 
         return true;
+
     return strncasecmp(haystack, needle, nLen) == 0;
 }
 
 // exact
 
 i32 Relational_getId(SymbolTable *scope, const char *name) {
-    if (!scope || !name)
+    if (!scope || !name) 
         return -1;
+
     return SymbolTable_getId(scope, name);
 }
 
@@ -151,84 +162,112 @@ const char *Relational_getName(const SymbolTable *scope, i32 varId) {
 }
 
 bool Relational_setName(SymbolTable *scope, const char *oldName, const char *newName) {
-    if (!scope || !oldName || !newName)
+    if (!scope || !oldName || !newName) 
         return false;
+
     return SymbolTable_rename(scope, oldName, newName);
 }
 
 // value — store as-is, pointer is the value
 
 any Relational_getValue(SymbolTable *scope, const char *name) {
-    if (!scope || !name)
+    if (!scope || !name) 
         return nullptr;
+
     i32 varId = SymbolTable_getId(scope, name);
-    if (varId < 0)
+
+    if (varId < 0) 
         return nullptr;
+
     return (any) SymbolTable_getPointer(scope, varId);
 }
 
 any Relational_getValueById(SymbolTable *scope, i32 varId) {
-    if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope))
+    if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope)) 
         return nullptr;
+
     return (any) SymbolTable_getPointer(scope, varId);
 }
 
 bool Relational_setValue(SymbolTable *scope, const char *name, u32 classId, any ptr) {
-    if (!scope || !name)
+    if (!scope || !name) 
         return false;
+
     i32 varId = SymbolTable_getId(scope, name);
+
     if (varId >= 0) {
         SymbolTable_setPointer(scope, varId, (pointer) ptr);
+
         return true;
     }
+
     return SymbolTable_instant(scope, name, classId, (pointer) ptr) >= 0;
 }
 
 bool Relational_setValueById(SymbolTable *scope, i32 varId, any ptr) {
-    if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope))
+    if (!scope || varId < 0 || (bytes) varId >= SymbolTable_getActiveCount(scope)) 
         return false;
+
     SymbolTable_setPointer(scope, varId, (pointer) ptr);
+
     return true;
 }
 
 // string sugar — allocates, frees old block
 
 static u8 *Relational_stringAlloc(const char *value) {
-    if (!value)
+    if (!value) 
         return nullptr;
+
     bytes length = (bytes) strlen(value) + 1u;
+
     u8 *block = (u8*) Memory_alloc(TYPE_RELATIONAL_STRING, length);
-    if (!block)
+
+    if (!block) 
         return nullptr;
+
     memcpy(block, value, length);
+
     return block;
 }
 
 const char *Relational_getString(SymbolTable *scope, const char *name) {
-    if (!scope || !name)
+    if (!scope || !name) 
         return nullptr;
+
     i32 varId = SymbolTable_getId(scope, name);
-    if (varId < 0 || SymbolTable_getClassId(scope, varId) != ID_RELATIONAL_STRING)
+
+    if (varId < 0 || SymbolTable_getClassId(scope, varId) != ID_RELATIONAL_STRING) 
         return nullptr;
+
     return (const char*) SymbolTable_getPointer(scope, varId);
 }
 
 fn Relational_setString(SymbolTable *scope, const char *name, const char *value) {
-    if (!scope || !name || !value)
+    if (!scope || !name || !value) 
         return;
+
     u8 *newPtr = Relational_stringAlloc(value);
-    if (!newPtr)
+
+    if (!newPtr) 
         return;
+
     i32 varId = SymbolTable_getId(scope, name);
+
     if (varId >= 0) {
         any oldPtr = (any) SymbolTable_getPointer(scope, varId);
+
         SymbolTable_setPointer(scope, varId, (pointer) newPtr);
-        if (oldPtr)
+
+        if (oldPtr) 
             Memory_free(oldPtr);
+
         return;
     }
+
     i32 assigned = SymbolTable_instant(scope, name, ID_RELATIONAL_STRING, (pointer) newPtr);
-    if (assigned < 0)
+
+    if (assigned < 0) 
         Memory_free(newPtr);
 }
 
@@ -239,112 +278,160 @@ any Relational_getFunction(SymbolTable *scope, const char *name) {
 }
 
 bool Relational_setFunction(SymbolTable *scope, const char *name, any fn) {
-    if (!scope || !name || !fn)
+    if (!scope || !name || !fn) 
         return false;
+
     i32 varId = SymbolTable_getId(scope, name);
+
     if (varId >= 0) {
         SymbolTable_setPointer(scope, varId, (pointer) fn);
+
         return true;
     }
+
     return SymbolTable_instant(scope, name, 0, (pointer) fn) >= 0;
 }
 
 // spotlight — linear scan, ranked exact > prefix > substring
 
 static bytes searchOne(SymbolTable *scope, const char *query, i32 *outIds, bytes cap, bytes filled) {
-    if (!scope || !query || !outIds)
+    if (!scope || !query || !outIds) 
         return filled;
+
     bytes active = SymbolTable_getActiveCount(scope);
+
     for (bytes i = 0; i < active; i++) {
-        if (filled >= cap)
+        if (filled >= cap) 
             break;
+
         i32 varId = (i32) i;
+
         const char *name = SymbolTable_getName(scope, varId);
-        if (!name)
+
+        if (!name) 
             continue;
+
         if (equalsCaseInsensitive(name, query)) {
             bool dup = false;
+
             for (bytes k = 0; k < filled; k++) {
                 if (outIds[k] == varId) {
                     dup = true;
+
                     break;
                 }
             }
-            if (dup)
+
+            if (dup) 
                 continue;
+
             outIds[filled++] = varId;
         }
     }
+
     for (bytes i = 0; i < active; i++) {
-        if (filled >= cap)
+        if (filled >= cap) 
             break;
+
         i32 varId = (i32) i;
+
         const char *name = SymbolTable_getName(scope, varId);
-        if (!name)
+
+        if (!name) 
             continue;
-        if (!prefixCaseInsensitive(name, query))
+
+        if (!prefixCaseInsensitive(name, query)) 
             continue;
-        if (equalsCaseInsensitive(name, query))
+
+        if (equalsCaseInsensitive(name, query)) 
             continue;
+
         bool dup = false;
+
         for (bytes k = 0; k < filled; k++) {
             if (outIds[k] == varId) {
                 dup = true;
+
                 break;
             }
         }
-        if (dup)
+
+        if (dup) 
             continue;
+
         outIds[filled++] = varId;
     }
+
     for (bytes i = 0; i < active; i++) {
-        if (filled >= cap)
+        if (filled >= cap) 
             break;
+
         i32 varId = (i32) i;
+
         const char *name = SymbolTable_getName(scope, varId);
-        if (!name)
+
+        if (!name) 
             continue;
-        if (!containsCaseInsensitive(name, query))
+
+        if (!containsCaseInsensitive(name, query)) 
             continue;
-        if (equalsCaseInsensitive(name, query))
+
+        if (equalsCaseInsensitive(name, query)) 
             continue;
-        if (prefixCaseInsensitive(name, query))
+
+        if (prefixCaseInsensitive(name, query)) 
             continue;
+
         bool dup = false;
+
         for (bytes k = 0; k < filled; k++) {
             if (outIds[k] == varId) {
                 dup = true;
+
                 break;
             }
         }
-        if (dup)
+
+        if (dup) 
             continue;
+
         outIds[filled++] = varId;
     }
+
     return filled;
 }
 
 bytes Relational_search(SymbolTable *scope, const char *query, i32 *outIds, bytes cap) {
-    if (!scope || !query || !outIds || cap == 0)
+    if (!scope || !query || !outIds || cap == 0) 
         return 0;
+
     bytes filled = 0;
+
     filled = searchOne(scope, query, outIds, cap, filled);
+
     return filled;
 }
 
 bytes Relational_searchAll(SymbolTable *global, SymbolTable *local, const char *query, i32 *outIds, bytes cap) {
-    if (!query || !outIds || cap == 0)
+    if (!query || !outIds || cap == 0) 
         return 0;
+
     bytes filled = 0;
+
     if (global) {
         filled = searchOne(global, query, outIds, cap, filled);
-        if (filled >= cap)
+
+        if (filled >= cap) 
             return filled;
     }
+
     if (local) {
         bytes before = filled;
+
         filled = searchOne(local, query, outIds, cap, filled);
+
         (discard) before;
     }
+
     return filled;
 }
