@@ -81,138 +81,193 @@
 // Find a row by folded name inside one bucket list. Null on a hole or a miss.
 static VariableSlot *findRow(ChunkedList *list, const char *name) {
     u32 rows = ChunkedList_size(list);
+
     for (u32 i = 0; i < rows; i++) {
         VariableSlot *row = (VariableSlot*) ChunkedList_slot(list, i);
-        if (row && VariableSlot_nameEquals(row, name))
+
+        if (row && VariableSlot_nameEquals(row, name)) 
             return row;
     }
+
     return nullptr;
 }
 
 // Mint a bucket's list on first use: one root slot, 16-row leaves.
 static ChunkedList *ensureBucket(VariableMiniMap *map, u32 bucket) {
     ChunkedList *list = (*map).buckets[bucket];
-    if (list)
+
+    if (list) 
         return list;
+
     list = ChunkedList(ID_VARIABLE_SLOT, VARIABLE_SLOT_SIZE, VARIABLE_MINI_ROOT_INIT, VARIABLE_MINI_LEAF_ROWS);
-    if (!list)
+
+    if (!list) 
         return nullptr;
+
     (*map).buckets[bucket] = list;
+
     return list;
 }
 
 // CONSTRUCTORS
 
 bool VariableMiniMap_init(VariableMiniMap *map) {
-    if (!map)
+    if (!map) 
         return false;
+
     memset(map, 0, sizeof(*map));
+
     (*map).active = true;
+
     return true;
 }
 
 fn VariableMiniMap_shutdown(VariableMiniMap *map) {
-    if (!map)
+    if (!map) 
         return;
+
     for (u32 b = 0u; b < VARIABLE_MINI_BUCKETS; b++) {
         ChunkedList *list = (*map).buckets[b];
-        if (list)
+
+        if (list) 
             ChunkedList_free(list);
+
         (*map).buckets[b] = nullptr;
     }
+
     (*map).count = 0u;
+
     (*map).active = false;
 }
 
 VariableMiniMap *VariableMiniMap_0() {
     VariableMiniMap *map = (VariableMiniMap*) Memory_alloc(TYPE_VARIABLE_MINI_MAP, sizeof(VariableMiniMap));
-    if (!map)
+
+    if (!map) 
         return nullptr;
+
     if (!VariableMiniMap_init(map)) {
         Memory_free(map);
+
         return nullptr;
     }
+
     return map;
 }
 
 fn VariableMiniMap_free(VariableMiniMap *map) {
-    if (!map)
+    if (!map) 
         return;
+
     VariableMiniMap_shutdown(map);
+
     Memory_free(map);
 }
 
 // CORE FUNCTIONS
 
 bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer) {
-    if (!map || !(*map).active)
+    if (!map || !(*map).active) 
         return false;
+
     char folded[VARIABLE_SLOT_NAME_BYTES];
-    if (!VariableSlot_foldName(name, folded))
+
+    if (!VariableSlot_foldName(name, folded)) 
         return false;
+
     i32 bucket = VariableSlot_bucketOf(folded[0]);
-    if (bucket < 0)
+
+    if (bucket < 0) 
         return false;
+
     ChunkedList *list = ensureBucket(map, (u32) bucket);
-    if (!list)
+
+    if (!list) 
         return false;
 
     VariableSlot *row = findRow(list, name);
+
     if (row) {
         VariableSlot_setPointer(row, pointer);
+
         return true;
     }
+
     VariableSlot *fresh = (VariableSlot*) ChunkedList_addSlot(list);
-    if (!fresh)
+
+    if (!fresh) 
         return false;
-    if (!VariableSlot_init(fresh, name, pointer))
+
+    if (!VariableSlot_init(fresh, name, pointer)) 
         return false;
+
     (*map).count++;
+
     return true;
 }
 
 pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
-    if (!map || !(*map).active)
+    if (!map || !(*map).active) 
         return 0u;
+
     char folded[VARIABLE_SLOT_NAME_BYTES];
-    if (!VariableSlot_foldName(name, folded))
+
+    if (!VariableSlot_foldName(name, folded)) 
         return 0u;
+
     i32 bucket = VariableSlot_bucketOf(folded[0]);
-    if (bucket < 0)
+
+    if (bucket < 0) 
         return 0u;
+
     ChunkedList *list = (*map).buckets[bucket];
-    if (!list)
+
+    if (!list) 
         return 0u;
+
     VariableSlot *row = findRow(list, name);
-    if (!row)
+
+    if (!row) 
         return 0u;
+
     return VariableSlot_getPointer(row);
 }
 
 bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name) {
-    if (!map || !(*map).active)
+    if (!map || !(*map).active) 
         return false;
+
     char folded[VARIABLE_SLOT_NAME_BYTES];
-    if (!VariableSlot_foldName(name, folded))
+
+    if (!VariableSlot_foldName(name, folded)) 
         return false;
+
     i32 bucket = VariableSlot_bucketOf(folded[0]);
-    if (bucket < 0)
+
+    if (bucket < 0) 
         return false;
+
     ChunkedList *list = (*map).buckets[bucket];
+
     return list && findRow(list, name) != nullptr;
 }
 
 fn VariableMiniMap_forEach(VariableMiniMap *map, VariableMiniMapVisitFn fn, any userdata) {
-    if (!map || !(*map).active || !fn)
+    if (!map || !(*map).active || !fn) 
         return;
+
     for (u32 b = 0u; b < VARIABLE_MINI_BUCKETS; b++) {
         ChunkedList *list = (*map).buckets[b];
-        if (!list)
+
+        if (!list) 
             continue;
+
         u32 rows = ChunkedList_size(list);
+
         for (u32 i = 0u; i < rows; i++) {
             VariableSlot *row = (VariableSlot*) ChunkedList_slot(list, i);
-            if (row)
+
+            if (row) 
                 fn(row, userdata);
         }
     }
@@ -225,42 +280,52 @@ u32 VariableMiniMap_count(const VariableMiniMap *map) {
 }
 
 bool VariableMiniMap_isEmpty(const VariableMiniMap *map) {
-    if (!map)
+    if (!map) 
         return true;
+
     return (*map).count == 0u;
 }
 
 // STRING PROJECTIONS (the toString Law)
 
 fn VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
-    if (outTruncated)
+    if (outTruncated) 
         *outTruncated = false;
-    if (!dest || cap == 0u)
+
+    if (!dest || cap == 0u) 
         return;
+
     if (!map) {
         snprintf(dest, cap, "nullptr");
+
         return;
     }
+
     i32 written = snprintf(dest, cap, "VariableMiniMap(count=%u)", (*map).count);
+
     if (written < 0 || (bytes) written >= cap) {
-        if (outTruncated)
+        if (outTruncated) 
             *outTruncated = true;
     }
 }
 
 fn VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
-    if (outTruncated)
+    if (outTruncated) 
         *outTruncated = false;
-    if (!dest || cap == 0u)
+
+    if (!dest || cap == 0u) 
         return;
+
     if (!map) {
         snprintf(dest, cap, "nullptr");
+
         return;
     }
+
     i32 written = snprintf(dest, cap, "VariableMiniMap { active=%s, count=%u, buckets=<array[%u]> }",
                            (*map).active ? "true" : "false", (*map).count, VARIABLE_MINI_BUCKETS);
     if (written < 0 || (bytes) written >= cap) {
-        if (outTruncated)
+        if (outTruncated) 
             *outTruncated = true;
     }
 }
