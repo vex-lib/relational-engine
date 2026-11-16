@@ -77,25 +77,31 @@ static u32 ticket(u64 thread_id) {
 // Spin until acquired. The CAS publishes with acquire so our critical section
 // sees everything the previous owner wrote before releasing.
 fn SpinLock_lock(SpinLock *lock) {
-    if (!lock)
+    if (!lock) 
         return;
+
     u32 expected = 0;
+
     u32 tk = ticket((u64) pthread_self());
+
     while (!atomic_compare_exchange_weak_explicit(&(*lock).word, &expected, tk,
                                                   memory_order_acquire, memory_order_relaxed)) {
         expected = 0;
-        for (i32 i = 0; i < 16; i++) {
+
+        for (i32 i = 0; i < 16; i++) 
             SPIN_PAUSE();
-        }
     }
 }
 
 // One-shot acquire: returns immediately whether it worked or not.
 bool SpinLock_tryLock(SpinLock *lock) {
-    if (!lock)
+    if (!lock) 
         return false;
+
     u32 expected = 0;
+
     u32 tk = ticket((u64) pthread_self());
+
     return atomic_compare_exchange_strong_explicit(&(*lock).word, &expected, tk,
                                                    memory_order_acquire, memory_order_relaxed);
 }
@@ -104,36 +110,45 @@ bool SpinLock_tryLock(SpinLock *lock) {
 // falsely-successful; the deadline is a hard stop.
 bool SpinLock_tryLockTimeout(SpinLock *lock, i64 timeout_nanos) {
     struct timespec start, now;
+
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     while (!SpinLock_tryLock(lock)) {
         clock_gettime(CLOCK_MONOTONIC, &now);
+
         i64 elapsed = (now.tv_sec - start.tv_sec) * 1000000000LL
                         + (now.tv_nsec - start.tv_nsec);
-        if (timeout_nanos >= 0 && elapsed >= timeout_nanos) return false;
-        for (i32 i = 0; i < 16; i++) {
+        if (timeout_nanos >= 0 && elapsed >= timeout_nanos) 
+           return false;
+
+        for (i32 i = 0; i < 16; i++) 
             SPIN_PAUSE();
-        }
     }
+
     return true;
 }
 
 // Release with release semantics so our critical-section writes are visible
 // to the next thread that acquires.
 fn SpinLock_unlock(SpinLock *lock) {
-    if (!lock)
+    if (!lock) 
         return;
+
     u32 cur = atomic_load_explicit(&(*lock).word, memory_order_acquire);
-    if (cur == 0)
+
+    if (cur == 0) 
         return;
-    if (cur != ticket((u64) pthread_self()))
+
+    if (cur != ticket((u64) pthread_self())) 
         return;
+
     atomic_store_explicit(&(*lock).word, 0, memory_order_release);
 }
 
 // is_locked takes a const pointer, so cast away const for the atomic load.
 bool SpinLock_isLocked(const SpinLock *lock) {
-    if (!lock)
+    if (!lock) 
         return false;
+
     return atomic_load_explicit(&(*(SpinLock*) lock).word, memory_order_acquire) != 0;
 }
