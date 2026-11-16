@@ -80,10 +80,14 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
 
 Cell *Cell_2(u64 typeId, pointer value) {
     Cell *cell = Memory_alloc(typeId, CELL_PAYLOAD_BYTES);
-    if (!cell)
+
+    if (!cell) 
         return nullptr;
+
     (*cell).value = value;
+
     (*cell).pad = 0u;
+
     return cell;
 }
 
@@ -96,74 +100,86 @@ Cell *Cell_1(u64 typeId) {
 }
 
 fn Cell_free(Cell *cell) {
-    if (cell)
+    if (cell) 
         Memory_free(cell);
 }
 
 // CORE FUNCTIONS
 
 u64 Cell_typeId(const Cell *cell) {
-    if (!cell)
+    if (!cell) 
         return 0u;
+
     return Memory_type((any) cell);
 }
 
 bool Cell_check(const Cell *cell, u64 typeId) {
-    if (!cell)
+    if (!cell) 
         return false;
+
     return Memory_type((any) cell) == typeId;
 }
 
 // SETTERS
 
 fn Cell_setValue(Cell *cell, pointer value) {
-    if (!cell)
+    if (!cell) 
         return;
+
     (*cell).value = value;
 }
 
 // GETTERS
 
 pointer Cell_getValue(const Cell *cell) {
-    if (!cell)
+    if (!cell) 
         return 0u;
+
     return (*cell).value;
 }
 
 // STRING PROJECTIONS (the toString Law)
 
 fn Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
-    if (outTruncated)
+    if (outTruncated) 
         *outTruncated = false;
-    if (!dest || cap == 0u)
+
+    if (!dest || cap == 0u) 
         return;
+
     if (!cell) {
         snprintf(dest, cap, "nullptr");
+
         return;
     }
+
     i32 written = snprintf(dest, cap, "Cell(typeId=0x%llx, value=0x%llx)",
                            (u64) Cell_typeId(cell),
                            (u64) (*cell).value);
     if (written < 0 || (bytes) written >= cap) {
-        if (outTruncated)
+        if (outTruncated) 
             *outTruncated = true;
     }
 }
 
 fn Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
-    if (outTruncated)
+    if (outTruncated) 
         *outTruncated = false;
-    if (!dest || cap == 0u)
+
+    if (!dest || cap == 0u) 
         return;
+
     if (!cell) {
         snprintf(dest, cap, "nullptr");
+
         return;
     }
+
     i32 written = snprintf(dest, cap, "Cell { value=0x%llx, pad=0x%llx }",
                            (u64) (*cell).value,
                            (u64) (*cell).pad);
     if (written < 0 || (bytes) written >= cap) {
-        if (outTruncated)
+        if (outTruncated) 
             *outTruncated = true;
     }
 }
