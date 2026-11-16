@@ -52,52 +52,69 @@
 
 /** Open a binary output path, creating missing parent directories and enabling full buffering. */
 bool FileWriter_open(FileWriter *w, const char *path) {
-    if (!w || !path)
+    if (!w || !path) 
         return false;
+
     (*w).open = false;
+
     (*w).bytes_written = 0;
 
     const char *slash = strrchr(path, '/');
+
     if (slash && slash != path) {
         bytes len = (bytes)(slash - path);
+
         char parent[FILE_PATH_MAX];
-        if (len >= FILE_PATH_MAX)
+
+        if (len >= FILE_PATH_MAX) 
             return false;
+
         memcpy(parent, path, len);
+
         parent[len] = '\0';
-        if (!File_mkdirs(parent))
+
+        if (!File_mkdirs(parent)) 
             return false;
     }
 
     (*w).out = fopen(path, "wb");
-    if (!(*w).out)
+
+    if (!(*w).out) 
         return false;
+
     setvbuf((*w).out, (*w).buffer, _IOFBF, sizeof((*w).buffer));
+
     (*w).open = true;
+
     return true;
 }
 
 /** Write one complete byte span when open, adding its length to the flushed-count field on success. */
 fn FileWriter_write(FileWriter *w, const u8 *data, bytes len) {
-    if (!(*w).open || len == 0)
+    if (!(*w).open || len == 0) 
         return;
-    if (fwrite(data, 1, len, (*w).out) == len)
+
+    if (fwrite(data, 1, len, (*w).out) == len) 
         (*w).bytes_written += len;
 }
 
 /** Flush the stdio buffer when the writer is open. */
 fn FileWriter_flush(FileWriter *w) {
-    if ((*w).open)
+    if ((*w).open) 
         fflush((*w).out);
 }
 
 /** Flush and close an open writer, then clear its handle and open flag. */
 fn FileWriter_close(FileWriter *w) {
-    if (!(*w).open)
+    if (!(*w).open) 
         return;
+
     fflush((*w).out);
+
     fclose((*w).out);
+
     (*w).out = nullptr;
+
     (*w).open = false;
 }
 
