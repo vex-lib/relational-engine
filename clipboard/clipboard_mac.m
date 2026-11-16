@@ -76,27 +76,29 @@ bool Clipboard_hasImage() {
 
 /** Copy pasteboard UTF-8 text into the caller buffer, NUL-terminating and truncating to its capacity. */
 bytes Clipboard_getText(char *dest, bytes maxBytes) {
-    if (dest == nullptr || maxBytes == 0) {
+    if (dest == nullptr || maxBytes == 0) 
         return 0;
-    }
+
     @autoreleasepool {
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         NSString *str = [pb stringForType:NSPasteboardTypeString];
         if (str == nil) {
             dest[0] = '\0';
+
             return 0;
         }
 
         const char *utf8 = [str UTF8String];
         if (utf8 == nullptr) {
             dest[0] = '\0';
+
             return 0;
         }
 
         bytes len = strlen(utf8);
-        if (len >= maxBytes) {
+        if (len >= maxBytes) 
             len = maxBytes - 1;
-        }
+
         memcpy(dest, utf8, len);
         dest[len] = '\0';
         return len;
@@ -105,46 +107,43 @@ bytes Clipboard_getText(char *dest, bytes maxBytes) {
 
 /** Replace pasteboard contents with the supplied UTF-8 text. */
 bool Clipboard_setText(const char *text) {
-    if (text == nullptr) {
+    if (text == nullptr) 
         return false;
-    }
+
     @autoreleasepool {
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         [pb clearContents];
         NSString *str = [NSString stringWithUTF8String:text];
-        if (str == nil) {
+        if (str == nil) 
             return false;
-        }
+
         return [pb setString:str forType:NSPasteboardTypeString];
     }
 }
 
 /** Decode pasteboard TIFF/PNG into caller RGBA storage when it fits, then return dimensions. */
 bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes) {
-    if (dest == nullptr || outWidth == nullptr || outHeight == nullptr) {
+    if (dest == nullptr || outWidth == nullptr || outHeight == nullptr) 
         return false;
-    }
+
     @autoreleasepool {
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         NSData *data = [pb dataForType:NSPasteboardTypeTIFF];
-        if (data == nil) {
+        if (data == nil) 
             data = [pb dataForType:NSPasteboardTypePNG];
-        }
-        if (data == nil) {
+
+        if (data == nil) 
             return false;
-        }
 
         NSBitmapImageRep *rep = [NSBitmapImageRep imageRepWithData:data];
-        if (rep == nil) {
+        if (rep == nil) 
             return false;
-        }
 
         i32 w = (i32) [rep pixelsWide];
         i32 h = (i32) [rep pixelsHigh];
         bytes needed = (bytes) w * (bytes) h * 4;
-        if (needed > maxBytes) {
+        if (needed > maxBytes) 
             return false;
-        }
 
         *outWidth = w;
         *outHeight = h;
@@ -152,17 +151,19 @@ bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes)
         u8 *bitmapData = [rep bitmapData];
         if (bitmapData != nullptr) {
             memcpy(dest, bitmapData, needed);
+
             return true;
         }
+
         return false;
     }
 }
 
 /** Encode caller-provided RGBA pixels as TIFF and replace pasteboard image contents. */
 bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
-    if (pixels == nullptr || width <= 0 || height <= 0) {
+    if (pixels == nullptr || width <= 0 || height <= 0) 
         return false;
-    }
+
     @autoreleasepool {
         NSBitmapImageRep *rep = [[NSBitmapImageRep alloc]
             initWithBitmapDataPlanes:nullptr
@@ -176,20 +177,18 @@ bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
                          bytesPerRow:width * 4
                         bitsPerPixel:32];
 
-        if (rep == nil) {
+        if (rep == nil) 
             return false;
-        }
 
         u8 *destData = [rep bitmapData];
-        if (destData == nullptr) {
+        if (destData == nullptr) 
             return false;
-        }
+
         memcpy(destData, pixels, (bytes) width * (bytes) height * 4);
 
         NSData *tiffData = [rep TIFFRepresentation];
-        if (tiffData == nil) {
+        if (tiffData == nil) 
             return false;
-        }
 
         NSPasteboard *pb = [NSPasteboard generalPasteboard];
         [pb clearContents];

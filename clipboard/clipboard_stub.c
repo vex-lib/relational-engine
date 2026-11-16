@@ -62,33 +62,49 @@ bool Clipboard_hasImage() {
 
 /** Copy the stub's stored text into the bounded caller buffer and return bytes copied. */
 bytes Clipboard_getText(char *dest, bytes maxBytes) {
-    if (dest == nullptr || maxBytes == 0) return 0;
+    if (dest == nullptr || maxBytes == 0) 
+       return 0;
+
     bytes len = strlen(s_stubText);
-    if (len >= maxBytes) len = maxBytes - 1;
+
+    if (len >= maxBytes) 
+       len = maxBytes - 1;
+
     memcpy(dest, s_stubText, len);
+
     dest[len] = '\0';
+
     return len;
 }
 
 /** Store text in the fixed stub buffer, truncating to its maximum NUL-terminated length. */
 bool Clipboard_setText(const char *text) {
-    if (text == nullptr) return false;
+    if (text == nullptr) 
+       return false;
+
     bytes len = strlen(text);
-    if (len >= sizeof(s_stubText)) len = sizeof(s_stubText) - 1;
+
+    if (len >= sizeof(s_stubText)) 
+       len = sizeof(s_stubText) - 1;
+
     memcpy(s_stubText, text, len);
+
     s_stubText[len] = '\0';
+
     return true;
 }
 
 /** Report that image retrieval is unsupported by the non-Apple clipboard stub. */
 bool Clipboard_getImage(i32 *outWidth, i32 *outHeight, any dest, bytes maxBytes) {
     (discard) dest; (discard) maxBytes; (discard) outWidth; (discard) outHeight;
+
     return false;
 }
 
 /** Report that image publication is unsupported by the non-Apple clipboard stub. */
 bool Clipboard_setImage(const_any pixels, i32 width, i32 height) {
     (discard) pixels; (discard) width; (discard) height;
+
     return false;
 }
 
