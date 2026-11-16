@@ -133,7 +133,7 @@ i32 main() {
 
     CHECK(Memory_length(p) == 16);
 
-    for (bytes i = 0; i < 16; i++)
+    for (bytes i = 0; i < 16; i++) 
         CHECK(((u8*) p)[i] == 0xA5);
 
     any grown = Memory_realloc(p, 128);
@@ -146,7 +146,7 @@ i32 main() {
 
     CHECK(Memory_type(grown) == TEST_TYPE_A);
 
-    for (bytes i = 0; i < 16; i++)
+    for (bytes i = 0; i < 16; i++) 
         CHECK(((u8*) grown)[i] == 0xA5);
 
     p = grown;
@@ -155,7 +155,7 @@ i32 main() {
 
     Memory_freeAll();
 
-    for (i32 i = 0; i < 3; i++)
+    for (i32 i = 0; i < 3; i++) 
         CHECK(Memory_alloc(0xABCDu, 8) != nullptr);
 
     CHECK(Memory_findAll(0xABCDu, nullptr, 0) == 3);

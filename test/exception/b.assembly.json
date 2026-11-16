@@ -1,0 +1,28 @@
+{
+  "application": {
+    "id": "local.vexgraph.re.exception",
+    "name": "re_exception",
+    "displayName": "RE Exception",
+    "version": "",
+    "type": "cli",
+    "authors": ["vexgraph"],
+    "publisher": "vexgraph",
+    "description": "",
+    "license": "UNLICENSED",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "try_code_test.c",
+    "sources": ["try_code_test.c", "try_ptr_test.c", "try_value_test.c"],
+    "includes": ["re", "lifetime"],
+    "dependencies": ["lifetime", "re"],
+    "defines": [],
+    "options": [],
+    "link": "executable"
+  },
+  "payload": { "files": [] },
+  "targets": {},
+  "formats": ["portable"],
+  "statePolicy": "clean"
+}

@@ -36,97 +36,153 @@ static fn path_of(char *out, bytes cap, const char *leaf) {
 /* Reads a file's size for verifying the writer's on-disk result. */
 static i64 read_file_size(const char *p) {
     FILE *f = fopen(p, "rb");
-    if (!f)
+
+    if (!f) 
         return -1;
+
     fseek(f, 0, SEEK_END);
+
     i64 n = ftell(f);
+
     fclose(f);
+
     return n;
 }
 
 i32 main() {
     const char *base = getenv("TMPDIR");
-    if (!base || !*base)
+
+    if (!base || !*base) 
         base = "/tmp";
+
     snprintf(g_dir, sizeof(g_dir), "%s/vexspoke_fw_%d", base, getpid());
+
     File_delete(g_dir);
+
     CHECK(File_mkdirs(g_dir));
-    if (g_failures)
+
+    if (g_failures) 
         return 1;
 
     FileWriter w;
+
     memset(&w, 0, sizeof(w));
+
     FileWriter_close(&w);
+
     FileWriter_flush(&w);
+
     CHECK(FileWriter_bytesWritten(&w) == 0);
 
     char p[300];
+
     path_of(p, sizeof(p), "sub/dir/out.bin");
+
     CHECK(FileWriter_open(&w, p));
+
     CHECK(FileWriter_bytesWritten(&w) == 0);
+
     CHECK(File_exists(p));
 
     FileWriter_write(&w, (const u8*) "hello", 5);
+
     CHECK(FileWriter_bytesWritten(&w) == 5);
+
     FileWriter_write(&w, (const u8*) "", 0);
+
     CHECK(FileWriter_bytesWritten(&w) == 5);
 
     enum { BIG = 200000 };
+
     u8 *big = (u8*) malloc(BIG);
+
     CHECK(big != nullptr);
-    for (i32 i = 0; i < BIG; i++)
+
+    for (i32 i = 0; i < BIG; i++) 
         big[i] = (u8) (i * 31 + 7);
+
     FileWriter_write(&w, big, BIG);
+
     CHECK(FileWriter_bytesWritten(&w) == (u64) (5 + BIG));
 
     FileWriter_flush(&w);
+
     FileWriter_close(&w);
+
     FileWriter_close(&w);
 
     CHECK(read_file_size(p) == 5 + BIG);
+
     FILE *f = fopen(p, "rb");
+
     CHECK(f != nullptr);
+
     if (f) {
         u8 head[5];
+
         CHECK(fread(head, 1, 5, f) == 5);
+
         CHECK(memcmp(head, "hello", 5) == 0);
+
         CHECK(fseek(f, 5, SEEK_SET) == 0);
+
         u8 *back = (u8*) malloc(BIG);
+
         CHECK(back != nullptr);
+
         if (back) {
             CHECK(fread(back, 1, BIG, f) == (bytes) BIG);
+
             CHECK(memcmp(back, big, BIG) == 0);
+
             free(back);
         }
+
         fclose(f);
     }
+
     free(big);
 
     FileWriter_write(&w, (const u8*) "late", 4);
+
     CHECK(FileWriter_bytesWritten(&w) == (u64) (5 + BIG));
 
     FileWriter w2;
+
     memset(&w2, 0, sizeof(w2));
+
     CHECK(!FileWriter_open(&w2, nullptr));
+
     CHECK(!FileWriter_open(nullptr, "some/path"));
 
     char blocker[300];
+
     path_of(blocker, sizeof(blocker), "blocker");
+
     FILE *bf = fopen(blocker, "wb");
+
     CHECK(bf != nullptr);
-    if (bf)
+
+    if (bf) 
         fclose(bf);
+
     char under[320];
+
     snprintf(under, sizeof(under), "%s/child", blocker);
+
     CHECK(!FileWriter_open(&w2, under));
 
     File_delete(p);
+
     File_delete(blocker);
 
     if (g_failures == 0) {
         printf("filewriter_test: all assertions held\n");
+
         return 0;
     }
+
     printf("filewriter_test: %d FAILURES\n", g_failures);
+
     return 1;
 }

@@ -1,0 +1,43 @@
+{
+  "application": {
+    "id": "local.vexgraph.re.struct",
+    "name": "re_struct",
+    "displayName": "RE Struct",
+    "version": "",
+    "type": "cli",
+    "authors": ["vexgraph"],
+    "publisher": "vexgraph",
+    "description": "",
+    "license": "UNLICENSED",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "array_test.c",
+    "sources": [
+      "array_test.c",
+      "chunked_list_test.c",
+      "chunked_paged_test.c",
+      "collection_test.c",
+      "deque_test.c",
+      "exhaustion_test.c",
+      "list_test.c",
+      "map_test.c",
+      "queue_test.c",
+      "ring_test.c",
+      "set_test.c",
+      "stack_observability_test.c",
+      "stack_test.c",
+      "stride_test.c"
+    ],
+    "includes": ["re", "lifetime"],
+    "dependencies": ["lifetime", "re"],
+    "defines": [],
+    "options": [],
+    "link": "executable"
+  },
+  "payload": { "files": [] },
+  "targets": {},
+  "formats": ["portable"],
+  "statePolicy": "clean"
+}

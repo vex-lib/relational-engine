@@ -1,0 +1,43 @@
+{
+  "application": {
+    "id": "org.vexgraph.re.hash",
+    "name": "hash",
+    "displayName": "Hash",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Hash owner scenarios: FNV-1a reference vectors, null/empty safety, determinism, Murmur3 avalanche",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "hash_test.c",
+    "sources": [
+      "hash_test.c"
+    ],
+    "includes": [
+      "re"
+    ],
+    "dependencies": [
+      "re"
+    ],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}

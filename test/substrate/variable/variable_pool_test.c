@@ -95,22 +95,26 @@ i32 main() {
         MemoryArena *arena = MemoryArena_create(64u << 20);
         StringPool_init(arena);
         const char *words[] = { "delta", "alpha", "charlie", "bravo" };
-        for (i32 i = 0; i < 4; i++)
+        for (i32 i = 0; i < 4; i++) 
             StringPool_intern(words[i]);
         CHECK("count four", StringPool_count() == 4);
         bool allFound = true;
         for (i32 i = 0; i < 4; i++) {
             i32 idx = StringPool_find(words[i]);
-            if (idx < 0 || strcmp(StringPool_name((u32) idx), words[i]) != 0)
+
+            if (idx < 0 || strcmp(StringPool_name((u32) idx), words[i]) != 0) 
                 allFound = false;
         }
+
         CHECK("all found by name", allFound);
         char buf[8];
         for (i32 i = 0; i < 200; i++) {
             snprintf(buf, sizeof(buf), "k%d", i);
-            if (StringPool_intern(buf) < 0)
+
+            if (StringPool_intern(buf) < 0) 
                 break;
         }
+
         CHECK("growth past capacity", StringPool_count() == 204);
         CHECK("early name survives grow", StringPool_find("alpha") >= 0);
         const StringSlot *s = StringPool_slot((u32) StringPool_find("alpha"));
@@ -120,5 +124,6 @@ i32 main() {
     }
 
     printf("\n=== Variable Pool Test Summary: %d failures ===\n", g_failures);
+
     return g_failures > 0 ? 1 : 0;
 }

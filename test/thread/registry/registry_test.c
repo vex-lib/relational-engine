@@ -30,13 +30,17 @@ static i32 g_failures = 0;
 
 static fn test_self_index() {
     i32 a = ThreadRegistry_index();
+
     i32 b = ThreadRegistry_index();
+
     CHECK(a == b);
+
     CHECK(a >= 0 && a < THREAD_REGISTRY_DEFAULT_SIZE);
 }
 
 static fn test_tags() {
     i32 idx = ThreadRegistry_index();
+
     CHECK(ThreadRegistry_tag(idx) == THREAD_TAG_NONE);
 
     static const u32 tags[] = {
@@ -44,20 +48,30 @@ static fn test_tags() {
     };
     for (bytes i = 0; i < sizeof tags / sizeof tags[0]; i++) {
         ThreadRegistry_setTag(idx, tags[i]);
+
         CHECK(ThreadRegistry_tag(idx) == tags[i]);
     }
+
     ThreadRegistry_setTag(idx, 42u);
+
     CHECK(ThreadRegistry_tag(idx) == 42u);
+
     ThreadRegistry_setTag(idx, THREAD_TAG_NONE);
 }
 
 static fn test_bounds() {
     ThreadRegistry_setTag(-1, 42u);
+
     ThreadRegistry_setTag(THREAD_REGISTRY_DEFAULT_SIZE, 42u);
+
     ThreadRegistry_setTag(1 << 20, 42u);
+
     CHECK(ThreadRegistry_tag(-1) == THREAD_TAG_NONE);
+
     CHECK(ThreadRegistry_tag(THREAD_REGISTRY_DEFAULT_SIZE) == THREAD_TAG_NONE);
+
     CHECK(ThreadRegistry_tag(INT32_MAX) == THREAD_TAG_NONE);
+
     CHECK(ThreadRegistry_tag(INT32_MIN) == THREAD_TAG_NONE);
 }
 
@@ -71,67 +85,97 @@ static i32 g_reg_stable_flags[REG_THREADS];     // 1 if all repeats agreed
 
 static any reg_worker(any arg) {
     i32 id = (i32) (pointer) arg;
-    while (!atomic_load_explicit(&g_reg_start, memory_order_acquire))
+
+    while (!atomic_load_explicit(&g_reg_start, memory_order_acquire)) 
         sched_yield();
+
     i32 first = ThreadRegistry_index();
+
     i32 stable = 1;
-    for (i32 i = 0; i < REG_REPEAT; i++)
-        if (ThreadRegistry_index() != first)
+
+    for (i32 i = 0; i < REG_REPEAT; i++) 
+        if (ThreadRegistry_index() != first) 
             stable = 0;
     ThreadRegistry_setTag(first, 42u);
+
     g_reg_index[id] = first;
+
     g_reg_stable_flags[id] = stable;
-    while (atomic_load_explicit(&g_reg_start, memory_order_acquire) != 2)
+
+    while (atomic_load_explicit(&g_reg_start, memory_order_acquire) != 2) 
         sched_yield();
+
     return nullptr;
 }
 
 static fn test_concurrent_distinct() {
     atomic_store(&g_reg_start, 0);
+
     pthread_t t[REG_THREADS];
+
     for (i32 i = 0; i < REG_THREADS; i++) {
         g_reg_index[i] = -1;
+
         g_reg_stable_flags[i] = 0;
+
         CHECK(pthread_create(&t[i], nullptr, reg_worker, (any) (pointer) i) == 0);
     }
+
     atomic_store_explicit(&g_reg_start, 1, memory_order_release);
+
     bool all_published = false;
+
     while (!all_published) {
         all_published = true;
-        for (i32 i = 0; i < REG_THREADS; i++)
-            if (g_reg_index[i] < 0)
+
+        for (i32 i = 0; i < REG_THREADS; i++) 
+            if (g_reg_index[i] < 0) 
                 all_published = false;
         sched_yield();
     }
+
     i32 idx[REG_THREADS];
+
     for (i32 i = 0; i < REG_THREADS; i++) {
         idx[i] = g_reg_index[i];
+
         CHECK(g_reg_stable_flags[i] == 1);
+
         CHECK(idx[i] >= 0 && idx[i] < THREAD_REGISTRY_DEFAULT_SIZE);
     }
-    for (i32 i = 0; i < REG_THREADS; i++)
-        for (i32 j = i + 1; j < REG_THREADS; j++)
+
+    for (i32 i = 0; i < REG_THREADS; i++) 
+        for (i32 j = i + 1; j < REG_THREADS; j++) 
             CHECK(idx[i] != idx[j]);
 
     atomic_store_explicit(&g_reg_start, 2, memory_order_release);
-    for (i32 i = 0; i < REG_THREADS; i++)
+
+    for (i32 i = 0; i < REG_THREADS; i++) 
         CHECK(pthread_join(t[i], nullptr) == 0);
 
     i32 me = ThreadRegistry_index();
+
     CHECK(me == ThreadRegistry_index());
+
     CHECK(me >= 0 && me < THREAD_REGISTRY_DEFAULT_SIZE);
 }
 
 i32 main() {
     test_self_index();
+
     test_tags();
+
     test_bounds();
+
     test_concurrent_distinct();
 
     if (g_failures == 0) {
         printf("registry_test: all assertions held\n");
+
         return 0;
     }
+
     printf("registry_test: %d FAILURES\n", g_failures);
+
     return 1;
 }

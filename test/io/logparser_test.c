@@ -35,22 +35,28 @@ static char g_dir[256];
 /* Writes one 32-bit value in the log format's big-endian byte order. */
 static fn put_be32(FILE *f, u32 v) {
     u8 b[4] = { (u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8), (u8)v };
+
     fwrite(b, 1, 4, f);
 }
 
 /* Writes one signed timestamp/value as its 64-bit big-endian representation. */
 static fn put_be64(FILE *f, i64 v) {
     u8 b[8];
-    for (i32 i = 0; i < 8; i++)
+
+    for (i32 i = 0; i < 8; i++) 
         b[i] = (u8)((u64)v >> (56 - 8 * i));
+
     fwrite(b, 1, 8, f);
 }
 
 /* Emits the ANTI-log magic, version, and big-endian record-size header. */
 static fn put_header(FILE *f, u8 version, u32 record_size) {
     fwrite("ANTILOG", 1, 7, f);
+
     u8 v = version;
+
     fwrite(&v, 1, 1, f);
+
     put_be32(f, record_size);
 }
 
@@ -65,46 +71,74 @@ typedef struct Collector {
 static fn collect(any userdata, i32 kind, i64 ts,
                     i64 v0, i64 v1, i64 v2, i64 v3, i64 v4) {
     (discard) v1; (discard) v2; (discard) v3; (discard) v4;
+
     Collector *c = (Collector*) userdata;
+
     if ((*c).count < 8) {
         (*c).kinds[(*c).count] = kind;
+
         (*c).ts[(*c).count] = ts;
+
         (*c).v0[(*c).count] = v0;
     }
+
     (*c).count++;
 }
 
 /* Verifies valid records, callback values, counts, and safe handling of a partial trailing record. */
 static fn test_valid() {
     char p[300];
+
     snprintf(p, sizeof(p), "%s/valid.log", g_dir);
+
     FILE *f = fopen(p, "wb");
+
     CHECK(f != nullptr);
+
     put_header(f, 1, 52);
+
     put_be32(f, 1);
+
     put_be64(f, 111);
+
     put_be64(f, 10); put_be64(f, 11); put_be64(f, 12); put_be64(f, 13); put_be64(f, 14);
+
     put_be32(f, 2);
+
     put_be64(f, 222);
+
     put_be64(f, 20); put_be64(f, 21); put_be64(f, 22); put_be64(f, 23); put_be64(f, 24);
+
     fclose(f);
 
     CHECK(LogParser_isLogFile(p));
+
     CHECK(LogParser_count(p) == 2);
 
     Collector c = { 0 };
+
     CHECK(LogParser_parse(p, collect, &c) == 2);
+
     CHECK(c.count == 2);
+
     CHECK(c.kinds[0] == 1 && c.ts[0] == 111 && c.v0[0] == 10);
+
     CHECK(c.kinds[1] == 2 && c.ts[1] == 222 && c.v0[1] == 20);
 
     f = fopen(p, "ab");
+
     CHECK(f != nullptr);
+
     fwrite("0123456789", 1, 10, f);
+
     fclose(f);
+
     CHECK(LogParser_count(p) == 2);
+
     Collector c2 = { 0 };
+
     CHECK(LogParser_parse(p, collect, &c2) == 2);
+
     CHECK(c2.count == 2);
 }
 
@@ -113,48 +147,83 @@ static fn test_malformed() {
     char p[300];
 
     snprintf(p, sizeof(p), "%s/badmagic.log", g_dir);
+
     FILE *f = fopen(p, "wb");
+
     CHECK(f != nullptr);
+
     fwrite("NOTALOG", 1, 7, f);
+
     u8 v = 1;
+
     fwrite(&v, 1, 1, f);
+
     put_be32(f, 52);
+
     put_be32(f, 1);
+
     put_be64(f, 1);
+
     put_be64(f, 1); put_be64(f, 1); put_be64(f, 1); put_be64(f, 1); put_be64(f, 1);
+
     fclose(f);
+
     CHECK(!LogParser_isLogFile(p));
+
     CHECK(LogParser_count(p) == -1);
+
     Collector c = { 0 };
+
     CHECK(LogParser_parse(p, collect, &c) == -1);
 
     snprintf(p, sizeof(p), "%s/badver.log", g_dir);
+
     f = fopen(p, "wb");
+
     CHECK(f != nullptr);
+
     put_header(f, 2, 52);
+
     fclose(f);
+
     CHECK(!LogParser_isLogFile(p));
+
     CHECK(LogParser_count(p) == -1);
 
     snprintf(p, sizeof(p), "%s/badrec.log", g_dir);
+
     f = fopen(p, "wb");
+
     CHECK(f != nullptr);
+
     put_header(f, 1, 40);
+
     fclose(f);
+
     CHECK(!LogParser_isLogFile(p));
 
     snprintf(p, sizeof(p), "%s/tiny.log", g_dir);
+
     f = fopen(p, "wb");
+
     CHECK(f != nullptr);
+
     fwrite("ANTI", 1, 4, f);
+
     fclose(f);
+
     CHECK(!LogParser_isLogFile(p));
+
     CHECK(LogParser_count(p) == -1);
 
     snprintf(p, sizeof(p), "%s/absent.log", g_dir);
+
     remove(p);
+
     CHECK(!LogParser_isLogFile(p));
+
     CHECK(LogParser_count(p) == -1);
+
     CHECK(LogParser_parse(p, collect, &c) == -1);
 
     CHECK(LogParser_parse(nullptr, nullptr, nullptr) == -1);
@@ -163,54 +232,79 @@ static fn test_malformed() {
 /* Checks timestamp formatting, kind-name fallback, supplied labels, and truncation reporting. */
 static fn test_format() {
     char out[256];
+
     i32 n = LogParser_formatRecord(out, sizeof(out), 1,
                                    1012345000LL, 1000000000LL, nullptr,
                                    1, 2, 3, 4, 5);
     CHECK(n > 0);
+
     CHECK(strstr(out, "12.345 ms") != nullptr);
+
     CHECK(strstr(out, "produce") != nullptr);
+
     CHECK(strstr(out, "1  2  3  4  5") != nullptr);
 
     n = LogParser_formatRecord(out, sizeof(out), 2, 5, 0, "custom", 0, 0, 0, 0, 0);
+
     CHECK(n > 0);
+
     CHECK(strstr(out, "0.000 ms") != nullptr);
+
     CHECK(strstr(out, "custom") != nullptr);
 
     char small[8];
+
     CHECK(LogParser_formatRecord(small, sizeof(small), 1, 1, 0, "x", 0, 0, 0, 0, 0) == -1);
 }
 
 /* Checks known event names and deterministic fallback names for unknown kinds. */
 static fn test_kind_names() {
     CHECK(strcmp(LogParser_kindName(1), "produce") == 0);
+
     CHECK(strcmp(LogParser_kindName(2), "present") == 0);
+
     CHECK(strcmp(LogParser_kindName(3), "drop") == 0);
+
     CHECK(strcmp(LogParser_kindName(10), "keyDown") == 0);
+
     CHECK(strcmp(LogParser_kindName(33), "touchCancel") == 0);
+
     CHECK(strcmp(LogParser_kindName(999), "kind#999") == 0);
+
     CHECK(strcmp(LogParser_kindName(-3), "kind#-3") == 0);
 }
 
 /* Creates an isolated temporary directory, runs parser contract cases, and returns their aggregate status. */
 i32 main() {
     const char *base = getenv("TMPDIR");
-    if (!base || !*base)
+
+    if (!base || !*base) 
         base = "/tmp";
+
     snprintf(g_dir, sizeof(g_dir), "%s/vexspoke_lp_%d", base, getpid());
+
     File_delete(g_dir);
+
     CHECK(File_mkdirs(g_dir));
-    if (g_failures)
+
+    if (g_failures) 
         return 1;
 
     test_valid();
+
     test_malformed();
+
     test_format();
+
     test_kind_names();
 
     if (g_failures == 0) {
         printf("logparser_test: all assertions held\n");
+
         return 0;
     }
+
     printf("logparser_test: %d FAILURES\n", g_failures);
+
     return 1;
 }

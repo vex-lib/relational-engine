@@ -10,10 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#if defined(LINK_DARLING)
-#include "darling/label/label.h"
-#else
-// Standalone fallback test struct modeling identical ownership semantics
+// Standalone test struct modeling owned vs borrowed text lifetime semantics
 typedef struct TestLabel {
     char *text;
     bool ownsText;
@@ -22,53 +19,68 @@ typedef struct TestLabel {
 /** Allocates and initializes the fallback label object from permanent memory. */
 static TestLabel *TestLabel_0() {
     TestLabel *lbl = (TestLabel*) Memory_alloc(100, sizeof(TestLabel));
-    if (!lbl)
+
+    if (!lbl) 
         return nullptr;
+
     (*lbl).text = nullptr;
+
     (*lbl).ownsText = false;
+
     return lbl;
 }
 
 /** Replaces label text with an owned permanent copy, releasing prior owned text. */
 static fn TestLabel_setText(TestLabel *lbl, const char *text) {
-    if (!lbl)
+    if (!lbl) 
         return;
-    if ((*lbl).text && (*lbl).ownsText)
+
+    if ((*lbl).text && (*lbl).ownsText) 
         Memory_free((*lbl).text);
+
     if (text) {
         bytes len = strlen(text) + 1;
+
         (*lbl).text = (char*) Memory_alloc(101, len);
-        if ((*lbl).text)
+
+        if ((*lbl).text) 
             memcpy((*lbl).text, text, len);
+
         (*lbl).ownsText = true;
     } else {
         (*lbl).text = nullptr;
+
         (*lbl).ownsText = false;
     }
 }
 
 /** Replaces label text with a borrowed pointer without taking ownership. */
 static fn TestLabel_setTextBorrowed(TestLabel *lbl, const char *text) {
-    if (!lbl)
+    if (!lbl) 
         return;
 #if defined(DEBUG_BORROW_CHECK)
     if (Transient_contains(text) && !Transient_contains(lbl)) {
         fprintf(stderr, "[LIFETIME ESCAPE] TestLabel_setTextBorrowed: escape abort\n");
+
         abort();
     }
 #endif
-    if ((*lbl).text && (*lbl).ownsText)
+    if ((*lbl).text && (*lbl).ownsText) 
         Memory_free((*lbl).text);
+
     (*lbl).text = (char*) text;
+
     (*lbl).ownsText = false;
 }
 
 /** Releases owned text and the fallback label allocation. */
 static fn TestLabel_free(TestLabel *lbl) {
-    if (!lbl)
+    if (!lbl) 
         return;
-    if ((*lbl).text && (*lbl).ownsText)
+
+    if ((*lbl).text && (*lbl).ownsText) 
         Memory_free((*lbl).text);
+
     Memory_free(lbl);
 }
 
@@ -77,65 +89,94 @@ static fn TestLabel_free(TestLabel *lbl) {
 #define Label_setText TestLabel_setText
 #define Label_setTextBorrowed TestLabel_setTextBorrowed
 #define Label_free TestLabel_free
-#endif
 
 i32 main() {
     printf("[transient_lifetime_test] Starting lifetime verification suite...\n");
 
     const char *lit = "literal_constant_string";
+
     assert(Memory_getLifetime(lit) == MEMORY_LIFETIME_UNKNOWN);
 
     char stackBuf[64];
+
     strcpy(stackBuf, "stack_buffer_array");
+
     assert(Memory_getLifetime(stackBuf) == MEMORY_LIFETIME_UNKNOWN);
 
     any perm = Memory_alloc(1, 128);
+
     assert(perm != nullptr);
+
     assert(Memory_getLifetime(perm) == MEMORY_LIFETIME_PERMANENT);
 
     any trans = Transient_alloc(2, 128);
+
     assert(trans != nullptr);
+
     assert(Memory_getLifetime(trans) == MEMORY_LIFETIME_TRANSIENT);
 
     Memory_free((any) lit);
+
     Memory_free((any) stackBuf);
+
     Memory_free(trans);
+
     printf("  [PASS] 1. Safe classification & free: lit/stack=UNKNOWN, safe no-op on free\n");
 
     char *transStr = (char*) Transient_alloc(3, 32);
+
     strcpy(transStr, "transient_string_123");
 
     Label *lbl = Label_0();
+
     assert(lbl != nullptr);
+
     Label_setText(lbl, transStr);
+
     assert((*lbl).ownsText == true);
+
     assert(Memory_getLifetime((*lbl).text) == MEMORY_LIFETIME_PERMANENT);
 
     Transient_reset();
+
     assert(strcmp((*lbl).text, "transient_string_123") == 0);
+
     printf("  [PASS] 2. Auto-promote: transient string copied to permanent, survives Transient_reset()\n");
 
     const char *staticStr = "constant_borrowed_literal";
+
     Label_setTextBorrowed(lbl, staticStr);
+
     assert((*lbl).ownsText == false);
+
     assert((*lbl).text == staticStr);
 
     Label_setText(lbl, "next_owned_value");
+
     assert((*lbl).ownsText == true);
+
     assert(strcmp((*lbl).text, "next_owned_value") == 0);
+
     Label_free(lbl);
+
     printf("  [PASS] 3. Borrowed no-free: borrowed string is never freed on replacement or teardown\n");
 
     bytes allocBytes = 65536;
+
     u8 *p = (u8*) Transient_alloc(4, allocBytes);
+
     assert(p != nullptr);
+
     memset(p, 0x55, allocBytes);
+
     assert((*p) == 0x55);
 
     Transient_reset();
 #if defined(DEBUG_BORROW_CHECK)
     assert((*p) == 0xDD);
+
     assert(*(p + allocBytes - 1) == 0xDD);
+
     printf("  [PASS] 4. Poisoning: used transient Bytes poisoned with 0xDD under DEBUG_BORROW_CHECK\n");
 #else
     printf("  [PASS] 4. Poisoning: skipped in release (DEBUG_BORROW_CHECK not defined)\n");
@@ -143,27 +184,39 @@ i32 main() {
 
 #if defined(DEBUG_BORROW_CHECK)
     pid_t pid = fork();
+
     assert(pid >= 0);
+
     if (pid == 0) {
         freopen("/dev/null", "w", stderr);
+
         char *escapeStr = (char*) Transient_alloc(5, 32);
+
         strcpy(escapeStr, "escaped_transient");
 
         Label *escapeLbl = Label_0();
+
         Label_setTextBorrowed(escapeLbl, escapeStr);
+
         exit(0);
     }
 
     i32 status = 0;
+
     waitpid(pid, &status, 0);
+
     assert(WIFSIGNALED(status));
+
     assert(WTERMSIG(status) == SIGABRT);
+
     printf("  [PASS] 5. Death test: child correctly aborted with SIGABRT on illegal transient borrow\n");
 #else
     printf("  [PASS] 5. Death test: skipped in release (DEBUG_BORROW_CHECK not defined)\n");
 #endif
 
     Memory_free(perm);
+
     printf("[transient_lifetime_test] ALL TESTS PASSED SUCCESSFULLY (exit 0).\n");
+
     return 0;
 }

@@ -32,81 +32,131 @@ static i32 g_failures = 0;
 
 i32 main() {
     const char *base = getenv("TMPDIR");
-    if (!base || !*base)
+
+    if (!base || !*base) 
         base = "/tmp";
+
     char dir[256];
+
     snprintf(dir, sizeof(dir), "%s/vexspoke_log_%d", base, getpid());
+
     File_delete(dir);
+
     CHECK(File_mkdirs(dir));
-    if (g_failures)
+
+    if (g_failures) 
         return 1;
+
     char path[300];
+
     snprintf(path, sizeof(path), "%s/engine.log", dir);
 
     CHECK(!Log_init(nullptr, path, 8));
+
     Log log;
+
     CHECK(!Log_init(&log, nullptr, 8));
 
     CHECK(Log_init(&log, path, 8));
+
     CHECK(Log_isEnabled(&log));
+
     CHECK(Log_isActive(&log));
+
     CHECK(strcmp(Log_path(&log), path) == 0);
+
     CHECK(Log_appended(&log) == 0);
+
     CHECK(Log_dropped(&log) == 0);
+
     CHECK(Log_written(&log) == 0);
 
     Log_append(&log, 1, 10, 20, 30, 40, 50);
+
     Log_appendKind(&log, 2);
+
     Log_append(&log, 3, -1, -2, -3, -4, -5);
+
     CHECK(Log_appended(&log) == 3);
 
     Log_setActive(&log, false);
+
     CHECK(!Log_isActive(&log));
+
     Log_append(&log, 9, 1, 1, 1, 1, 1);
+
     CHECK(Log_appended(&log) == 3);
+
     Log_setActive(&log, true);
 
     u64 before = Log_appended(&log) + Log_dropped(&log);
+
     enum { BURST = 2000 };
-    for (i32 i = 0; i < BURST; i++)
+
+    for (i32 i = 0; i < BURST; i++) 
         Log_append(&log, 4, i, 0, 0, 0, 0);
+
     u64 after = Log_appended(&log) + Log_dropped(&log);
+
     CHECK(after - before == BURST);
 
     Log dead;
+
     memset(&dead, 0, sizeof(dead));
+
     Log_append(&dead, 1, 0, 0, 0, 0, 0);
+
     Log_append(nullptr, 1, 0, 0, 0, 0, 0);
 
     Log_shutdown(&log);
+
     CHECK(!Log_isEnabled(&log));
+
     CHECK(Log_written(&log) == Log_appended(&log));
+
     Log_shutdown(&log);
+
     Log_shutdown(nullptr);
 
     CHECK(LogParser_isLogFile(path));
+
     i64 n = LogParser_count(path);
+
     CHECK(n >= 0);
+
     CHECK((u64) n == Log_written(&log));
 
     Log again;
+
     CHECK(Log_init(&again, path, 4));
+
     CHECK(Log_isEnabled(&again));
+
     Log_shutdown(&again);
 
     Log tiny;
+
     char path2[320];
+
     snprintf(path2, sizeof(path2), "%s/tiny.log", dir);
+
     CHECK(Log_init(&tiny, path2, 0));
+
     Log_append(&tiny, 7, 1, 2, 3, 4, 5);
+
     CHECK(Log_appended(&tiny) == 1);
+
     Log_shutdown(&tiny);
+
     CHECK(LogParser_count(path2) == 1);
 
     if (g_failures == 0) {
         printf("log_test: all assertions held\n");
+
         return 0;
     }
+
     printf("log_test: %d FAILURES\n", g_failures);
+
     return 1;
 }

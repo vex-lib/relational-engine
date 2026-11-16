@@ -32,9 +32,13 @@ static i32 g_failures = 0;
 /** Verifies null lock operations fail safely without acquiring or releasing state. */
 static fn test_null_safety() {
     SpinLock_lock(nullptr);
+
     CHECK(!SpinLock_tryLock(nullptr));
+
     CHECK(!SpinLock_tryLockTimeout(nullptr, 0));
+
     SpinLock_unlock(nullptr);
+
     CHECK(!SpinLock_isLocked(nullptr));
 }
 
@@ -42,18 +46,29 @@ static fn test_null_safety() {
 /** Checks zero initialization, acquisition, try-acquisition, lock state, and release. */
 static fn test_basic_round_trip() {
     SpinLock lock = SPIN_LOCK_INIT;
+
     CHECK(!SpinLock_isLocked(&lock));
+
     CHECK(SpinLock_tryLock(&lock));
+
     CHECK(SpinLock_isLocked(&lock));
+
     CHECK(!SpinLock_tryLock(&lock));
+
     SpinLock_unlock(&lock);
+
     CHECK(!SpinLock_isLocked(&lock));
+
     SpinLock_unlock(&lock);
+
     CHECK(!SpinLock_isLocked(&lock));
 
     SpinLock_lock(&lock);
+
     CHECK(SpinLock_isLocked(&lock));
+
     SpinLock_unlock(&lock);
+
     CHECK(!SpinLock_isLocked(&lock));
 }
 
@@ -61,11 +76,17 @@ static fn test_basic_round_trip() {
 /** Confirms timed acquisition returns at its deadline and succeeds after release. */
 static fn test_timeout() {
     SpinLock lock = SPIN_LOCK_INIT;
+
     CHECK(SpinLock_tryLock(&lock));
+
     CHECK(!SpinLock_tryLockTimeout(&lock, 200000));
+
     CHECK(!SpinLock_tryLockTimeout(&lock, 0));
+
     SpinLock_unlock(&lock);
+
     CHECK(SpinLock_tryLockTimeout(&lock, 1000000));
+
     SpinLock_unlock(&lock);
 }
 
@@ -77,30 +98,44 @@ static atomic_int g_foreign_go;
 /** Holds the shared lock until the test permits its owning thread to release it. */
 static any foreign_owner(any arg) {
     (discard) arg;
+
     SpinLock_lock(&g_foreign);
+
     atomic_store_explicit(&g_foreign_ready, 1, memory_order_release);
-    while (!atomic_load_explicit(&g_foreign_go, memory_order_acquire))
+
+    while (!atomic_load_explicit(&g_foreign_go, memory_order_acquire)) 
         sched_yield();
+
     SpinLock_unlock(&g_foreign);
+
     return nullptr;
 }
 
 /** Checks a non-owner cannot unlock another thread's lock and that the owner can release it. */
 static fn test_foreign_unlock_refused() {
     g_foreign = SPIN_LOCK_INIT;
+
     atomic_store(&g_foreign_ready, 0);
+
     atomic_store(&g_foreign_go, 0);
+
     pthread_t t;
+
     CHECK(pthread_create(&t, nullptr, foreign_owner, nullptr) == 0);
-    while (!atomic_load_explicit(&g_foreign_ready, memory_order_acquire))
+
+    while (!atomic_load_explicit(&g_foreign_ready, memory_order_acquire)) 
         sched_yield();
+
     CHECK(SpinLock_isLocked(&g_foreign));
 
     SpinLock_unlock(&g_foreign);
+
     CHECK(SpinLock_isLocked(&g_foreign));
 
     atomic_store_explicit(&g_foreign_go, 1, memory_order_release);
+
     CHECK(pthread_join(t, nullptr) == 0);
+
     CHECK(!SpinLock_isLocked(&g_foreign));
 }
 
@@ -118,57 +153,85 @@ static atomic_int g_spin_start;
 /** Contends on the shared lock while updating the protected counter and watchdog progress count. */
 static any spin_worker(any arg) {
     (discard) arg;
-    while (!atomic_load_explicit(&g_spin_start, memory_order_acquire))
+
+    while (!atomic_load_explicit(&g_spin_start, memory_order_acquire)) 
         sched_yield();
+
     for (i32 i = 0; i < SPIN_ITER; i++) {
         SpinLock_lock(&g_counter_lock);
+
         i64 before = g_plain_counter;
+
         g_plain_counter = before + 1;
-        if (before < g_observed_min)
+
+        if (before < g_observed_min) 
             g_observed_min = before;
-        if (before > g_observed_max)
+
+        if (before > g_observed_max) 
             g_observed_max = before;
+
         SpinLock_unlock(&g_counter_lock);
+
         atomic_fetch_add_explicit(&g_watchdog_ticks, 1, memory_order_relaxed);
     }
+
     return nullptr;
 }
 
 /** Verifies concurrent increments are neither lost nor duplicated under lock contention. */
 static fn test_contention() {
     g_counter_lock = SPIN_LOCK_INIT;
+
     g_plain_counter = 0;
+
     g_observed_min = INT64_MAX;
+
     g_observed_max = 0;
+
     atomic_store(&g_watchdog_ticks, 0);
+
     atomic_store(&g_spin_start, 0);
 
     pthread_t t[SPIN_THREADS];
-    for (i32 i = 0; i < SPIN_THREADS; i++)
+
+    for (i32 i = 0; i < SPIN_THREADS; i++) 
         CHECK(pthread_create(&t[i], nullptr, spin_worker, nullptr) == 0);
+
     atomic_store_explicit(&g_spin_start, 1, memory_order_release);
-    for (i32 i = 0; i < SPIN_THREADS; i++)
+
+    for (i32 i = 0; i < SPIN_THREADS; i++) 
         CHECK(pthread_join(t[i], nullptr) == 0);
 
     CHECK(g_plain_counter == (i64) SPIN_THREADS * SPIN_ITER);
+
     CHECK(g_observed_min == 0);
+
     CHECK(g_observed_max == (i64) SPIN_THREADS * SPIN_ITER - 1);
+
     CHECK(atomic_load(&g_watchdog_ticks) == (i64) SPIN_THREADS * SPIN_ITER);
+
     CHECK(!SpinLock_isLocked(&g_counter_lock));
 }
 
 /** Runs the SpinLock owner scenarios and returns failure if any assertion was violated. */
 i32 main() {
     test_null_safety();
+
     test_basic_round_trip();
+
     test_timeout();
+
     test_foreign_unlock_refused();
+
     test_contention();
 
     if (g_failures == 0) {
         printf("spin_test: all assertions held\n");
+
         return 0;
     }
+
     printf("spin_test: %d FAILURES\n", g_failures);
+
     return 1;
 }

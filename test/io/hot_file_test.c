@@ -5,11 +5,16 @@
 #include "io/file/file.h"
 i32 main() {
     HotFileSys_pumpEvents();
+
     HotFileSys_shutdown();
+
     for (i32 i = 0; i < 2; ++i) {
         HotFileSys_init();
+
         HotFileSys_pumpEvents();
+
         HotFileSys_shutdown();
     }
+
     return 0;
 }

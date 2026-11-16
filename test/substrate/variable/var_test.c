@@ -9,43 +9,66 @@ static pointer g_last;
 
 static fn observer(var *self, pointer value, any context) {
     (discard) self;
+
     g_calls += 1;
+
     g_last = value;
+
     assert(context == &g_calls);
 }
 
 i32 main() {
     MemoryArena *arena = MemoryArena_create(64u * 1024u * 1024u);
+
     assert(arena);
 
     var *v = var("health", arena);
+
     assert(v);
+
     assert(strcmp(var_name(v), "health") == 0);
+
     assert(var_value(v) == 0);
+
     assert(var_observerCount(v) == 0);
+
     assert(var_arena(v) == arena);
 
     assert(var_subscribe(v, observer, &g_calls));
+
     assert(var_set(v, 42));
+
     assert(g_calls == 1 && g_last == 42);
 
     char buffer[128];
+
     bool truncated = true;
+
     var_toString(v, buffer, sizeof buffer, &truncated);
+
     assert(!truncated && strstr(buffer, "health") != nullptr);
 
     var_unsubscribe(v, observer, &g_calls);
+
     assert(var_observerCount(v) == 0);
+
     assert(var_set(v, 7));
+
     assert(g_calls == 1);
+
     assert(var_value(v) == 7);
 
     assert(!var_subscribe(nullptr, observer, nullptr));
+
     assert(!var_set(nullptr, 1));
+
     var_unsubscribeAll(v);
+
     var_unsubscribeAll(nullptr);
 
     MemoryArena_destroy(arena);
+
     Memory_freeAll();
+
     return 0;
 }
