@@ -86,16 +86,26 @@ static u32 g_bareCount = 0;
 // the slate is left untouched and registration fails; the caller drops.
 /** Grow the parent-chain registration table to at least needed rows. */
 static bool growSlate(bytes needed) {
-    if (needed <= g_typeTableCap) return true;
+    if (needed <= g_typeTableCap) 
+       return true;
+
     bytes newCap = (g_typeTableCap == 0) ? 8 : g_typeTableCap * 2;
-    while (newCap < needed) newCap *= 2;
+
+    while (newCap < needed) 
+       newCap *= 2;
+
     TypeParentsRow *nb = (TypeParentsRow*) Memory_alloc(
         0u, newCap * sizeof(TypeParentsRow));
-    if (nb == nullptr) return false;
-    if (g_typeTables != nullptr && g_typeTableCap > 0)
+    if (nb == nullptr) 
+       return false;
+
+    if (g_typeTables != nullptr && g_typeTableCap > 0) 
         memcpy(nb, g_typeTables, g_typeTableCap * sizeof(TypeParentsRow));
+
     g_typeTables = nb;
+
     g_typeTableCap = newCap;
+
     return true;
 }
 
@@ -103,9 +113,11 @@ static bool growSlate(bytes needed) {
 static const TypeParentsRow *findTable(u64 proj) {
     for (bytes i = 0; i < g_typeTableCount; ++i) {
         const TypeParentsRow *row = &g_typeTables[i];
-        if ((*row).proj == proj)
+
+        if ((*row).proj == proj) 
             return row;
     }
+
     return nullptr;
 }
 
@@ -115,123 +127,174 @@ static const TypeParentsRow *findTable(u64 proj) {
 // table (the Bounded Wait Law).
 /** Validate parent indices and reject multi-class cycles before chain publication. */
 static bool chainIsValid(const u32 *parents, u32 count) {
-    if (parents == nullptr)
+    if (parents == nullptr) 
         return count == 0u;
-    if (count == 0u)
+
+    if (count == 0u) 
         return true;
+
     for (u32 i = 1u; i < count; ++i) {
-        if (parents[i] >= count)
+        if (parents[i] >= count) 
             return false;
     }
+
     for (u32 i = 1u; i < count; ++i) {
         u32 cur = i;
+
         u32 hops = 0u;
+
         while (parents[cur] != 0u && parents[cur] != cur) {
-            if (++hops > count)
+            if (++hops > count) 
                 return false;
+
             cur = parents[cur];
         }
     }
+
     return true;
 }
 
 /** Return the registered parent-chain length used to bound Type_isA traversal. */
 static u32 chainCount(u64 proj) {
-    if (proj == 0u || proj == PROJ_VEXSPOKE)
+    if (proj == 0u || proj == PROJ_VEXSPOKE) 
         return g_bareCount;
+
     const TypeParentsRow *row = findTable(proj);
+
     return row != nullptr ? (*row).count : 0u;
 }
 
 /** Register or replace one non-Vexspoke project's validated class-parent table. */
 bool Type_registerParents(u64 proj, const u32 *parents, u32 count) {
-    if (proj == 0u)
+    if (proj == 0u) 
         return false;
-    if ((proj & MASK_PROJECT) != proj)
+
+    if ((proj & MASK_PROJECT) != proj) 
         return false;
-    if (proj == PROJ_VEXSPOKE)
+
+    if (proj == PROJ_VEXSPOKE) 
         return false;
-    if (!chainIsValid(parents, count))
+
+    if (!chainIsValid(parents, count)) 
         return false;
+
     for (bytes i = 0; i < g_typeTableCount; ++i) {
         TypeParentsRow *row = &g_typeTables[i];
+
         if ((*row).proj == proj) {
             (*row).parents = parents;
+
             (*row).count = count;
+
             return true;
         }
     }
-    if (!growSlate(g_typeTableCount + 1u)) return false;
+
+    if (!growSlate(g_typeTableCount + 1u)) 
+       return false;
+
     TypeParentsRow *row = &g_typeTables[g_typeTableCount++];
+
     (*row).proj = proj;
+
     (*row).parents = parents;
+
     (*row).count = count;
+
     return true;
 }
 
 /** Register or replace the validated parent table for bare/Vexspoke class ids. */
 bool Type_registerBareParents(const u32 *parents, u32 count) {
-    if (!chainIsValid(parents, count))
+    if (!chainIsValid(parents, count)) 
         return false;
+
     g_bareParents = parents;
+
     g_bareCount = count;
+
     return true;
 }
 
 /** Return a class's parent id, treating absent or unregistered entries as roots. */
 u64 Type_getParentClass(u64 classId) {
     u64 proj = classId & MASK_PROJECT;
+
     u64 cls = classId & MASK_CLASS;
+
     if (proj == 0u || proj == PROJ_VEXSPOKE) {
         if (g_bareParents != nullptr && cls != 0u && cls < g_bareCount) {
             u32 parent = g_bareParents[cls];
+
             return parent != 0u ? (u64) parent : cls;
         }
+
         return cls;
     }
+
     const TypeParentsRow *row = findTable(proj);
+
     if (row != nullptr && cls != 0u && cls < (*row).count) {
         u32 parent = (*row).parents[cls];
+
         return parent != 0u ? (u64) parent : cls;
     }
+
     return cls;
 }
 
 /** Map an encoded project byte to its architecture id; bare or unknown projects default to Vexspoke. */
 u64 Type_arch(u64 classId) {
     const u64 proj = classId & MASK_PROJECT;
-    if (proj == PROJ_VEXSPOKE)
+
+    if (proj == PROJ_VEXSPOKE) 
         return ARCH_VEXSPOKE;
-    if (proj == PROJ_GRAPHVEX)
+
+    if (proj == PROJ_GRAPHVEX) 
         return ARCH_GRAPHVEX;
-    if (proj == PROJ_HOTCWAP)
+
+    if (proj == PROJ_HOTCWAP) 
         return ARCH_HOTCWAP;
-    if (proj == PROJ_DARLING)
+
+    if (proj == PROJ_DARLING) 
         return ARCH_DARLING;
-    if (proj == PROJ_API_HAVEN)
+
+    if (proj == PROJ_API_HAVEN) 
         return ARCH_APIHAVEN;
-    if (proj == PROJ_DARKBASE)
+
+    if (proj == PROJ_DARKBASE) 
         return ARCH_DARKBASE;
-    if (proj == PROJ_SAMPLERATE)
+
+    if (proj == PROJ_SAMPLERATE) 
         return ARCH_SAMPLERATE;
+
     return ARCH_VEXSPOKE;
 }
 
 /** Test class ancestry within the same project using a walk bounded by its registered chain length. */
 u32 Type_isA(u64 classId, u64 ancestorId) {
     u64 proj = classId & MASK_PROJECT;
+
     u64 target = ancestorId & MASK_CLASS;
+
     u64 current = classId;
+
     u32 budget = chainCount(proj) + 2u;
+
     while (budget-- > 0u) {
         u64 cc = current & MASK_CLASS;
-        if (cc == target)
+
+        if (cc == target) 
             return 1;
+
         u64 parent = Type_getParentClass(current);
-        if ((parent & MASK_CLASS) == cc)
+
+        if ((parent & MASK_CLASS) == cc) 
             return 0;
+
         current = (parent & MASK_CLASS) | proj;
     }
+
     return 0;
 }
 
@@ -248,6 +311,7 @@ u32 Type_isSingleton(u64 typeId) {
 
 u32 Type_isArray(u64 typeId) {
     u64 form = typeId & MASK_FORM;
+
     return form == FORM_ARRAY || form == FORM_ARRAY_SOA || form == FORM_ARRAY_AOS || form == FORM_STRUCT_COEXISTENT;
 }
 
@@ -261,6 +325,7 @@ u32 Type_isStructSingleton(u64 typeId) {
 
 u32 Type_isStructArray(u64 typeId) {
     u64 form = typeId & MASK_FORM;
+
     return form == FORM_STRUCT_ARRAY || form == FORM_ARRAY_SOA || form == FORM_ARRAY_AOS || form == FORM_STRUCT_COEXISTENT;
 }
 
@@ -282,6 +347,7 @@ u32 Type_isStructPointer(u64 typeId) {
 
 u32 Type_isPrimitive(u64 typeId) {
     u64 form = typeId & MASK_FORM;
+
     return form == FORM_SINGLETON || form == FORM_ARRAY || form == FORM_POINTER;
 }
 

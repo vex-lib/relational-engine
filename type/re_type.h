@@ -99,6 +99,75 @@
 #define Type_make(proj, form, classId) (((proj) & MASK_PROJECT) | ((form) & MASK_FORM) | SUGAR_VEX | ((classId) & MASK_CLASS))
 
 //
+// Shared scalar & plain-container class IDs (compatible with vexspoke's legacy table).
+//
+#define ID_INT          0x0001u
+#define ID_LONG         0x0002u
+#define ID_f64          0x0003u
+#define ID_FIXED64      0x0004u
+#define ID_FLOAT        0x0005u
+#define ID_SHORT        0x0006u
+#define ID_SPINLOCK     0x0007u
+#define ID_RING_BUFFER  0x0008u
+#define ID_BIT8         0x0009u
+#define ID_BIT16        0x000Au
+#define ID_BIT32        0x000Bu
+#define ID_BIT64        0x000Cu
+#define ID_VEC2         0x000Du
+#define ID_VEC3         0x000Eu
+#define ID_ENTITY       0x000Fu
+#define ID_BYTE         0x0010u
+#define ID_STRING       0x0011u
+#define ID_VARIABLE     0x0016u
+#define ID_ARRAYS       0x0018u
+#define ID_STRIDE       0x001Bu
+#define ID_LIST         0x001Cu
+#define ID_MAP          0x001Du
+#define ID_SET          0x001Eu
+#define ID_STACK        0x001Fu
+#define ID_DEQUE        0x0020u
+#define ID_MIN_HEAP     0x0021u
+#define ID_SPARSE_SET   0x0022u
+#define ID_RANDOM       0x0023u
+#define ID_INDEX_RANDOM 0x0024u
+#define ID_QUEUE        0x0027u
+#define ID_ARGUMENTS    0x0028u
+#define ID_VEC4         0x0029u
+#define ID_MAT3         0x002Au
+#define ID_MAT4         0x002Bu
+#define ID_QUATERNION   0x002Cu
+#define ID_POINT        0x002Du
+#define ID_RECT         0x002Eu
+#define ID_CHUNKED_LIST 0x008Au
+
+#define TYPE_INT_SINGLETON     (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_INT)
+#define TYPE_INT_ARRAY         (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_INT)
+#define TYPE_INT_POINTER       (SUGAR_VEX | PROJ_VEXSPOKE | FORM_POINTER   | ID_INT)
+#define TYPE_LONG_ARRAY        (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_LONG)
+#define TYPE_FLOAT_ARRAY       (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_FLOAT)
+#define TYPE_f64_ARRAY         (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_f64)
+#define TYPE_BYTE_ARRAY        (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_BYTE)
+#define TYPE_STRING_ARRAY      (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_STRING)
+#define TYPE_SPIN_LOCK         (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_SPINLOCK)
+#define TYPE_RING_BUFFER       (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_RING_BUFFER)
+#define TYPE_LIST              (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_LIST)
+#define TYPE_ARRAY             (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_ARRAYS)
+#define TYPE_CHUNKED_LIST      (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_CHUNKED_LIST)
+#define TYPE_STACK             (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_STACK)
+#define TYPE_DEQUE             (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_DEQUE)
+#define TYPE_QUEUE             (SUGAR_VEX | PROJ_VEXSPOKE | FORM_ARRAY     | ID_QUEUE)
+#define TYPE_MAP               (SUGAR_VEX | PROJ_VEXSPOKE | FORM_POINTER   | ID_MAP)
+#define TYPE_SET               (SUGAR_VEX | PROJ_VEXSPOKE | FORM_POINTER   | ID_SET)
+#define TYPE_VEC2_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_VEC2)
+#define TYPE_VEC3_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_VEC3)
+#define TYPE_VEC4_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_VEC4)
+#define TYPE_MAT3_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_MAT3)
+#define TYPE_MAT4_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_MAT4)
+#define TYPE_QUATERNION_SINGLETON (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_QUATERNION)
+#define TYPE_POINT_SINGLETON   (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_POINT)
+#define TYPE_RECT_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_RECT)
+
+//
 // TYPES FOR RELATIONAL ENGINE SPECIFICALLY!!!
 //
 // Relational Engine class registry (project byte 0x07). The class numbers are
