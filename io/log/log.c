@@ -81,44 +81,60 @@ static const u8 LOG_MAGIC[7] = { 0x41, 0x4E, 0x54, 0x49, 0x4C, 0x4F, 0x47 };
 /** Return monotonic time as nanoseconds for event timestamps. */
 static i64 monotonic_nanos() {
     struct timespec ts;
+
     clock_gettime(CLOCK_MONOTONIC, &ts);
+
     return (i64)ts.tv_sec * 1000000000L + (i64)ts.tv_nsec;
 }
 
 /** Encode a 32-bit value in big-endian byte order at the requested offset. */
 static fn put_be32(u8 *b, bytes off, u32 v) {
     b[off] = (u8)(v >> 24);
+
     b[off + 1] = (u8)(v >> 16);
+
     b[off + 2] = (u8)(v >> 8);
+
     b[off + 3] = (u8)v;
 }
 
 /** Encode a 64-bit value in big-endian byte order at the requested offset. */
 static fn put_be64(u8 *b, bytes off, i64 v) {
-    for (i32 i = 0; i < 8; i++)
+    for (i32 i = 0; i < 8; i++) 
         b[off + (bytes)i] = (u8)((u64)v >> (56 - 8 * i));
 }
 
 /** Write the binary log magic, version, and fixed record-size header. */
 static bool write_header(Log *log) {
     u8 header[LOG_HEADER_BYTES];
+
     memcpy(header, LOG_MAGIC, 7);
+
     header[7] = 0x01;
+
     put_be32(header, 8, LOG_RECORD_BYTES);
+
     FileWriter_write(&(*log).writer, header, LOG_HEADER_BYTES);
+
     return true;
 }
 
 /** Atomically reserve the next producer slot, returning -1 when the ring is full. */
 static i64 claim_slot(Log *log) {
     _Atomic i64 *head = (_Atomic i64*) ((*log).arena + LOG_HEAD_OFF);
+
     _Atomic i64 *tail = (_Atomic i64*) ((*log).arena + LOG_TAIL_OFF);
+
     i64 h;
+
     i64 t;
+
     do {
         h = atomic_load_explicit(head, memory_order_acquire);
+
         t = atomic_load_explicit(tail, memory_order_acquire);
-        if (h - t >= (i64)(*log).slot_count)
+
+        if (h - t >= (i64)(*log).slot_count) 
             return -1;
     } while (!atomic_compare_exchange_strong_explicit(head, &h, h + 1,
                                                       memory_order_acq_rel,
@@ -129,134 +145,205 @@ static i64 claim_slot(Log *log) {
 /** Convert one native ring slot to the on-disk big-endian record representation. */
 static fn write_slot(Log *log, const u8 *slot) {
     u8 rec[LOG_RECORD_BYTES];
+
     u32 kind;
+
     i64 ts;
+
     memcpy(&kind, slot, 4);
+
     memcpy(&ts, slot + 8, 8);
+
     put_be32(rec, 0, kind);
+
     put_be64(rec, 4, ts);
+
     for (i32 i = 0; i < 5; i++) {
         i64 v;
+
         memcpy(&v, slot + 16 + (bytes)i * 8, 8);
+
         put_be64(rec, 12 + (bytes)i * 8, v);
     }
+
     FileWriter_write(&(*log).writer, rec, LOG_RECORD_BYTES);
 }
 
 /** Drain consecutive published records from the ring to the file writer. */
 static u64 drain_and_write(Log *log) {
     _Atomic i64 *head = (_Atomic i64*) ((*log).arena + LOG_HEAD_OFF);
+
     _Atomic i64 *tail = (_Atomic i64*) ((*log).arena + LOG_TAIL_OFF);
+
     i64 h = atomic_load_explicit(head, memory_order_acquire);
+
     i64 t = atomic_load_explicit(tail, memory_order_acquire);
+
     u64 wrote = 0;
+
     while (t < h) {
         bytes slot_idx = (bytes)t & (*log).slot_mask;
+
         u8 *slot = (*log).arena + LOG_SLOT_BASE + slot_idx * (*log).slot_size;
+
         _Atomic i32 *valid = (_Atomic i32*) (slot + 4);
-        if (atomic_load_explicit(valid, memory_order_acquire) != 1)
+
+        if (atomic_load_explicit(valid, memory_order_acquire) != 1) 
             break;
+
         write_slot(log, slot);
+
         atomic_store_explicit(valid, 0, memory_order_release);
+
         t++;
+
         atomic_store_explicit(tail, t, memory_order_release);
+
         wrote++;
     }
-    if (wrote > 0)
+
+    if (wrote > 0) 
         (*log).written += wrote;
+
     return wrote;
 }
 
 /** Writer thread loop: drain records, periodically flush, then drain once on stop. */
 static any writer_main(any arg) {
     Log *log = (Log*) arg;
+
     u64 idle = 0;
+
     while (atomic_load_explicit(&(*log).running, memory_order_acquire)) {
         u64 wrote = drain_and_write(log);
+
         if (wrote > 0) {
             idle = 0;
+
             if ((*log).written - (*log).flush_point >= LOG_FLUSH_EVERY) {
                 (*log).flush_point = (*log).written;
+
                 FileWriter_flush(&(*log).writer);
             }
+
             continue;
         }
+
         idle++;
+
         if (idle >= LOG_IDLE_FLUSH_TICKS) {
             idle = 0;
+
             (*log).flush_point = (*log).written;
+
             FileWriter_flush(&(*log).writer);
         }
+
         struct timespec ts = { .tv_sec = 0, .tv_nsec = LOG_IDLE_POLL_NANOS };
+
         nanosleep(&ts, nullptr);
     }
+
     drain_and_write(log);
+
     FileWriter_flush(&(*log).writer);
+
     return nullptr;
 }
 
 /** Initialize the bounded record ring, file sink, counters, and writer thread. */
 bool Log_init(Log *log, const char *path, bytes slot_count) {
-    if (!log || !path)
+    if (!log || !path) 
         return false;
 
     memset(log, 0, sizeof(*log));
+
     (*log).slot_count = 1;
-    while ((*log).slot_count < slot_count)
+
+    while ((*log).slot_count < slot_count) 
         (*log).slot_count <<= 1;
+
     (*log).slot_mask = (*log).slot_count - 1;
+
     (*log).slot_size = LOG_SLOT_SIZE;
 
     strncpy((*log).path, path, FILE_PATH_MAX - 1);
+
     (*log).path[FILE_PATH_MAX - 1] = '\0';
 
-    if (!FileWriter_open(&(*log).writer, path))
+    if (!FileWriter_open(&(*log).writer, path)) 
         return false;
+
     write_header(log);
 
     bytes arenaBytes = LOG_SLOT_BASE + (*log).slot_count * (*log).slot_size;
+
     (*log).arena = (u8*) Memory_alloc(TYPE_LOG_SINGLETON, arenaBytes);
+
     if (!(*log).arena) {
         FileWriter_close(&(*log).writer);
+
         return false;
     }
+
     memset((*log).arena, 0, arenaBytes);
 
     (*log).enabled = true;
+
     (*log).active = true;
+
     atomic_init(&(*log).running, true);
+
     atomic_init(&(*log).appended, 0);
+
     atomic_init(&(*log).dropped, 0);
+
     (*log).written = 0;
+
     (*log).flush_point = 0;
 
     if (pthread_create(&(*log).thread, nullptr, writer_main, log) != 0) {
         atomic_store(&(*log).running, false);
+
         Memory_free((*log).arena);
+
         (*log).arena = nullptr;
+
         FileWriter_close(&(*log).writer);
+
         (*log).enabled = false;
+
         return false;
     }
+
     (*log).thread_started = true;
+
     return true;
 }
 
 /** Stop and join the writer, drain remaining records, and release its ring and file sink. */
 fn Log_shutdown(Log *log) {
-    if (!log)
+    if (!log) 
         return;
+
     atomic_store(&(*log).running, false);
+
     if ((*log).thread_started) {
         pthread_join((*log).thread, nullptr);
+
         (*log).thread_started = false;
     }
+
     if ((*log).arena) {
         drain_and_write(log);
+
         Memory_free((*log).arena);
+
         (*log).arena = nullptr;
     }
+
     FileWriter_close(&(*log).writer);
+
     (*log).enabled = false;
 }
 
@@ -272,7 +359,7 @@ bool Log_isActive(const Log *log) {
 
 /** Change the append gate when the log sink is enabled. */
 fn Log_setActive(Log *log, bool on) {
-    if ((*log).enabled)
+    if ((*log).enabled) 
         (*log).active = on;
 }
 
@@ -299,28 +386,43 @@ u64 Log_written(const Log *log) {
 /** Publish a timestamped event and five values, or increment dropped when the ring has no slot. */
 fn Log_append(Log *log, i32 kind, i64 v0, i64 v1, i64 v2,
                 i64 v3, i64 v4) {
-    if (!log || !(*log).enabled || !(*log).active || !(*log).arena)
+    if (!log || !(*log).enabled || !(*log).active || !(*log).arena) 
         return;
+
     i64 index = claim_slot(log);
+
     if (index < 0) {
         atomic_fetch_add_explicit(&(*log).dropped, 1, memory_order_relaxed);
+
         return;
     }
+
     bytes slot_idx = (bytes)index & (*log).slot_mask;
+
     u8 *slot = (*log).arena + LOG_SLOT_BASE + slot_idx * (*log).slot_size;
 
     u32 k = (u32)kind;
+
     memcpy(slot, &k, 4);
+
     i64 ts = monotonic_nanos();
+
     memcpy(slot + 8, &ts, 8);
+
     memcpy(slot + 16, &v0, 8);
+
     memcpy(slot + 24, &v1, 8);
+
     memcpy(slot + 32, &v2, 8);
+
     memcpy(slot + 40, &v3, 8);
+
     memcpy(slot + 48, &v4, 8);
 
     _Atomic i32 *valid = (_Atomic i32*) (slot + 4);
+
     atomic_store_explicit(valid, 1, memory_order_release);
+
     atomic_fetch_add_explicit(&(*log).appended, 1, memory_order_relaxed);
 }
 
