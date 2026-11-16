@@ -57,17 +57,19 @@ static _Atomic u32 s_tags[THREAD_REGISTRY_DEFAULT_SIZE];
 
 i32 ThreadRegistry_index() {
     u64 tid = (u64)pthread_self();
+
     i32 index = (i32)(tid & (THREAD_REGISTRY_DEFAULT_SIZE - 1));
 
     while (true) {
         u64 registered = atomic_load_explicit(&s_table[index], memory_order_acquire);
 
-        if (registered == tid)
+        if (registered == tid) 
             return index;
 
         if (registered == 0) {
             u64 expected = 0;
-            if (atomic_compare_exchange_strong(&s_table[index], &expected, tid))
+
+            if (atomic_compare_exchange_strong(&s_table[index], &expected, tid)) 
                 return index;
         }
 
@@ -76,11 +78,15 @@ i32 ThreadRegistry_index() {
 }
 
 fn ThreadRegistry_setTag(i32 index, u32 tag) {
-    if (index < 0 || index >= THREAD_REGISTRY_DEFAULT_SIZE) return;
+    if (index < 0 || index >= THREAD_REGISTRY_DEFAULT_SIZE) 
+       return;
+
     atomic_store_explicit(&s_tags[index], tag, memory_order_release);
 }
 
 u32 ThreadRegistry_tag(i32 index) {
-    if (index < 0 || index >= THREAD_REGISTRY_DEFAULT_SIZE) return THREAD_TAG_NONE;
+    if (index < 0 || index >= THREAD_REGISTRY_DEFAULT_SIZE) 
+       return THREAD_TAG_NONE;
+
     return atomic_load_explicit(&s_tags[index], memory_order_acquire);
 }
