@@ -111,13 +111,17 @@ static u8 *Memory_alignUp(const u8 *raw) {
  */
 static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
     u64 hash = 1469598103934665603ull;
+
     const u64 words[3] = { typeId, length, pointer };
+
     for (i32 w = 0; w < 3; w++) {
         for (i32 i = 0; i < 8; i++) {
             hash ^= (words[w] >> (i * 8)) & 0xFFull;
+
             hash *= 1099511628211ull;
         }
     }
+
     return hash | 1ull;
 }
 
@@ -127,8 +131,11 @@ static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
  */
 static fn Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
     (*h).typeId = typeId;
+
     (*h).length = (u64) numBytes;
+
     (*h).pointer = (u64) (pointer) ((u8*) h + sizeof(MemoryHeader));
+
     (*h).hash = Memory_headerHash((*h).typeId, (*h).length, (*h).pointer);
 }
 
