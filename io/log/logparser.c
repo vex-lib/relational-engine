@@ -57,15 +57,17 @@ static u32 read_be32(const u8 *b) {
 /** Decode a 64-bit big-endian integer from eight input bytes. */
 static i64 read_be64(const u8 *b) {
     u64 v = 0;
-    for (i32 i = 0; i < 8; i++)
+
+    for (i32 i = 0; i < 8; i++) 
         v = (v << 8) | (u64)b[i];
+
     return (i64)v;
 }
 
 /** Validate the format magic, version, and expected fixed record size. */
 static bool is_log_header(const u8 *h) {
-    for (i32 i = 0; i < 7; i++)
-        if (h[i] != LOGPARSER_MAGIC[i])
+    for (i32 i = 0; i < 7; i++) 
+        if (h[i] != LOGPARSER_MAGIC[i]) 
             return false;
     return h[7] == 0x01 && read_be32(h + 8) == LOGPARSER_RECORD_BYTES;
 }
@@ -73,50 +75,73 @@ static bool is_log_header(const u8 *h) {
 /** Open a path and determine whether its leading bytes form a supported log header. */
 bool LogParser_isLogFile(const char *path) {
     File *f = File_open(path, FILE_MODE_READ);
-    if (!f)
+
+    if (!f) 
         return false;
+
     u8 h[LOGPARSER_HEADER_BYTES];
+
     i64 n = File_read(f, h, LOGPARSER_HEADER_BYTES);
+
     bool ok = n == LOGPARSER_HEADER_BYTES && is_log_header(h);
+
     File_close(f);
+
     return ok;
 }
 
 /** Return the number of complete records in a valid log, or -1 when its header cannot be read. */
 i64 LogParser_count(const char *path) {
     File *f = File_open(path, FILE_MODE_READ);
-    if (!f)
+
+    if (!f) 
         return -1;
+
     i64 size = File_size(f);
+
     if (size < LOGPARSER_HEADER_BYTES) {
         File_close(f);
+
         return -1;
     }
+
     u8 h[LOGPARSER_HEADER_BYTES];
+
     if (File_read(f, h, LOGPARSER_HEADER_BYTES) != LOGPARSER_HEADER_BYTES
         || !is_log_header(h)) {
         File_close(f);
+
         return -1;
     }
+
     File_close(f);
+
     return (size - LOGPARSER_HEADER_BYTES) / LOGPARSER_RECORD_BYTES;
 }
 
 /** Stream complete decoded records to the callback and return the number delivered. */
 i64 LogParser_parse(const char *path, LogRecordFn handler, any userdata) {
-    if (!handler)
+    if (!handler) 
         return -1;
+
     File *f = File_open(path, FILE_MODE_READ);
-    if (!f)
+
+    if (!f) 
         return -1;
+
     u8 h[LOGPARSER_HEADER_BYTES];
+
     if (File_read(f, h, LOGPARSER_HEADER_BYTES) != LOGPARSER_HEADER_BYTES
         || !is_log_header(h)) {
         File_close(f);
+
         return -1;
     }
+
     u8 rec[LOGPARSER_RECORD_BYTES];
+
     i64 count = 0;
+
     while (File_read(f, rec, LOGPARSER_RECORD_BYTES) == LOGPARSER_RECORD_BYTES) {
         handler(userdata,
                 (i32)read_be32(rec),
@@ -128,7 +153,9 @@ i64 LogParser_parse(const char *path, LogRecordFn handler, any userdata) {
                 read_be64(rec + 44));
         count++;
     }
+
     File_close(f);
+
     return count;
 }
 
@@ -138,10 +165,14 @@ i32 LogParser_formatRecord(char *out, bytes out_cap, i32 kind, i64 ts,
                            i64 v0, i64 v1, i64 v2,
                            i64 v3, i64 v4) {
     d64 ms = base_ts <= 0 ? 0.0 : (d64)(ts - base_ts) / 1000000.0;
+
     i64 rounded = (i64)(ms * 1000.0 + (ms >= 0 ? 0.5 : -0.5));
+
     i64 whole = rounded / 1000;
+
     i64 frac = rounded % 1000;
-    if (frac < 0)
+
+    if (frac < 0) 
         frac = -frac;
 
     i32 n = snprintf(out, out_cap, "%lld.%03lld ms  %s  %lld  %lld  %lld  %lld  %lld",
@@ -149,8 +180,9 @@ i32 LogParser_formatRecord(char *out, bytes out_cap, i32 kind, i64 ts,
                      name ? name : LogParser_kindName(kind),
                      (i64)v0, (i64)v1, (i64)v2,
                      (i64)v3, (i64)v4);
-    if (n < 0 || (bytes)n >= out_cap)
+    if (n < 0 || (bytes)n >= out_cap) 
         return -1;
+
     return n;
 }
 
