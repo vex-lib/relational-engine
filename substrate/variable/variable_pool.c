@@ -99,20 +99,28 @@ static SpinLock s_lock = SPIN_LOCK_INIT;
 // zero-padded 24-byte names through one indirection per probe. Lock held.
 static i32 search_order(const char key[24]) {
     u32 *order = s_pool.order;
+
     StringSlot *slots = s_pool.slots;
+
     i32 lo = 0;
+
     i32 hi = (i32) s_pool.count;
+
     while (lo < hi) {
         i32 mid = lo + (hi - lo) / 2;
+
         u32 s = order[mid];
+
         i32 c = memcmp(slots[s].name, key, 24);
-        if (c < 0)
+
+        if (c < 0) 
             lo = mid + 1;
-        else if (c > 0)
+        else if (c > 0) 
             hi = mid;
-        else
+        else 
             return (i32) s;
     }
+
     return -lo - 1;
 }
 
@@ -120,168 +128,260 @@ static i32 search_order(const char key[24]) {
 // verbatim then rewrites every self link — absolute addresses change on move.
 static bool grow() {
     u32 cap = s_pool.capacity * 2;
-    if (cap < s_pool.capacity)
+
+    if (cap < s_pool.capacity) 
         return false;
-    if (cap == 0)
+
+    if (cap == 0) 
         cap = STRING_POOL_DEFAULT_CAPACITY;
+
     StringSlot *slots = (StringSlot*) MemoryArena_alloc(s_pool.arena, TYPE_STRING_POOL, (bytes) cap * sizeof(StringSlot));
-    if (!slots)
+
+    if (!slots) 
         return false;
+
     u32 *order = (u32*) MemoryArena_alloc(s_pool.arena, TYPE_VARIABLE_POOL_ORDER, (bytes) cap * sizeof(u32));
+
     if (!order) {
         MemoryArena_free(s_pool.arena, slots);
+
         return false;
     }
+
     for (u32 i = 0; i < s_pool.count; i++) {
         slots[i] = s_pool.slots[i];
+
         slots[i].self = (u64) (pointer) &slots[i];
+
         order[i] = s_pool.order[i];
     }
-    if (s_pool.slots)
+
+    if (s_pool.slots) 
         MemoryArena_free(s_pool.arena, s_pool.slots);
-    if (s_pool.order)
+
+    if (s_pool.order) 
         MemoryArena_free(s_pool.arena, s_pool.order);
+
     s_pool.slots = slots;
+
     s_pool.order = order;
+
     s_pool.capacity = cap;
+
     return true;
 }
 
 bool StringPool_init(MemoryArena *arena) {
-    if (!arena)
+    if (!arena) 
         return false;
+
     SpinLock_lock(&s_lock);
+
     if (s_pool.magic == STRING_POOL_MAGIC) {
         SpinLock_unlock(&s_lock);
+
         return true;
     }
+
     s_pool.magic = 0;
+
     s_pool.arena = arena;
+
     s_pool.slots = nullptr;
+
     s_pool.order = nullptr;
+
     s_pool.count = 0;
+
     s_pool.capacity = 0;
+
     bool ok = grow();
-    if (ok)
+
+    if (ok) 
         s_pool.magic = STRING_POOL_MAGIC;
-    else
+    else 
         s_pool.arena = nullptr;
+
     SpinLock_unlock(&s_lock);
+
     return ok;
 }
 
 fn StringPool_shutdown() {
     SpinLock_lock(&s_lock);
+
     s_pool.magic = 0;
+
     if (s_pool.arena) {
-        if (s_pool.slots)
+        if (s_pool.slots) 
             MemoryArena_free(s_pool.arena, s_pool.slots);
-        if (s_pool.order)
+
+        if (s_pool.order) 
             MemoryArena_free(s_pool.arena, s_pool.order);
     }
+
     s_pool.slots = nullptr;
+
     s_pool.order = nullptr;
+
     s_pool.count = 0;
+
     s_pool.capacity = 0;
+
     s_pool.arena = nullptr;
+
     SpinLock_unlock(&s_lock);
 }
 
 ;;INTENTION("23-char names: fixed 32B slots (24B name + 8B self) keep the pool indexable with O(1) validity checks; longer names rejected cold — class/widget/probe names are short by convention and silent truncation would corrupt identity")
 i32 StringPool_intern(const char *str) {
-    if (!str || str[0] == '\0')
+    if (!str || str[0] == '\0') 
         return -1;
+
     bytes len = strlen(str);
-    if (len > STRING_POOL_NAME_MAX)
+
+    if (len > STRING_POOL_NAME_MAX) 
         return -1;
+
     char key[24];
+
     memset(key, 0, sizeof(key));
+
     memcpy(key, str, len);
+
     SpinLock_lock(&s_lock);
+
     if (s_pool.magic != STRING_POOL_MAGIC) {
         SpinLock_unlock(&s_lock);
+
         return -1;
     }
+
     i32 at = search_order(key);
+
     if (at >= 0) {
         SpinLock_unlock(&s_lock);
+
         return at;
     }
+
     if (s_pool.count >= s_pool.capacity && !grow()) {
         SpinLock_unlock(&s_lock);
+
         return -1;
     }
+
     at = search_order(key);
+
     if (at >= 0) {
         SpinLock_unlock(&s_lock);
+
         return at;
     }
+
     u32 pos = (u32) (-(at + 1));
+
     u32 idx = s_pool.count;
+
     StringSlot *slots = s_pool.slots;
+
     u32 *order = s_pool.order;
+
     memset(&slots[idx], 0, sizeof(slots[idx]));
+
     memcpy(slots[idx].name, key, 24);
+
     slots[idx].self = (u64) (pointer) &slots[idx];
+
     memmove(&order[pos + 1], &order[pos], ((bytes) s_pool.count - pos) * sizeof(u32));
+
     order[pos] = idx;
+
     s_pool.count++;
+
     SpinLock_unlock(&s_lock);
+
     return (i32) idx;
 }
 
 i32 StringPool_find(const char *str) {
-    if (!str || str[0] == '\0')
+    if (!str || str[0] == '\0') 
         return -1;
+
     bytes len = strlen(str);
-    if (len > STRING_POOL_NAME_MAX)
+
+    if (len > STRING_POOL_NAME_MAX) 
         return -1;
+
     char key[24];
+
     memset(key, 0, sizeof(key));
+
     memcpy(key, str, len);
+
     SpinLock_lock(&s_lock);
+
     if (s_pool.magic != STRING_POOL_MAGIC) {
         SpinLock_unlock(&s_lock);
+
         return -1;
     }
+
     i32 at = search_order(key);
+
     SpinLock_unlock(&s_lock);
+
     return at >= 0 ? at : -1;
 }
 
 const StringSlot *StringPool_slot(u32 index) {
     SpinLock_lock(&s_lock);
+
     const StringSlot *out = nullptr;
-    if (s_pool.magic == STRING_POOL_MAGIC && index < s_pool.count)
+
+    if (s_pool.magic == STRING_POOL_MAGIC && index < s_pool.count) 
         out = &s_pool.slots[index];
+
     SpinLock_unlock(&s_lock);
+
     return out;
 }
 
 const char *StringPool_name(u32 index) {
     const StringSlot *slot = StringPool_slot(index);
+
     return slot ? (*slot).name : nullptr;
 }
 
 u32 StringPool_count() {
     SpinLock_lock(&s_lock);
+
     u32 n = s_pool.magic == STRING_POOL_MAGIC ? s_pool.count : 0;
+
     SpinLock_unlock(&s_lock);
+
     return n;
 }
 
 bool StringPool_isSlot(const_any ptr) {
-    if (!ptr)
+    if (!ptr) 
         return false;
+
     SpinLock_lock(&s_lock);
+
     bool ok = false;
+
     if (s_pool.magic == STRING_POOL_MAGIC) {
         const StringSlot *slot = (const StringSlot*) ptr;
+
         if ((*slot).self == (u64) (pointer) ptr) {
             const StringSlot *base = s_pool.slots;
+
             ok = slot >= base && slot < base + s_pool.capacity;
         }
     }
+
     SpinLock_unlock(&s_lock);
+
     return ok;
 }
