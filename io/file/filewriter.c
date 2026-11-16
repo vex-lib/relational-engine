@@ -50,14 +50,29 @@
 
 // filewriter.c — FileWriter port (Legacy: io/FileWriter.java).
 
+;;GETTER
+static inline bool FileWriter_openField(const FileWriter *w) { return (*w).open; }
+;;SETTER
+static inline fn FileWriter_setOpen(FileWriter *w, bool open) { (*w).open = open; }
+;;GETTER
+static inline FILE *FileWriter_out(const FileWriter *w) { return (*w).out; }
+;;SETTER
+static inline fn FileWriter_setOut(FileWriter *w, FILE *out) { (*w).out = out; }
+;;GETTER
+static inline char *FileWriter_bufferMut(FileWriter *w) { return (*w).buffer; }
+;;GETTER
+static inline u64 FileWriter_bytesWrittenField(const FileWriter *w) { return (*w).bytes_written; }
+;;SETTER
+static inline fn FileWriter_setBytesWritten(FileWriter *w, u64 bw) { (*w).bytes_written = bw; }
+
 /** Open a binary output path, creating missing parent directories and enabling full buffering. */
 bool FileWriter_open(FileWriter *w, const char *path) {
     if (!w || !path) 
         return false;
 
-    (*w).open = false;
+    FileWriter_setOpen(w, false);
 
-    (*w).bytes_written = 0;
+    FileWriter_setBytesWritten(w, 0);
 
     const char *slash = strrchr(path, '/');
 
@@ -77,48 +92,50 @@ bool FileWriter_open(FileWriter *w, const char *path) {
             return false;
     }
 
-    (*w).out = fopen(path, "wb");
+    FILE *out = fopen(path, "wb");
+    FileWriter_setOut(w, out);
 
-    if (!(*w).out) 
+    if (!out) 
         return false;
 
-    setvbuf((*w).out, (*w).buffer, _IOFBF, sizeof((*w).buffer));
+    setvbuf(out, FileWriter_bufferMut(w), _IOFBF, sizeof(((FileWriter) {0}).buffer));
 
-    (*w).open = true;
+    FileWriter_setOpen(w, true);
 
     return true;
 }
 
 /** Write one complete byte span when open, adding its length to the flushed-count field on success. */
 fn FileWriter_write(FileWriter *w, const u8 *data, bytes len) {
-    if (!(*w).open || len == 0) 
+    if (!FileWriter_openField(w) || len == 0) 
         return;
 
-    if (fwrite(data, 1, len, (*w).out) == len) 
-        (*w).bytes_written += len;
+    if (fwrite(data, 1, len, FileWriter_out(w)) == len) 
+        FileWriter_setBytesWritten(w, FileWriter_bytesWrittenField(w) + len);
 }
 
 /** Flush the stdio buffer when the writer is open. */
 fn FileWriter_flush(FileWriter *w) {
-    if ((*w).open) 
-        fflush((*w).out);
+    if (FileWriter_openField(w)) 
+        fflush(FileWriter_out(w));
 }
 
 /** Flush and close an open writer, then clear its handle and open flag. */
 fn FileWriter_close(FileWriter *w) {
-    if (!(*w).open) 
+    if (!FileWriter_openField(w)) 
         return;
 
-    fflush((*w).out);
+    FILE *out = FileWriter_out(w);
+    fflush(out);
 
-    fclose((*w).out);
+    fclose(out);
 
-    (*w).out = nullptr;
+    FileWriter_setOut(w, nullptr);
 
-    (*w).open = false;
+    FileWriter_setOpen(w, false);
 }
 
 /** Return the writer's tracked byte count. */
 u64 FileWriter_bytesWritten(const FileWriter *w) {
-    return (*w).bytes_written;
+    return FileWriter_bytesWrittenField(w);
 }

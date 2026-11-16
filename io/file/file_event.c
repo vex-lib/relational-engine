@@ -89,42 +89,98 @@ struct FileEventWatcher {
     bool running;
 };
 
+;;GETTER
+static inline char *FileEventWatcher_path(const FileEventWatcher *w) { return (*w).path; }
+;;GETTER
+static inline char **FileEventWatcher_pathPtr(FileEventWatcher *w) { return &(*w).path; }
+;;SETTER
+static inline fn FileEventWatcher_setPath(FileEventWatcher *w, char *p) { (*w).path = p; }
+;;GETTER
+static inline FileEventType FileEventWatcher_mask(const FileEventWatcher *w) { return (*w).mask; }
+;;SETTER
+static inline fn FileEventWatcher_setMask(FileEventWatcher *w, FileEventType m) { (*w).mask = m; }
+;;GETTER
+static inline FileEventCallback FileEventWatcher_callback(const FileEventWatcher *w) { return (*w).callback; }
+;;SETTER
+static inline fn FileEventWatcher_setCallback(FileEventWatcher *w, FileEventCallback cb) { (*w).callback = cb; }
+;;GETTER
+static inline any FileEventWatcher_userdata(const FileEventWatcher *w) { return (*w).userdata; }
+;;SETTER
+static inline fn FileEventWatcher_setUserdata(FileEventWatcher *w, any ud) { (*w).userdata = ud; }
+;;GETTER
+static inline pthread_mutex_t *FileEventWatcher_mutexMut(FileEventWatcher *w) { return &(*w).mutex; }
+;;GETTER
+static inline QueuedEvent *FileEventWatcher_queue(const FileEventWatcher *w) { return (*w).queue; }
+;;SETTER
+static inline fn FileEventWatcher_setQueue(FileEventWatcher *w, QueuedEvent *q) { (*w).queue = q; }
+;;GETTER
+static inline bytes FileEventWatcher_queueCount(const FileEventWatcher *w) { return (*w).queueCount; }
+;;SETTER
+static inline fn FileEventWatcher_setQueueCount(FileEventWatcher *w, bytes c) { (*w).queueCount = c; }
+;;GETTER
+static inline bytes FileEventWatcher_queueCapacity(const FileEventWatcher *w) { return (*w).queueCapacity; }
+;;SETTER
+static inline fn FileEventWatcher_setQueueCapacity(FileEventWatcher *w, bytes c) { (*w).queueCapacity = c; }
+;;GETTER
+static inline bool FileEventWatcher_running(const FileEventWatcher *w) { return (*w).running; }
+;;SETTER
+static inline fn FileEventWatcher_setRunning(FileEventWatcher *w, bool r) { (*w).running = r; }
+#if defined(VEX_PLATFORM_APPLE)
+;;GETTER
+static inline FSEventStreamRef FileEventWatcher_stream(const FileEventWatcher *w) { return (*w).stream; }
+;;SETTER
+static inline fn FileEventWatcher_setStream(FileEventWatcher *w, FSEventStreamRef s) { (*w).stream = s; }
+;;GETTER
+static inline dispatch_queue_t FileEventWatcher_dispatchQueue(const FileEventWatcher *w) {
+    return (*w).dispatchQueue;
+}
+;;SETTER
+static inline fn FileEventWatcher_setDispatchQueue(FileEventWatcher *w, dispatch_queue_t q) {
+    (*w).dispatchQueue = q;
+}
+#endif
+
 static fn enqueue(FileEventWatcher *watcher, const char *path, FileEventType type) {
     if (!watcher || !path) 
         return;
 
-    if (!(type & (*watcher).mask)) 
+    if (!(type & FileEventWatcher_mask(watcher))) 
         return;
 
-    pthread_mutex_lock(&(*watcher).mutex);
+    pthread_mutex_t *mtx = FileEventWatcher_mutexMut(watcher);
+    pthread_mutex_lock(mtx);
 
-    if ((*watcher).queueCount == (*watcher).queueCapacity) {
-        bytes newCap = (*watcher).queueCapacity ? (*watcher).queueCapacity * 2 : 16;
+    bytes qcount = FileEventWatcher_queueCount(watcher);
+    bytes qcap = FileEventWatcher_queueCapacity(watcher);
+    QueuedEvent *queue = FileEventWatcher_queue(watcher);
+    if (qcount == qcap) {
+        bytes newCap = qcap ? qcap * 2 : 16;
 
-        QueuedEvent *grown = (*watcher).queue
-            ? (QueuedEvent*) Memory_realloc((*watcher).queue, newCap * sizeof(QueuedEvent))
+        QueuedEvent *grown = queue
+            ? (QueuedEvent*) Memory_realloc(queue, newCap * sizeof(QueuedEvent))
             : (QueuedEvent*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, newCap * sizeof(QueuedEvent));
         if (!grown) {
-            pthread_mutex_unlock(&(*watcher).mutex);
+            pthread_mutex_unlock(mtx);
 
             return;
         }
 
-        (*watcher).queue = grown;
+        queue = grown;
+        FileEventWatcher_setQueue(watcher, queue);
 
-        (*watcher).queueCapacity = newCap;
+        FileEventWatcher_setQueueCapacity(watcher, newCap);
     }
 
-    (*watcher).queue[(*watcher).queueCount].path = (char*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, strlen(path)+1);
+    queue[qcount].path = (char*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, strlen(path)+1);
 
-    if ((*watcher).queue[(*watcher).queueCount].path) 
-       strcpy((*watcher).queue[(*watcher).queueCount].path, path);
+    if (queue[qcount].path) 
+       strcpy(queue[qcount].path, path);
 
-    (*watcher).queue[(*watcher).queueCount].type = type;
+    queue[qcount].type = type;
 
-    (*watcher).queueCount++;
+    FileEventWatcher_setQueueCount(watcher, qcount + 1u);
 
-    pthread_mutex_unlock(&(*watcher).mutex);
+    pthread_mutex_unlock(mtx);
 }
 
 #if defined(VEX_PLATFORM_APPLE)
@@ -179,62 +235,65 @@ FileEventWatcher *FileEventWatcher_create(const char *path, FileEventType mask,
     if (!watcher) 
         return nullptr;
 
-    (*watcher).path = (char*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, strlen(path)+1);
+    char *wpath = (char*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, strlen(path)+1);
+    FileEventWatcher_setPath(watcher, wpath);
 
-    if ((*watcher).path) 
-       strcpy((*watcher).path, path);
+    if (wpath) 
+       strcpy(wpath, path);
 
-    if (!(*watcher).path) {
+    if (!wpath) {
         Memory_free(watcher);
 
         return nullptr;
     }
 
-    (*watcher).mask = mask ? mask : FILE_EVENT_ALL;
+    FileEventWatcher_setMask(watcher, mask ? mask : FILE_EVENT_ALL);
 
-    (*watcher).callback = callback;
+    FileEventWatcher_setCallback(watcher, callback);
 
-    (*watcher).userdata = userdata;
+    FileEventWatcher_setUserdata(watcher, userdata);
 
-    pthread_mutex_init(&(*watcher).mutex, nullptr);
+    pthread_mutex_init(FileEventWatcher_mutexMut(watcher), nullptr);
 
-    (*watcher).running = false;
+    FileEventWatcher_setRunning(watcher, false);
 
     return watcher;
 }
 
 bool FileEventWatcher_start(FileEventWatcher *watcher) {
-    if (!watcher || (*watcher).running) 
+    if (!watcher || FileEventWatcher_running(watcher)) 
         return false;
 
 #if defined(VEX_PLATFORM_APPLE)
     FSEventStreamContext context = { 0, watcher, nullptr, nullptr, nullptr };
 
-    (*watcher).stream = FSEventStreamCreate(nullptr, fsCallback, &context,
+    FSEventStreamRef stream = FSEventStreamCreate(nullptr, fsCallback, &context,
                                          (CFArrayRef) CFArrayCreate(nullptr,
-                                             (const_any*) &(*watcher).path, 1,
+                                             (const_any*) FileEventWatcher_pathPtr(watcher), 1,
                                              &kCFTypeArrayCallBacks),
                                          kFSEventStreamEventIdSinceNow,
                                          0.25,
                                          kFSEventStreamCreateFlagFileEvents);
-    if (!(*watcher).stream) 
+    FileEventWatcher_setStream(watcher, stream);
+    if (!stream) 
         return false;
 
-    (*watcher).dispatchQueue = dispatch_queue_create("vex.file_event", DISPATCH_QUEUE_SERIAL);
+    dispatch_queue_t dq = dispatch_queue_create("vex.file_event", DISPATCH_QUEUE_SERIAL);
+    FileEventWatcher_setDispatchQueue(watcher, dq);
 
-    FSEventStreamSetDispatchQueue((*watcher).stream, (*watcher).dispatchQueue);
+    FSEventStreamSetDispatchQueue(stream, dq);
 
-    if (!FSEventStreamStart((*watcher).stream)) {
-        FSEventStreamInvalidate((*watcher).stream);
+    if (!FSEventStreamStart(stream)) {
+        FSEventStreamInvalidate(stream);
 
-        FSEventStreamRelease((*watcher).stream);
+        FSEventStreamRelease(stream);
 
-        (*watcher).stream = nullptr;
+        FileEventWatcher_setStream(watcher, nullptr);
 
         return false;
     }
 
-    (*watcher).running = true;
+    FileEventWatcher_setRunning(watcher, true);
 
     return true;
 #else
@@ -245,49 +304,54 @@ bool FileEventWatcher_start(FileEventWatcher *watcher) {
 }
 
 fn FileEventWatcher_stop(FileEventWatcher *watcher) {
-    if (!watcher || !(*watcher).running) 
+    if (!watcher || !FileEventWatcher_running(watcher)) 
         return;
 #if defined(VEX_PLATFORM_APPLE)
-    if ((*watcher).stream) {
-        FSEventStreamStop((*watcher).stream);
+    FSEventStreamRef stream = FileEventWatcher_stream(watcher);
+    if (stream) {
+        FSEventStreamStop(stream);
 
-        FSEventStreamInvalidate((*watcher).stream);
+        FSEventStreamInvalidate(stream);
 
-        FSEventStreamRelease((*watcher).stream);
+        FSEventStreamRelease(stream);
 
-        (*watcher).stream = nullptr;
+        FileEventWatcher_setStream(watcher, nullptr);
     }
 
-    if ((*watcher).dispatchQueue) {
-        dispatch_release((*watcher).dispatchQueue);
+    dispatch_queue_t dq = FileEventWatcher_dispatchQueue(watcher);
+    if (dq) {
+        dispatch_release(dq);
 
-        (*watcher).dispatchQueue = nullptr;
+        FileEventWatcher_setDispatchQueue(watcher, nullptr);
     }
 #endif
-    (*watcher).running = false;
+    FileEventWatcher_setRunning(watcher, false);
 }
 
 fn FileEventWatcher_pump(FileEventWatcher *watcher) {
     if (!watcher) 
         return;
 
-    pthread_mutex_lock(&(*watcher).mutex);
+    pthread_mutex_t *mtx = FileEventWatcher_mutexMut(watcher);
+    pthread_mutex_lock(mtx);
 
-    bytes count = (*watcher).queueCount;
+    bytes count = FileEventWatcher_queueCount(watcher);
 
-    QueuedEvent *events = (*watcher).queue;
+    QueuedEvent *events = FileEventWatcher_queue(watcher);
 
-    (*watcher).queue = nullptr;
+    FileEventWatcher_setQueue(watcher, nullptr);
 
-    (*watcher).queueCount = 0;
+    FileEventWatcher_setQueueCount(watcher, 0);
 
-    (*watcher).queueCapacity = 0;
+    FileEventWatcher_setQueueCapacity(watcher, 0);
 
-    pthread_mutex_unlock(&(*watcher).mutex);
+    pthread_mutex_unlock(mtx);
 
+    FileEventCallback cb = FileEventWatcher_callback(watcher);
+    any ud = FileEventWatcher_userdata(watcher);
     for (bytes i = 0; i < count; i++) {
-        if (events[i].path && (*watcher).callback) 
-            (*watcher).callback(events[i].path, events[i].type, (*watcher).userdata);
+        if (events[i].path && cb) 
+            cb(events[i].path, events[i].type, ud);
 
         Memory_free(events[i].path);
     }
@@ -303,11 +367,11 @@ fn FileEventWatcher_destroy(FileEventWatcher *watcher) {
 
     FileEventWatcher_pump(watcher);
 
-    pthread_mutex_destroy(&(*watcher).mutex);
+    pthread_mutex_destroy(FileEventWatcher_mutexMut(watcher));
 
-    Memory_free((*watcher).path);
+    Memory_free(FileEventWatcher_path(watcher));
 
-    Memory_free((*watcher).queue);
+    Memory_free(FileEventWatcher_queue(watcher));
 
     Memory_free(watcher);
 }

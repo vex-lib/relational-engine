@@ -73,12 +73,17 @@ TryValue TryValue_error(TryCode code) {
     return TryValue_2(0u, code);
 }
 
+;;GETTER
+static inline u64 TryValue_value(const TryValue *self) { return (*self).value; }
+;;GETTER
+static inline TryCode TryValue_code(const TryValue *self) { return (*self).code; }
+
 // Returns the stored scalar, or zero when self is nullptr.
 u64 TryValue_getValue(const TryValue *self) {
     if (!self) 
         return 0u;
 
-    return (*self).value;
+    return TryValue_value(self);
 }
 
 // Replaces the scalar payload when self is non-null.
@@ -94,7 +99,7 @@ TryCode TryValue_getCode(const TryValue *self) {
     if (!self) 
         return TRY_NULL_ARG;
 
-    return (*self).code;
+    return TryValue_code(self);
 }
 
 // Replaces the result code when self is non-null.
@@ -110,7 +115,7 @@ bool TryValue_isOk(const TryValue *self) {
     if (!self) 
         return false;
 
-    return (*self).code == TRY_OK;
+    return TryValue_code(self) == TRY_OK;
 }
 
 // Formats a value-oriented summary into dest and reports capacity truncation.
@@ -128,14 +133,14 @@ fn TryValue_toString(const TryValue *self, char *dest, bytes cap, bool *outTrunc
     }
 
     i32 written;
-
-    if ((*self).code == TRY_OK) {
+    TryCode code = TryValue_code(self);
+    if (code == TRY_OK) {
         written = snprintf(dest, cap, "TryValue(value=%llu, code=TRY_OK)",
-                           (u64) (*self).value);
+                           (u64) TryValue_value(self));
     } else {
         written = snprintf(dest, cap, "TryValue(code=%s: %s)",
-                           TryCode_name((*self).code),
-                           TryCode_message((*self).code));
+                           TryCode_name(code),
+                           TryCode_message(code));
     }
 
     if (written < 0 || (bytes) written >= cap) {
@@ -159,8 +164,7 @@ fn TryValue_toStringStruct(const TryValue *self, char *dest, bytes cap, bool *ou
     }
 
     i32 written = snprintf(dest, cap, "TryValue { value=%llu, code=%s }",
-                           (u64) (*self).value,
-                           TryCode_name((*self).code));
+                           (u64) TryValue_value(self), TryCode_name(TryValue_code(self)));
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
             *outTruncated = true;

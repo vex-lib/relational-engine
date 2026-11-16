@@ -38,14 +38,6 @@
 // the redirect the block carries. The hash vetoes the redirect's value without
 // constraining what it addresses, so an object and a primitive block are both
 // admissible and the id tells a reader which it is.
-/** Validate a header against its own stated fields. */
-static bool header_valid(const MemoryHeader *h) {
-    if (!h) 
-        return false;
-
-    return (*h).hash == Memory_headerHash((*h).typeId, (*h).length, (*h).pointer);
-}
-
 typedef struct FreeNode {
     struct FreeNode *next;
 } FreeNode;
@@ -76,6 +68,214 @@ typedef struct MemoryArena {
     u64 exhaustionCount;   // rejected requests since the last reset
     bool exhaustionReported;    // the epoch's one diagnostic was emitted
 } MemoryArena;
+
+;;GETTER
+static u64 MemoryHeader_hash(const MemoryHeader *h) {
+    return (*h).hash;
+}
+
+;;GETTER
+static u64 MemoryHeader_typeId(const MemoryHeader *h) {
+    return (*h).typeId;
+}
+
+;;GETTER
+static bytes MemoryHeader_length(const MemoryHeader *h) {
+    return (*h).length;
+}
+
+;;GETTER
+static any MemoryHeader_pointer(const MemoryHeader *h) {
+    return (*h).pointer;
+}
+
+;;GETTER
+static FreeNode *FreeNode_next(const FreeNode *node) {
+    return (*node).next;
+}
+
+;;SETTER
+static fn FreeNode_setNext(FreeNode *node, FreeNode *next) {
+    (*node).next = next;
+}
+
+;;GETTER
+static u32 SlabClass_slotSize(const SlabClass *slab) {
+    return (*slab).slot_size;
+}
+
+;;GETTER
+static u32 SlabClass_capacity(const SlabClass *slab) {
+    return (*slab).capacity;
+}
+
+;;GETTER
+static u32 SlabClass_count(const SlabClass *slab) {
+    return (*slab).count;
+}
+
+;;GETTER
+static u8 *SlabClass_arena(const SlabClass *slab) {
+    return (*slab).arena;
+}
+
+;;GETTER
+static FreeNode *SlabClass_freeHead(const SlabClass *slab) {
+    return (*slab).free_head;
+}
+
+;;GETTER
+static SpinLock *SlabClass_lockMut(SlabClass *slab) {
+    return &(*slab).lock;
+}
+
+;;SETTER
+static fn SlabClass_setSlotSize(SlabClass *slab, u32 slotSize) {
+    (*slab).slot_size = slotSize;
+}
+
+;;SETTER
+static fn SlabClass_setCapacity(SlabClass *slab, u32 capacity) {
+    (*slab).capacity = capacity;
+}
+
+;;SETTER
+static fn SlabClass_setCount(SlabClass *slab, u32 count) {
+    (*slab).count = count;
+}
+
+;;SETTER
+static fn SlabClass_setArena(SlabClass *slab, u8 *arena) {
+    (*slab).arena = arena;
+}
+
+;;SETTER
+static fn SlabClass_setFreeHead(SlabClass *slab, FreeNode *freeHead) {
+    (*slab).free_head = freeHead;
+}
+
+;;SETTER
+static fn SlabClass_setLock(SlabClass *slab, SpinLock lock) {
+    (*slab).lock = lock;
+}
+
+;;GETTER
+static SlabClass *MemoryArena_slabs(MemoryArena *a) {
+    return (*a).slabs;
+}
+
+;;GETTER
+static u8 *MemoryArena_masterArena(const MemoryArena *a) {
+    return (*a).masterArena;
+}
+
+;;GETTER
+static u8 *MemoryArena_masterRaw(const MemoryArena *a) {
+    return (*a).masterRaw;
+}
+
+;;GETTER
+static bytes MemoryArena_masterCapacity(const MemoryArena *a) {
+    return (*a).masterCapacity;
+}
+
+;;GETTER
+static u8 *MemoryArena_bumpArena(const MemoryArena *a) {
+    return (*a).bumpArena;
+}
+
+;;GETTER
+static bytes MemoryArena_bumpCapacity(const MemoryArena *a) {
+    return (*a).bumpCapacity;
+}
+
+;;GETTER
+static bytes MemoryArena_bumpOffset(const MemoryArena *a) {
+    return (*a).bumpOffset;
+}
+
+;;GETTER
+static SpinLock *MemoryArena_bumpLockMut(MemoryArena *a) {
+    return &(*a).bumpLock;
+}
+
+;;GETTER
+static bool MemoryArena_live(const MemoryArena *a) {
+    return (*a).live;
+}
+
+;;GETTER
+static u64 MemoryArena_exhaustionCountRaw(const MemoryArena *a) {
+    return (*a).exhaustionCount;
+}
+
+;;GETTER
+static bool MemoryArena_exhaustionReported(const MemoryArena *a) {
+    return (*a).exhaustionReported;
+}
+
+;;SETTER
+static fn MemoryArena_setMasterArena(MemoryArena *a, u8 *masterArena) {
+    (*a).masterArena = masterArena;
+}
+
+;;SETTER
+static fn MemoryArena_setMasterRaw(MemoryArena *a, u8 *masterRaw) {
+    (*a).masterRaw = masterRaw;
+}
+
+;;SETTER
+static fn MemoryArena_setMasterCapacity(MemoryArena *a, bytes masterCapacity) {
+    (*a).masterCapacity = masterCapacity;
+}
+
+;;SETTER
+static fn MemoryArena_setBumpArena(MemoryArena *a, u8 *bumpArena) {
+    (*a).bumpArena = bumpArena;
+}
+
+;;SETTER
+static fn MemoryArena_setBumpCapacity(MemoryArena *a, bytes bumpCapacity) {
+    (*a).bumpCapacity = bumpCapacity;
+}
+
+;;SETTER
+static fn MemoryArena_setBumpOffset(MemoryArena *a, bytes bumpOffset) {
+    (*a).bumpOffset = bumpOffset;
+}
+
+;;SETTER
+static fn MemoryArena_setBumpLock(MemoryArena *a, SpinLock bumpLock) {
+    (*a).bumpLock = bumpLock;
+}
+
+;;SETTER
+static fn MemoryArena_setInitLock(MemoryArena *a, SpinLock initLock) {
+    (*a).initLock = initLock;
+}
+
+;;SETTER
+static fn MemoryArena_setLive(MemoryArena *a, bool live) {
+    (*a).live = live;
+}
+
+;;SETTER
+static fn MemoryArena_setExhaustionCount(MemoryArena *a, u64 exhaustionCount) {
+    (*a).exhaustionCount = exhaustionCount;
+}
+
+;;SETTER
+static fn MemoryArena_setExhaustionReported(MemoryArena *a, bool exhaustionReported) {
+    (*a).exhaustionReported = exhaustionReported;
+}
+
+/** Validate a header against its own stated fields. */
+static bool header_valid(const MemoryHeader *h) {
+    if (!h) 
+        return false;
+
+    return MemoryHeader_hash(h) == Memory_headerHash(MemoryHeader_typeId(h), MemoryHeader_length(h), MemoryHeader_pointer(h));
+}
 
 static u32 s_slabSizes[SLAB_COUNT] = { 64, 128, 256, 512, 1024, 2048, 4096 };
 static u32 s_slabCaps[SLAB_COUNT] = { 32768, 32768, 16384, 8192, 4096, 2048, 2048 };
@@ -152,31 +352,33 @@ static i32 find_slab(bytes payload_bytes) {
 }
 /** Initialize a slab descriptor from its fixed class-size and capacity tables. */
 static fn slab_template(SlabClass *slab, u32 idx) {
-    (*slab).slot_size = s_slabSizes[idx];
+    SlabClass_setSlotSize(slab, s_slabSizes[idx]);
 
-    (*slab).capacity = s_slabCaps[idx];
+    SlabClass_setCapacity(slab, s_slabCaps[idx]);
 
-    (*slab).count = 0;
+    SlabClass_setCount(slab, 0);
 
-    (*slab).arena = nullptr;
+    SlabClass_setArena(slab, nullptr);
 
-    (*slab).free_head = nullptr;
+    SlabClass_setFreeHead(slab, nullptr);
 
-    (*slab).lock = SPIN_LOCK_INIT;
+    SlabClass_setLock(slab, SPIN_LOCK_INIT);
 }
 /** Allocate and partition an arena into initialized slab freelists and a bump region. */
 static bool arena_init(MemoryArena *a, bytes totalBytes) {
     if (!a) 
         return false;
 
+    SlabClass *slabs = MemoryArena_slabs(a);
+
     for (bytes s = 0; s < SLAB_COUNT; s++) 
-        slab_template(&(*a).slabs[s], (u32) s);
+        slab_template(&slabs[s], (u32) s);
 
-    (*a).initLock = SPIN_LOCK_INIT;
+    MemoryArena_setInitLock(a, SPIN_LOCK_INIT);
 
-    (*a).bumpLock = SPIN_LOCK_INIT;
+    MemoryArena_setBumpLock(a, SPIN_LOCK_INIT);
 
-    (*a).live = false;
+    MemoryArena_setLive(a, false);
 
     bytes cap = totalBytes > 0 ? totalBytes : ANTI_ARENA_DEFAULT_SIZE;
 
@@ -197,9 +399,13 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
     bytes left = alignedCap;
 
     for (bytes s = 0; s < SLAB_COUNT; s++) {
-        SlabClass *slab = &(*a).slabs[s];
+        SlabClass *slab = &slabs[s];
 
-        bytes need = (bytes)(*slab).capacity * (*slab).slot_size;
+        u32 slabCap = SlabClass_capacity(slab);
+
+        u32 sz = SlabClass_slotSize(slab);
+
+        bytes need = (bytes)slabCap * sz;
 
         if (need > left) {
             Memory_systemFree(raw);
@@ -207,16 +413,14 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
             return false;
         }
 
-        (*slab).arena = cur;
+        SlabClass_setArena(slab, cur);
 
-        (*slab).free_head = nullptr;
+        SlabClass_setFreeHead(slab, nullptr);
 
-        (*slab).count = 0;
+        SlabClass_setCount(slab, 0);
 
-        u32 sz = (*slab).slot_size;
-
-        for (bytes i = (*slab).capacity; i > 0; i--) {
-            u8 *slot_ptr = (*slab).arena + (i - 1) * sz;
+        for (bytes i = slabCap; i > 0; i--) {
+            u8 *slot_ptr = cur + (i - 1) * sz;
 
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
 
@@ -224,9 +428,9 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
 
             FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
 
-            (*node).next = (*slab).free_head;
+            FreeNode_setNext(node, SlabClass_freeHead(slab));
 
-            (*slab).free_head = node;
+            SlabClass_setFreeHead(slab, node);
         }
 
         cur += need;
@@ -234,37 +438,37 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
         left -= need;
     }
 
-    (*a).masterArena = master;
+    MemoryArena_setMasterArena(a, master);
 
-    (*a).masterRaw = raw;
+    MemoryArena_setMasterRaw(a, raw);
 
-    (*a).masterCapacity = alignedCap;
+    MemoryArena_setMasterCapacity(a, alignedCap);
 
-    (*a).bumpArena = cur;
+    MemoryArena_setBumpArena(a, cur);
 
-    (*a).bumpCapacity = left;
+    MemoryArena_setBumpCapacity(a, left);
 
-    (*a).bumpOffset = 0;
+    MemoryArena_setBumpOffset(a, 0);
 
-    (*a).live = true;
+    MemoryArena_setLive(a, true);
 
-    (*a).exhaustionCount = 0;
+    MemoryArena_setExhaustionCount(a, 0);
 
-    (*a).exhaustionReported = false;
+    MemoryArena_setExhaustionReported(a, false);
 
     return true;
 }
 /** Allocate from owner storage only; exhaustion is reported loudly, once per epoch. */
 ;;INTENTION("exhaustion is a cold, terminal detection reached from a hot allocator: it reports once per epoch (never per call) and counts the rest, so the Cold-Strict hot-minimal contract holds for the success path while a failure can never be silent -- the Exhaustion Loudness Law's hot-path clause under the Conflict Triage Law")
 static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
-    if (!a || !(*a).live) 
+    if (!a || !MemoryArena_live(a)) 
         return nullptr;
 
     if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
-        (*a).exhaustionCount++;
+        MemoryArena_setExhaustionCount(a, MemoryArena_exhaustionCountRaw(a) + 1);
 
-        if (!(*a).exhaustionReported) {
-            (*a).exhaustionReported = true;
+        if (!MemoryArena_exhaustionReported(a)) {
+            MemoryArena_setExhaustionReported(a, true);
 
             THROW("memory: request %zu overflows the block size", numBytes);
         }
@@ -275,19 +479,19 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
     i32 s_idx = find_slab(numBytes);
 
     if (s_idx >= 0) {
-        SlabClass *slab = &(*a).slabs[s_idx];
+        SlabClass *slab = &MemoryArena_slabs(a)[s_idx];
 
-        SpinLock_lock(&(*slab).lock);
+        SpinLock_lock(SlabClass_lockMut(slab));
 
-        FreeNode *node = (*slab).free_head;
+        FreeNode *node = SlabClass_freeHead(slab);
 
         if (node) {
-            (*slab).free_head = (*node).next;
+            SlabClass_setFreeHead(slab, FreeNode_next(node));
 
-            (*slab).count++;
+            SlabClass_setCount(slab, SlabClass_count(slab) + 1);
         }
 
-        SpinLock_unlock(&(*slab).lock);
+        SpinLock_unlock(SlabClass_lockMut(slab));
 
         if (node) {
             MemoryHeader *h = (MemoryHeader*) ((u8*) node - sizeof(MemoryHeader));
@@ -302,14 +506,18 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
 
     bytes total = sizeof(MemoryHeader) + aligned_len;
 
-    SpinLock_lock(&(*a).bumpLock);
+    SpinLock_lock(MemoryArena_bumpLockMut(a));
 
-    if ((*a).bumpOffset + total <= (*a).bumpCapacity) {
-        u8 *slot_ptr = (*a).bumpArena + (*a).bumpOffset;
+    bytes bumpOffset = MemoryArena_bumpOffset(a);
 
-        (*a).bumpOffset += total;
+    bytes bumpCap = MemoryArena_bumpCapacity(a);
 
-        SpinLock_unlock(&(*a).bumpLock);
+    if (bumpOffset + total <= bumpCap) {
+        u8 *slot_ptr = MemoryArena_bumpArena(a) + bumpOffset;
+
+        MemoryArena_setBumpOffset(a, bumpOffset + total);
+
+        SpinLock_unlock(MemoryArena_bumpLockMut(a));
 
         MemoryHeader *h = (MemoryHeader*) slot_ptr;
 
@@ -318,15 +526,15 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
         return (any) (slot_ptr + sizeof(MemoryHeader));
     }
 
-    SpinLock_unlock(&(*a).bumpLock);
+    SpinLock_unlock(MemoryArena_bumpLockMut(a));
 
-    (*a).exhaustionCount++;
+    MemoryArena_setExhaustionCount(a, MemoryArena_exhaustionCountRaw(a) + 1);
 
-    if (!(*a).exhaustionReported) {
-        (*a).exhaustionReported = true;
+    if (!MemoryArena_exhaustionReported(a)) {
+        MemoryArena_setExhaustionReported(a, true);
 
         THROW("memory: arena exhausted, request %zu bytes (bump used %zu/%zu)",
-              numBytes, (*a).bumpOffset, (*a).bumpCapacity);
+              numBytes, MemoryArena_bumpOffset(a), MemoryArena_bumpCapacity(a));
     }
 
     return nullptr;
@@ -345,7 +553,9 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
     bool in_range = false;
 
-    if ((*a).masterArena && p >= (*a).masterArena + sizeof(MemoryHeader) && p < (*a).masterArena + (*a).masterCapacity) 
+    u8 *masterArena = MemoryArena_masterArena(a);
+
+    if (masterArena && p >= masterArena + sizeof(MemoryHeader) && p < masterArena + MemoryArena_masterCapacity(a)) 
         in_range = true;
 
     if (!in_range) 
@@ -358,16 +568,20 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
     SlabClass *slab = nullptr;
 
+    SlabClass *slabs = MemoryArena_slabs(a);
+
     for (bytes s = 0; s < SLAB_COUNT; s++) {
-        SlabClass *candidate = &(*a).slabs[s];
+        SlabClass *candidate = &slabs[s];
 
-        pointer base = (pointer) (*candidate).arena;
+        pointer base = (pointer) SlabClass_arena(candidate);
 
-        bytes extent = (bytes) (*candidate).capacity * (*candidate).slot_size;
+        u32 slotSize = SlabClass_slotSize(candidate);
+
+        bytes extent = (bytes) SlabClass_capacity(candidate) * slotSize;
 
         if (u >= base + sizeof(MemoryHeader) && u < base + extent) {
-            if ((u - base) % (*candidate).slot_size != sizeof(MemoryHeader)
-                || (*h).length > (*candidate).slot_size - sizeof(MemoryHeader))
+            if ((u - base) % slotSize != sizeof(MemoryHeader)
+                || MemoryHeader_length(h) > slotSize - sizeof(MemoryHeader))
                 return;
             slab = candidate;
 
@@ -382,35 +596,41 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
     FreeNode *node = (FreeNode*) userPtr;
 
-    SpinLock_lock(&(*slab).lock);
+    SpinLock_lock(SlabClass_lockMut(slab));
 
-    (*node).next = (*slab).free_head;
+    FreeNode_setNext(node, SlabClass_freeHead(slab));
 
-    (*slab).free_head = node;
+    SlabClass_setFreeHead(slab, node);
 
-    if ((*slab).count > 0) 
-        (*slab).count--;
+    u32 count = SlabClass_count(slab);
 
-    SpinLock_unlock(&(*slab).lock);
+    if (count > 0) 
+        SlabClass_setCount(slab, count - 1);
+
+    SpinLock_unlock(SlabClass_lockMut(slab));
 }
 /** Reset slab freelists and the bump cursor, invalidating all arena payloads. */
 static fn arena_freeAll(MemoryArena *a) {
-    if (!a || !(*a).live) 
+    if (!a || !MemoryArena_live(a)) 
         return;
 
+    SlabClass *slabs = MemoryArena_slabs(a);
+
     for (bytes s = 0; s < SLAB_COUNT; s++) {
-        SlabClass *slab = &(*a).slabs[s];
+        SlabClass *slab = &slabs[s];
 
-        SpinLock_lock(&(*slab).lock);
+        SpinLock_lock(SlabClass_lockMut(slab));
 
-        (*slab).free_head = nullptr;
+        SlabClass_setFreeHead(slab, nullptr);
 
-        (*slab).count = 0;
+        SlabClass_setCount(slab, 0);
 
-        u32 sz = (*slab).slot_size;
+        u32 sz = SlabClass_slotSize(slab);
 
-        for (bytes i = (*slab).capacity; i > 0; i--) {
-            u8 *slot_ptr = (*slab).arena + (i - 1) * sz;
+        u8 *slabArena = SlabClass_arena(slab);
+
+        for (bytes i = SlabClass_capacity(slab); i > 0; i--) {
+            u8 *slot_ptr = slabArena + (i - 1) * sz;
 
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
 
@@ -418,25 +638,25 @@ static fn arena_freeAll(MemoryArena *a) {
 
             FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
 
-            (*node).next = (*slab).free_head;
+            FreeNode_setNext(node, SlabClass_freeHead(slab));
 
-            (*slab).free_head = node;
+            SlabClass_setFreeHead(slab, node);
         }
 
-        SpinLock_unlock(&(*slab).lock);
+        SpinLock_unlock(SlabClass_lockMut(slab));
     }
 
-    SpinLock_lock(&(*a).bumpLock);
+    SpinLock_lock(MemoryArena_bumpLockMut(a));
 
-    memset((*a).bumpArena, 0, (*a).bumpOffset);
+    memset(MemoryArena_bumpArena(a), 0, MemoryArena_bumpOffset(a));
 
-    (*a).bumpOffset = 0;
+    MemoryArena_setBumpOffset(a, 0);
 
-    SpinLock_unlock(&(*a).bumpLock);
+    SpinLock_unlock(MemoryArena_bumpLockMut(a));
 
-    (*a).exhaustionCount = 0;
+    MemoryArena_setExhaustionCount(a, 0);
 
-    (*a).exhaustionReported = false;
+    MemoryArena_setExhaustionReported(a, false);
 }
 // Free-routing: headers carry no arena tag (ABI-stable by design), so the
 // owner is whoever's master range contains the header. Registry writes happen at
@@ -456,10 +676,10 @@ MemoryArena *Memory_arenaFor(any userPtr) {
     for (bytes i = 0; i < s_registryCount; i++) {
         MemoryArena *a = s_registry[i];
 
-        if (a && (*a).live && (*a).masterArena) {
-            u8 *base = (*a).masterArena;
+        if (a && MemoryArena_live(a) && MemoryArena_masterArena(a)) {
+            u8 *base = MemoryArena_masterArena(a);
 
-            if (p >= base + sizeof(MemoryHeader) && p < base + (*a).masterCapacity) {
+            if (p >= base + sizeof(MemoryHeader) && p < base + MemoryArena_masterCapacity(a)) {
                 MemoryHeader *h = (MemoryHeader*) (p - sizeof(MemoryHeader));
 
                 if (header_valid(h)) 
@@ -493,10 +713,10 @@ const MemoryHeader *Memory_safeHeader(const_any userPtr) {
     for (bytes i = 0; i < s_registryCount; i++) {
         MemoryArena *a = s_registry[i];
 
-        if (a && (*a).live && (*a).masterArena) {
-            u8 *base = (*a).masterArena;
+        if (a && MemoryArena_live(a) && MemoryArena_masterArena(a)) {
+            u8 *base = MemoryArena_masterArena(a);
 
-            if (p >= base + sizeof(MemoryHeader) && p < base + (*a).masterCapacity) {
+            if (p >= base + sizeof(MemoryHeader) && p < base + MemoryArena_masterCapacity(a)) {
                 const MemoryHeader *h = (const MemoryHeader*) (p - sizeof(MemoryHeader));
 
                 if (header_valid(h)) 
@@ -582,7 +802,7 @@ MemoryArena *MemoryArena_create(bytes totalBytes) {
     SpinLock_unlock(&s_registryLock);
 
     if (!placed) {
-        Memory_systemFree((*a).masterRaw);
+        Memory_systemFree(MemoryArena_masterRaw(a));
 
         Memory_systemFree(a);
 
@@ -608,17 +828,17 @@ fn MemoryArena_destroy(MemoryArena *a) {
 
     SpinLock_unlock(&s_registryLock);
 
-    (*a).live = false;
+    MemoryArena_setLive(a, false);
 
-    Memory_systemFree((*a).masterRaw);
+    Memory_systemFree(MemoryArena_masterRaw(a));
 
-    (*a).masterRaw = nullptr;
+    MemoryArena_setMasterRaw(a, nullptr);
 
-    (*a).masterArena = nullptr;
+    MemoryArena_setMasterArena(a, nullptr);
 
-    (*a).bumpArena = nullptr;
+    MemoryArena_setBumpArena(a, nullptr);
 
-    (*a).masterCapacity = 0;
+    MemoryArena_setMasterCapacity(a, 0);
 
     Memory_systemFree(a);
 }
@@ -673,23 +893,29 @@ fn MemoryArena_freeAll(MemoryArena *a) {
 bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCount) {
     bytes count = 0;
 
-    if (!a || !(*a).live) 
+    if (!a || !MemoryArena_live(a)) 
         return 0;
 
+    SlabClass *slabs = MemoryArena_slabs(a);
+
     for (bytes s = 0; s < SLAB_COUNT; s++) {
-        SlabClass *slab = &(*a).slabs[s];
+        SlabClass *slab = &slabs[s];
 
-        SpinLock_lock(&(*slab).lock);
+        SpinLock_lock(SlabClass_lockMut(slab));
 
-        u32 sz = (*slab).slot_size;
+        u32 sz = SlabClass_slotSize(slab);
 
-        for (bytes i = 0; i < (*slab).capacity; i++) {
-            u8 *slot_ptr = (*slab).arena + i * sz;
+        u8 *slabArena = SlabClass_arena(slab);
+
+        u32 cap = SlabClass_capacity(slab);
+
+        for (bytes i = 0; i < cap; i++) {
+            u8 *slot_ptr = slabArena + i * sz;
 
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
 
             if (header_valid(h)) {
-                if (typeId == 0 || (*h).typeId == typeId) {
+                if (typeId == 0 || MemoryHeader_typeId(h) == typeId) {
                     if (outArray && count < maxCount) 
                         outArray[count] = (any) (slot_ptr + sizeof(MemoryHeader));
 
@@ -698,29 +924,33 @@ bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCo
             }
         }
 
-        SpinLock_unlock(&(*slab).lock);
+        SpinLock_unlock(SlabClass_lockMut(slab));
     }
 
-    SpinLock_lock(&(*a).bumpLock);
+    SpinLock_lock(MemoryArena_bumpLockMut(a));
 
     bytes offset = 0;
 
-    while (offset < (*a).bumpOffset) {
-        bytes remaining = (*a).bumpOffset - offset;
+    bytes bumpOffset = MemoryArena_bumpOffset(a);
 
-        MemoryHeader *h = (MemoryHeader*) ((*a).bumpArena + offset);
+    u8 *bumpArena = MemoryArena_bumpArena(a);
+
+    while (offset < bumpOffset) {
+        bytes remaining = bumpOffset - offset;
+
+        MemoryHeader *h = (MemoryHeader*) (bumpArena + offset);
 
         if (remaining < sizeof(MemoryHeader)) 
             break;
 
-        bytes length = (*h).length;
+        bytes length = MemoryHeader_length(h);
 
         bytes total = sizeof(MemoryHeader) + ((length + MEMORY_ALIGN_MASK) & ~(u64) MEMORY_ALIGN_MASK);
 
         if (total > remaining) 
             break;
 
-        if (header_valid(h) && (typeId == 0 || (*h).typeId == typeId)) {
+        if (header_valid(h) && (typeId == 0 || MemoryHeader_typeId(h) == typeId)) {
             if (outArray && count < maxCount) 
                 outArray[count] = (u8*) h + sizeof(MemoryHeader);
 
@@ -730,7 +960,7 @@ bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCo
         offset += total;
     }
 
-    SpinLock_unlock(&(*a).bumpLock);
+    SpinLock_unlock(MemoryArena_bumpLockMut(a));
 
     return count;
 }
@@ -738,24 +968,26 @@ bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCo
 bytes MemoryArena_activeBytes(MemoryArena *a) {
     bytes total = 0;
 
-    if (!a || !(*a).live) 
+    if (!a || !MemoryArena_live(a)) 
         return 0;
 
+    SlabClass *slabs = MemoryArena_slabs(a);
+
     for (bytes s = 0; s < SLAB_COUNT; s++) {
-        SlabClass *slab = &(*a).slabs[s];
+        SlabClass *slab = &slabs[s];
 
-        SpinLock_lock(&(*slab).lock);
+        SpinLock_lock(SlabClass_lockMut(slab));
 
-        total += (bytes)(*slab).count * (*slab).slot_size;
+        total += (bytes)SlabClass_count(slab) * SlabClass_slotSize(slab);
 
-        SpinLock_unlock(&(*slab).lock);
+        SpinLock_unlock(SlabClass_lockMut(slab));
     }
 
-    SpinLock_lock(&(*a).bumpLock);
+    SpinLock_lock(MemoryArena_bumpLockMut(a));
 
-    total += (*a).bumpOffset;
+    total += MemoryArena_bumpOffset(a);
 
-    SpinLock_unlock(&(*a).bumpLock);
+    SpinLock_unlock(MemoryArena_bumpLockMut(a));
 
     return total;
 }
@@ -764,11 +996,11 @@ bytes MemoryArena_capacity(MemoryArena *a) {
     if (!a) 
         return 0;
 
-    return (*a).masterCapacity;
+    return MemoryArena_masterCapacity(a);
 }
 /** Return the number of rejected requests since the arena's last init/freeAll. */
 u64 MemoryArena_exhaustionCount(const MemoryArena *a) {
-    return a ? (*a).exhaustionCount : 0;
+    return a ? MemoryArena_exhaustionCountRaw(a) : 0;
 }
 /** Return the default arena's rejected-request count since the last freeAll. */
 u64 Memory_exhaustionCount() {

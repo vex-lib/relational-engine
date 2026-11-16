@@ -76,17 +76,48 @@ static Collection *asCollection(List *list) {
     return (Collection*) list;
 }
 
+;;SETTER
+static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+;;GETTER
+static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+;;SETTER
+static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+;;GETTER
+static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+;;SETTER
+static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+;;GETTER
+static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+;;SETTER
+static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+;;GETTER
+static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+;;SETTER
+static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+;;SETTER
+static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+;;SETTER
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+;;SETTER
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+;;GETTER
+static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+;;SETTER
+static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+
 static u8 *bufferGrow(Collection *c, bytes needed) {
     // d64, so growth is amortized O(1). A fixed increment makes "support a
     // million" quadratic (the Dynamic Scalability & Anti-Hardcoding Law).
-    bytes newCap = (*c).capacity ? (*c).capacity : DEFAULT_CAPACITY;
+    u32 curCap = Collection_capacityField(c);
+    bytes newCap = curCap ? curCap : DEFAULT_CAPACITY;
 
     while (newCap < needed) 
         newCap *= 2;
 
-    bytes Bytes = newCap * (*c).stride;
+    u32 stride = Collection_strideField(c);
+    bytes Bytes = newCap * stride;
 
-    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, (*c).elementClass);
+    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, Collection_elementClass(c));
 
     u8 *next = (u8*) Memory_alloc(bufType, Bytes);
 
@@ -98,15 +129,16 @@ static u8 *bufferGrow(Collection *c, bytes needed) {
         return nullptr;
     }
 
-    bytes oldBytes = (*c).activeCount * (*c).stride;
+    u8 *oldData = Collection_data(c);
+    bytes oldBytes = Collection_activeCount(c) * stride;
 
-    memcpy(next, (*c).data, oldBytes);
+    memcpy(next, oldData, oldBytes);
 
-    Memory_free((*c).data);
+    Memory_free(oldData);
 
-    (*c).data = next;
+    Collection_setData(c, next);
 
-    (*c).capacity = (u32)newCap;
+    Collection_setCapacity(c, (u32)newCap);
 
     return next;
 }
@@ -119,24 +151,24 @@ bool List_initStride(List *self, u32 elementClass, bytes stride, bytes capacity)
 
     Collection *c = asCollection(self);
 
-    (*c).typeId = TYPE_LIST;
+    Collection_setTypeId(c, TYPE_LIST);
 
-    (*c).activeCount = 0;
+    Collection_setActiveCount(c, 0);
 
-    (*c).elementClass = elementClass;
+    Collection_setElementClass(c, elementClass);
 
-    (*c).stride = (u32)stride;
+    Collection_setStride(c, (u32)stride);
 
-    (*c).capacity = (u32)cap;
+    Collection_setCapacity(c, (u32)cap);
 
-    (*c).head = 0;
+    Collection_setHead(c, 0);
 
-    (*c).exhaustionCount = 0;
+    Collection_setExhaustionCount(c, 0);
 
-    (*c).exhaustionReported = false;
+    Collection_setExhaustionReported(c, false);
     // Set before the allocation so a refused buffer still leaves a List_free-able
     // object: data == nullptr is the empty-buffer state.
-    (*c).data = nullptr;
+    Collection_setData(c, nullptr);
 
     bytes Bytes = cap * stride;
 
@@ -152,7 +184,7 @@ bool List_initStride(List *self, u32 elementClass, bytes stride, bytes capacity)
 
     memset(data, 0, Bytes);
 
-    (*c).data = data;
+    Collection_setData(c, data);
 
     return true;
 }
@@ -179,7 +211,7 @@ List *List_3(u32 elementClass, bytes capacity, bytes count) {
     // List_init's, so the count is the only extra step.
     Collection *c = asCollection(list);
 
-    (*c).activeCount = (u32)count;
+    Collection_setActiveCount(c, (u32)count);
 
     return list;
 }
@@ -193,9 +225,9 @@ fn List_free(List *list) {
        return;
 
     Collection *c = asCollection(list);
-
-    if ((*c).data) 
-        Memory_free((*c).data);
+    u8 *data = Collection_data(c);
+    if (data) 
+        Memory_free(data);
 
     Memory_free(list);
 }
@@ -205,15 +237,16 @@ fn List_add(List *list, u64 valueOrPointer) {
        return;
 
     Collection *c = asCollection(list);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount >= (*c).capacity) {
-        if (!bufferGrow(c, (*c).activeCount + 1)) 
+    if (activeCount >= Collection_capacityField(c)) {
+        if (!bufferGrow(c, activeCount + 1)) 
             return;
     }
 
-    Collection_writeSlot(c, (*c).activeCount, valueOrPointer);
+    Collection_writeSlot(c, activeCount, valueOrPointer);
 
-    (*c).activeCount++;
+    Collection_setActiveCount(c, activeCount + 1u);
 }
 
 u8 *List_addSlot(List *list) {
@@ -221,17 +254,19 @@ u8 *List_addSlot(List *list) {
        return nullptr;
 
     Collection *c = asCollection(list);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount >= (*c).capacity) {
-        if (!bufferGrow(c, (*c).activeCount + 1)) 
+    if (activeCount >= Collection_capacityField(c)) {
+        if (!bufferGrow(c, activeCount + 1)) 
             return nullptr;
     }
 
-    u8 *slot = (*c).data + (*c).activeCount * (*c).stride;
+    u32 stride = Collection_strideField(c);
+    u8 *slot = Collection_data(c) + activeCount * stride;
 
-    memset(slot, 0, (*c).stride);
+    memset(slot, 0, stride);
 
-    (*c).activeCount++;
+    Collection_setActiveCount(c, activeCount + 1u);
 
     return slot;
 }
@@ -242,7 +277,7 @@ u64 List_get(List *list, bytes index) {
 
     Collection *c = asCollection(list);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return 0;
 
     return Collection_readSlot(c, index);
@@ -254,7 +289,7 @@ fn List_set(List *list, bytes index, u64 value) {
 
     Collection *c = asCollection(list);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return;
 
     Collection_writeSlot(c, index, value);
@@ -266,10 +301,10 @@ u8 *List_slot(List *list, bytes index) {
 
     Collection *c = asCollection(list);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return nullptr;
 
-    return (*c).data + index * (*c).stride;
+    return Collection_data(c) + index * Collection_strideField(c);
 }
 
 fn List_remove(List *list, bytes index) {
@@ -277,19 +312,22 @@ fn List_remove(List *list, bytes index) {
        return;
 
     Collection *c = asCollection(list);
+    u32 activeCount = Collection_activeCount(c);
 
-    if (index >= (*c).activeCount) 
+    if (index >= activeCount) 
         return;
 
-    bytes tail = (*c).activeCount - index - 1;
+    bytes tail = activeCount - index - 1;
+    u32 stride = Collection_strideField(c);
+    u8 *data = Collection_data(c);
 
     if (tail > 0) {
-        memmove((*c).data + index * (*c).stride,
-                (*c).data + (index + 1) * (*c).stride,
-                tail * (*c).stride);
+        memmove(data + index * stride,
+                data + (index + 1) * stride,
+                tail * stride);
     }
 
-    (*c).activeCount--;
+    Collection_setActiveCount(c, activeCount - 1u);
 }
 
 bool List_compare(List *a, List *b) {
@@ -303,15 +341,17 @@ bool List_compare(List *a, List *b) {
 
     Collection *cb = asCollection(b);
 
-    if ((*ca).activeCount != (*cb).activeCount) 
+    u32 activeA = Collection_activeCount(ca);
+    if (activeA != Collection_activeCount(cb)) 
         return false;
 
-    if ((*ca).stride != (*cb).stride) 
+    u32 strideA = Collection_strideField(ca);
+    if (strideA != Collection_strideField(cb)) 
         return false;
 
-    bytes Bytes = (*ca).activeCount * (*ca).stride;
+    bytes Bytes = activeA * strideA;
 
-    return memcmp((*ca).data, (*cb).data, Bytes) == 0;
+    return memcmp(Collection_data(ca), Collection_data(cb), Bytes) == 0;
 }
 
 bool List_isEmpty(List *list) {

@@ -108,6 +108,161 @@ static bytes strideFor(bytes elementSize) {
     return rounded == 0 ? BITPOOL_ALIGN : rounded;
 }
 
+;;GETTER
+static MemoryArena *BitPool_arena(const BitPool *pool) {
+    return (*pool).arena;
+}
+
+;;GETTER
+static bytes BitPool_elementSize(const BitPool *pool) {
+    return (*pool).elementSize;
+}
+
+;;GETTER
+static bytes BitPool_stride(const BitPool *pool) {
+    return (*pool).stride;
+}
+
+;;GETTER
+static u32 BitPool_chunkSlots(const BitPool *pool) {
+    return (*pool).chunkSlots;
+}
+
+;;GETTER
+static BitChunk *BitPool_chunks(const BitPool *pool) {
+    return (*pool).chunks;
+}
+
+;;GETTER
+static bytes BitPool_chunkCount(const BitPool *pool) {
+    return (*pool).chunkCount;
+}
+
+;;GETTER
+static bytes BitPool_chunkCap(const BitPool *pool) {
+    return (*pool).chunkCap;
+}
+
+;;GETTER
+static u32 BitPool_freeHead(const BitPool *pool) {
+    return (*pool).freeHead;
+}
+
+;;GETTER
+static u32 BitPool_totalSlots(const BitPool *pool) {
+    return (*pool).totalSlots;
+}
+
+;;GETTER
+static u32 BitPool_liveCount(const BitPool *pool) {
+    return (*pool).liveCount;
+}
+
+;;GETTER
+static SpinLock *BitPool_lockMut(BitPool *pool) {
+    return &(*pool).lock;
+}
+
+;;SETTER
+static fn BitPool_setChunks(BitPool *pool, BitChunk *chunks) {
+    (*pool).chunks = chunks;
+}
+
+;;SETTER
+static fn BitPool_setChunkCount(BitPool *pool, bytes chunkCount) {
+    (*pool).chunkCount = chunkCount;
+}
+
+;;SETTER
+static fn BitPool_setChunkCap(BitPool *pool, bytes chunkCap) {
+    (*pool).chunkCap = chunkCap;
+}
+
+;;SETTER
+static fn BitPool_setFreeHead(BitPool *pool, u32 freeHead) {
+    (*pool).freeHead = freeHead;
+}
+
+;;SETTER
+static fn BitPool_setTotalSlots(BitPool *pool, u32 totalSlots) {
+    (*pool).totalSlots = totalSlots;
+}
+
+;;SETTER
+static fn BitPool_setLiveCount(BitPool *pool, u32 liveCount) {
+    (*pool).liveCount = liveCount;
+}
+
+;;GETTER
+static u8 *BitChunk_base(const BitChunk *chunk) {
+    return (*chunk).base;
+}
+
+;;GETTER
+static u32 BitChunk_count(const BitChunk *chunk) {
+    return (*chunk).count;
+}
+
+;;GETTER
+static u32 BitChunk_live(const BitChunk *chunk) {
+    return (*chunk).live;
+}
+
+;;SETTER
+static fn BitChunk_setBase(BitChunk *chunk, u8 *base) {
+    (*chunk).base = base;
+}
+
+;;SETTER
+static fn BitChunk_setCount(BitChunk *chunk, u32 count) {
+    (*chunk).count = count;
+}
+
+;;SETTER
+static fn BitChunk_setLive(BitChunk *chunk, u32 live) {
+    (*chunk).live = live;
+}
+
+;;GETTER
+static u64 BitSlot_typeId(const BitSlot *slot) {
+    return (*slot).typeId;
+}
+
+;;GETTER
+static u32 BitSlot_length(const BitSlot *slot) {
+    return (*slot).length;
+}
+
+;;GETTER
+static u32 BitSlot_generation(const BitSlot *slot) {
+    return (*slot).generation;
+}
+
+;;GETTER
+static u32 BitSlot_nextFree(const BitSlot *slot) {
+    return (*slot).nextFree;
+}
+
+;;SETTER
+static fn BitSlot_setTypeId(BitSlot *slot, u64 typeId) {
+    (*slot).typeId = typeId;
+}
+
+;;SETTER
+static fn BitSlot_setLength(BitSlot *slot, u32 length) {
+    (*slot).length = length;
+}
+
+;;SETTER
+static fn BitSlot_setGeneration(BitSlot *slot, u32 generation) {
+    (*slot).generation = generation;
+}
+
+;;SETTER
+static fn BitSlot_setNextFree(BitSlot *slot, u32 nextFree) {
+    (*slot).nextFree = nextFree;
+}
+
 // Payload pointer for a global slot index. Caller holds the pool lock OR
 // can prove exclusion. Returns nullptr when index is out of range. One
 // implementation: the header's BitPool_slotAt, so the two cannot drift.
@@ -119,23 +274,29 @@ static any slotPayload(const BitPool *pool, u32 index) {
 // math against committed chunks. Never reads through the pointer to find
 // its own index: provenance is range math, not self-describing trust.
 static bool resolveIndex(const BitPool *pool, const_any userPtr, u32 *outIndex) {
-    if (!pool || !userPtr || !(*pool).arena || (*pool).totalSlots == 0) 
+    if (!pool || !userPtr || !BitPool_arena(pool) || BitPool_totalSlots(pool) == 0) 
         return false;
 
     const u8 *p = (const u8*) userPtr;
 
-    bytes stride = (*pool).stride;
+    bytes stride = BitPool_stride(pool);
 
-    u32 chunkSlots = (*pool).chunkSlots;
+    u32 chunkSlots = BitPool_chunkSlots(pool);
 
-    for (bytes c = 0; c < (*pool).chunkCount; c++) {
-        const BitChunk *chunk = &(*pool).chunks[c];
+    bytes chunkCount = BitPool_chunkCount(pool);
 
-        const u8 *base = (*chunk).base;
+    const BitChunk *chunks = BitPool_chunks(pool);
+
+    for (bytes c = 0; c < chunkCount; c++) {
+        const BitChunk *chunk = &chunks[c];
+
+        const u8 *base = BitChunk_base(chunk);
+
+        u32 count = BitChunk_count(chunk);
 
         const u8 *payload0 = base + sizeof(BitSlot);
 
-        const u8 *endPayload = base + (bytes) (*chunk).count * stride;
+        const u8 *endPayload = base + (bytes) count * stride;
 
         if (p < payload0 || p >= endPayload) 
             continue;
@@ -150,7 +311,7 @@ static bool resolveIndex(const BitPool *pool, const_any userPtr, u32 *outIndex) 
 
         u32 within = (u32) ((delta - sizeof(BitSlot)) / stride);
 
-        if (within >= (*chunk).count) 
+        if (within >= count) 
             return false;
 
         if (outIndex) 
@@ -165,15 +326,19 @@ static bool resolveIndex(const BitPool *pool, const_any userPtr, u32 *outIndex) 
 // Commit one chunk of chunkSlots slots. Allocate-before-publish: the
 // arena allocation completes before directory or freelist change.
 static bool commitChunk(BitPool *pool, u32 slots) {
-    if (!pool || !(*pool).arena || slots == 0) 
+    if (!pool || !BitPool_arena(pool) || slots == 0) 
         return false;
 
-    if (slots > (*pool).chunkSlots) 
-        slots = (*pool).chunkSlots;
+    if (slots > BitPool_chunkSlots(pool)) 
+        slots = BitPool_chunkSlots(pool);
 
-    bytes span = (bytes) slots * (*pool).stride;
+    bytes stride = BitPool_stride(pool);
 
-    any raw = MemoryArena_alloc((*pool).arena, BITPOOL_CHUNK_TYPE, span);
+    bytes span = (bytes) slots * stride;
+
+    MemoryArena *arena = BitPool_arena(pool);
+
+    any raw = MemoryArena_alloc(arena, BITPOOL_CHUNK_TYPE, span);
 
     if (!raw) 
         return false;
@@ -183,60 +348,70 @@ static bool commitChunk(BitPool *pool, u32 slots) {
 
     // Ensure directory room. Directory is itself arena-backed; growing it
     // allocates a NEW directory and copies, never moves slot pixels.
-    if ((*pool).chunkCount == (*pool).chunkCap) {
-        bytes newCap = (*pool).chunkCap == 0 ? 8 : (*pool).chunkCap * 2;
+    bytes chunkCount = BitPool_chunkCount(pool);
 
-        any nextDir = MemoryArena_alloc((*pool).arena, BITPOOL_CHUNK_TYPE,
+    bytes chunkCap = BitPool_chunkCap(pool);
+
+    if (chunkCount == chunkCap) {
+        bytes newCap = chunkCap == 0 ? 8 : chunkCap * 2;
+
+        any nextDir = MemoryArena_alloc(arena, BITPOOL_CHUNK_TYPE,
                                           newCap * sizeof(BitChunk));
         if (!nextDir) 
             return false;
 
         memset(nextDir, 0, newCap * sizeof(BitChunk));
 
-        if ((*pool).chunks && (*pool).chunkCount > 0) 
-            memcpy(nextDir, (*pool).chunks, (*pool).chunkCount * sizeof(BitChunk));
+        BitChunk *oldChunks = BitPool_chunks(pool);
+
+        if (oldChunks && chunkCount > 0) 
+            memcpy(nextDir, oldChunks, chunkCount * sizeof(BitChunk));
         // Old directory backing is reclaimed by shutdown accounting via
         // the chunks pointer swap: the previous directory block stays
         // inside the arena until arena freeAll; slots already point at
         // chunk base pixels, never at directory entries.
-        (*pool).chunks = (BitChunk*) nextDir;
+        BitPool_setChunks(pool, (BitChunk*) nextDir);
 
-        (*pool).chunkCap = newCap;
+        BitPool_setChunkCap(pool, newCap);
     }
 
-    BitChunk *chunk = &(*pool).chunks[(*pool).chunkCount];
+    BitChunk *chunk = &BitPool_chunks(pool)[chunkCount];
 
-    (*chunk).base = (u8*) raw;
+    BitChunk_setBase(chunk, (u8*) raw);
 
-    (*chunk).count = slots;
+    BitChunk_setCount(chunk, slots);
 
-    (*chunk).live = 0;
+    BitChunk_setLive(chunk, 0);
 
     // Thread every new slot onto the freelist by index. No pointer
     // truncation: the chain is index arithmetic.
-    u32 firstIndex = (u32) (*pool).chunkCount * (*pool).chunkSlots;
+    u32 chunkSlots = BitPool_chunkSlots(pool);
+
+    u32 firstIndex = (u32) chunkCount * chunkSlots;
+
+    u32 freeHead = BitPool_freeHead(pool);
 
     for (u32 within = 0; within < slots; within++) {
         u32 index = firstIndex + within;
 
-        u32 next = (within + 1 < slots) ? (index + 1) : (*pool).freeHead;
+        u32 next = (within + 1 < slots) ? (index + 1) : freeHead;
 
-        BitSlot *slot = (BitSlot*) ((u8*) raw + (bytes) within * (*pool).stride);
+        BitSlot *slot = (BitSlot*) ((u8*) raw + (bytes) within * stride);
 
-        (*slot).nextFree = next;
+        BitSlot_setNextFree(slot, next);
 
-        (*slot).generation = 0;
+        BitSlot_setGeneration(slot, 0);
 
-        (*slot).length = 0;
+        BitSlot_setLength(slot, 0);
 
-        (*slot).typeId = 0;
+        BitSlot_setTypeId(slot, 0);
     }
 
-    (*pool).freeHead = firstIndex;
+    BitPool_setFreeHead(pool, firstIndex);
 
-    (*pool).chunkCount++;
+    BitPool_setChunkCount(pool, chunkCount + 1);
 
-    (*pool).totalSlots = (u32) ((*pool).chunkCount * (*pool).chunkSlots);
+    BitPool_setTotalSlots(pool, (u32) ((chunkCount + 1) * chunkSlots));
 
     return true;
 }
@@ -322,13 +497,19 @@ fn BitPool_shutdown(BitPool *pool) {
     if (!pool) 
         return;
 
-    SpinLock_lock(&(*pool).lock);
+    SpinLock_lock(BitPool_lockMut(pool));
     // Release every chunk's backing to the owning arena. The arena reclaims
     // via its own slab/bump accounting; frees here are one MemoryArena_free
     // per chunk (O(chunks), cold, once at teardown).
-    if ((*pool).arena) {
-        for (bytes c = 0; c < (*pool).chunkCount; c++) 
-            MemoryArena_free((*pool).arena, (*pool).chunks[c].base);
+    MemoryArena *arena = BitPool_arena(pool);
+
+    if (arena) {
+        bytes chunkCount = BitPool_chunkCount(pool);
+
+        BitChunk *chunks = BitPool_chunks(pool);
+
+        for (bytes c = 0; c < chunkCount; c++) 
+            MemoryArena_free(arena, BitChunk_base(&chunks[c]));
     }
     // Directory backing stays inside the arena until freeAll; nulling it
     // here prevents a double shutdown from re-freeing it.
@@ -340,49 +521,52 @@ fn BitPool_shutdown(BitPool *pool) {
 }
 
 any BitPool_alloc(BitPool *pool, u64 typeId) {
-    if (!pool || !(*pool).arena) 
+    if (!pool || !BitPool_arena(pool)) 
         return nullptr;
 
-    SpinLock_lock(&(*pool).lock);
+    SpinLock_lock(BitPool_lockMut(pool));
 
-    if ((*pool).freeHead == BITPOOL_FREE_END) {
+    if (BitPool_freeHead(pool) == BITPOOL_FREE_END) {
         // Full pool: grow by one chunk. allocate-before-publish inside
         // commitChunk guarantees a failure leaves the pool untouched.
-        if (!commitChunk(pool, (*pool).chunkSlots)) {
-            SpinLock_unlock(&(*pool).lock);
+        if (!commitChunk(pool, BitPool_chunkSlots(pool))) {
+            SpinLock_unlock(BitPool_lockMut(pool));
 
             return nullptr;
         }
     }
 
-    u32 index = (*pool).freeHead;
+    u32 index = BitPool_freeHead(pool);
 
     any payload = slotPayload(pool, index);
 
     if (!payload) {
-        SpinLock_unlock(&(*pool).lock);
+        SpinLock_unlock(BitPool_lockMut(pool));
 
         return nullptr;
     }
 
     BitSlot *slot = (BitSlot*) ((u8*) payload - sizeof(BitSlot));
 
-    (*pool).freeHead = (*slot).nextFree;
+    BitPool_setFreeHead(pool, BitSlot_nextFree(slot));
 
-    (*slot).typeId = typeId;
+    BitSlot_setTypeId(slot, typeId);
 
-    (*slot).length = (u32) (*pool).elementSize;
+    BitSlot_setLength(slot, (u32) BitPool_elementSize(pool));
 
-    u32 chunkSlots = (*pool).chunkSlots;
+    u32 chunkSlots = BitPool_chunkSlots(pool);
 
     u32 chunkIndex = index / chunkSlots;
 
-    if (chunkIndex < (*pool).chunkCount) 
-        (*pool).chunks[chunkIndex].live++;
+    if (chunkIndex < BitPool_chunkCount(pool)) {
+        BitChunk *chunk = &BitPool_chunks(pool)[chunkIndex];
 
-    (*pool).liveCount++;
+        BitChunk_setLive(chunk, BitChunk_live(chunk) + 1);
+    }
 
-    SpinLock_unlock(&(*pool).lock);
+    BitPool_setLiveCount(pool, BitPool_liveCount(pool) + 1);
+
+    SpinLock_unlock(BitPool_lockMut(pool));
 
     return payload;
 }
@@ -391,12 +575,12 @@ fn BitPool_free(BitPool *pool, any userPtr) {
     if (!pool || !userPtr) 
         return;
 
-    SpinLock_lock(&(*pool).lock);
+    SpinLock_lock(BitPool_lockMut(pool));
 
     u32 index = 0;
 
     if (!resolveIndex(pool, userPtr, &index)) {
-        SpinLock_unlock(&(*pool).lock);
+        SpinLock_unlock(BitPool_lockMut(pool));
 
         return;
     }
@@ -404,7 +588,7 @@ fn BitPool_free(BitPool *pool, any userPtr) {
     any payload = slotPayload(pool, index);
 
     if (payload != userPtr) {
-        SpinLock_unlock(&(*pool).lock);
+        SpinLock_unlock(BitPool_lockMut(pool));
 
         return;
     }
@@ -413,33 +597,41 @@ fn BitPool_free(BitPool *pool, any userPtr) {
     // Free slots carry typeId==0. A second release sees typeId==0 AND
     // generation already bumped, so it is refused before touching the
     // freelist: no cycle, no O(capacity) walk.
-    if ((*slot).typeId == 0) {
-        SpinLock_unlock(&(*pool).lock);
+    if (BitSlot_typeId(slot) == 0) {
+        SpinLock_unlock(BitPool_lockMut(pool));
 
         return;
     }
 
-    (*slot).typeId = 0;
+    BitSlot_setTypeId(slot, 0);
 
-    (*slot).generation++;
+    BitSlot_setGeneration(slot, BitSlot_generation(slot) + 1);
 
-    (*slot).length = 0;
+    BitSlot_setLength(slot, 0);
 
-    (*slot).nextFree = (*pool).freeHead;
+    BitSlot_setNextFree(slot, BitPool_freeHead(pool));
 
-    (*pool).freeHead = index;
+    BitPool_setFreeHead(pool, index);
 
-    u32 chunkSlots = (*pool).chunkSlots;
+    u32 chunkSlots = BitPool_chunkSlots(pool);
 
     u32 chunkIndex = index / chunkSlots;
 
-    if (chunkIndex < (*pool).chunkCount && (*pool).chunks[chunkIndex].live > 0) 
-        (*pool).chunks[chunkIndex].live--;
+    if (chunkIndex < BitPool_chunkCount(pool)) {
+        BitChunk *chunk = &BitPool_chunks(pool)[chunkIndex];
 
-    if ((*pool).liveCount > 0) 
-        (*pool).liveCount--;
+        u32 live = BitChunk_live(chunk);
 
-    SpinLock_unlock(&(*pool).lock);
+        if (live > 0) 
+            BitChunk_setLive(chunk, live - 1);
+    }
+
+    u32 liveCount = BitPool_liveCount(pool);
+
+    if (liveCount > 0) 
+        BitPool_setLiveCount(pool, liveCount - 1);
+
+    SpinLock_unlock(BitPool_lockMut(pool));
 }
 
 bool BitPool_contains(const BitPool *pool, const_any userPtr) {
@@ -459,7 +651,7 @@ u64 BitPool_type(const BitPool *pool, const_any userPtr) {
 
     const BitSlot *slot = (const BitSlot*) ((const u8*) payload - sizeof(BitSlot));
 
-    return (*slot).typeId;
+    return BitSlot_typeId(slot);
 }
 
 bytes BitPool_length(const BitPool *pool, const_any userPtr) {
@@ -475,5 +667,5 @@ bytes BitPool_length(const BitPool *pool, const_any userPtr) {
 
     const BitSlot *slot = (const BitSlot*) ((const u8*) payload - sizeof(BitSlot));
 
-    return (bytes) (*slot).length;
+    return (bytes) BitSlot_length(slot);
 }

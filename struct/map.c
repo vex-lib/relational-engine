@@ -72,6 +72,33 @@ static Collection *asCollection(Map *map) {
     return (Collection*) map;
 }
 
+;;SETTER
+static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+;;GETTER
+static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+;;SETTER
+static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+;;GETTER
+static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+;;SETTER
+static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+;;SETTER
+static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+;;GETTER
+static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+;;SETTER
+static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+;;SETTER
+static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+;;SETTER
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+;;SETTER
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+;;GETTER
+static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+;;SETTER
+static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+
 static i32 isReferenceClass(u32 classId) {
     return classId == ID_STRING || classId >= ID_LIST;
 }
@@ -147,7 +174,7 @@ static bytes highestOneBit(bytes n) {
 }
 
 static u8 *slotAt(Collection *c, bytes index) {
-    return (*c).data + index * SLOT_SIZE;
+    return Collection_data(c) + index * SLOT_SIZE;
 }
 
 static u64 slotState(const u8 *slot) {
@@ -155,9 +182,9 @@ static u64 slotState(const u8 *slot) {
 }
 
 static fn rehash(Collection *c, bytes newCap) {
-    bytes oldCap = (*c).capacity;
+    bytes oldCap = Collection_capacityField(c);
 
-    u8 *oldData = (*c).data;
+    u8 *oldData = Collection_data(c);
 
     bytes Bytes = newCap * SLOT_SIZE;
 
@@ -200,9 +227,9 @@ static fn rehash(Collection *c, bytes newCap) {
 
     Memory_free(oldData);
 
-    (*c).data = newData;
+    Collection_setData(c, newData);
 
-    (*c).capacity = (u32)newCap;
+    Collection_setCapacity(c, (u32)newCap);
 }
 
 Map *Map_3(u32 keyClass, u32 valClass, bytes capacity) {
@@ -221,29 +248,30 @@ Map *Map_3(u32 keyClass, u32 valClass, bytes capacity) {
 
     Collection *c = asCollection(map);
 
-    (*c).typeId = TYPE_MAP;
+    Collection_setTypeId(c, TYPE_MAP);
 
-    (*c).activeCount = 0;
+    Collection_setActiveCount(c, 0);
 
-    (*c).elementClass = keyClass;
+    Collection_setElementClass(c, keyClass);
 
-    (*c).stride = valClass;
+    Collection_setStride(c, valClass);
 
-    (*c).capacity = (u32)cap;
+    Collection_setCapacity(c, (u32)cap);
 
-    (*c).head = 0;
+    Collection_setHead(c, 0);
 
-    (*c).exhaustionCount = 0;
+    Collection_setExhaustionCount(c, 0);
 
-    (*c).exhaustionReported = false;
+    Collection_setExhaustionReported(c, false);
 
     bytes Bytes = cap * SLOT_SIZE;
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_MAP);
 
-    (*c).data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    Collection_setData(c, data);
 
-    if (!(*c).data) {
+    if (!data) {
         (discard) Struct_reportConstructionExhaustion("map", Bytes);
 
         Memory_free(map);
@@ -251,7 +279,7 @@ Map *Map_3(u32 keyClass, u32 valClass, bytes capacity) {
         return nullptr;
     }
 
-    memset((*c).data, 0, Bytes);
+    memset(data, 0, Bytes);
 
     return map;
 }
@@ -261,9 +289,9 @@ fn Map_free(Map *map) {
        return;
 
     Collection *c = asCollection(map);
-
-    if ((*c).data) 
-        Memory_free((*c).data);
+    u8 *data = Collection_data(c);
+    if (data) 
+        Memory_free(data);
 
     Memory_free(map);
 }
@@ -273,15 +301,19 @@ fn Map_put(Map *map, u64 key, u64 value) {
        return;
 
     Collection *c = asCollection(map);
+    u32 cap = Collection_capacityField(c);
+    u32 activeCount = Collection_activeCount(c);
+    bytes load = cap - cap / LOAD_DIVISOR;
 
-    bytes load = (*c).capacity - (*c).capacity / LOAD_DIVISOR;
+    if (activeCount >= load) {
+        rehash(c, cap * 2);
+        cap = Collection_capacityField(c);
+    }
 
-    if ((*c).activeCount >= load) 
-        rehash(c, (*c).capacity * 2);
+    u32 elemClass = Collection_elementClass(c);
+    u64 hash = computeHash(elemClass, key);
 
-    u64 hash = computeHash((*c).elementClass, key);
-
-    bytes mask = (*c).capacity - 1;
+    bytes mask = cap - 1;
 
     bytes idx = (bytes)(hash & mask);
 
@@ -301,7 +333,7 @@ fn Map_put(Map *map, u64 key, u64 value) {
             *(u64*) (tslot + 16) = hash;
             *(u64*) (tslot + 24) = STATE_OCCUPIED;
 
-            (*c).activeCount++;
+            Collection_setActiveCount(c, activeCount + 1u);
 
             return;
         } else if (st == STATE_DELETED) {
@@ -309,7 +341,7 @@ fn Map_put(Map *map, u64 key, u64 value) {
                 firstDeleted = idx;
         } else if (st == STATE_OCCUPIED) {
             if (*(u64*) (slot + 16) == hash
-                && keysEqual((*c).elementClass, *(u64*) slot, key)) {
+                && keysEqual(elemClass, *(u64*) slot, key)) {
                 *(u64*) (slot + 8) = value;
 
                 return;
@@ -325,17 +357,19 @@ u64 Map_get(Map *map, u64 key) {
        return 0;
 
     Collection *c = asCollection(map);
+    u32 cap = Collection_capacityField(c);
 
-    if ((*c).capacity == 0) 
+    if (cap == 0) 
        return 0;
 
-    u64 hash = computeHash((*c).elementClass, key);
+    u32 elemClass = Collection_elementClass(c);
+    u64 hash = computeHash(elemClass, key);
 
-    bytes mask = (*c).capacity - 1;
+    bytes mask = cap - 1;
 
     bytes idx = (bytes)(hash & mask);
 
-    for (bytes i = 0; i < (*c).capacity; i++) {
+    for (bytes i = 0; i < cap; i++) {
         u8 *slot = slotAt(c, idx);
 
         u64 st = slotState(slot);
@@ -345,7 +379,7 @@ u64 Map_get(Map *map, u64 key) {
 
         if (st == STATE_OCCUPIED
             && *(u64*) (slot + 16) == hash
-            && keysEqual((*c).elementClass, *(u64*) slot, key))
+            && keysEqual(elemClass, *(u64*) slot, key))
             return *(u64*) (slot + 8);
         idx = (idx + 1) & mask;
     }
@@ -358,17 +392,19 @@ bool Map_containsKey(Map *map, u64 key) {
        return false;
 
     Collection *c = asCollection(map);
+    u32 cap = Collection_capacityField(c);
 
-    if ((*c).capacity == 0) 
+    if (cap == 0) 
        return false;
 
-    u64 hash = computeHash((*c).elementClass, key);
+    u32 elemClass = Collection_elementClass(c);
+    u64 hash = computeHash(elemClass, key);
 
-    bytes mask = (*c).capacity - 1;
+    bytes mask = cap - 1;
 
     bytes idx = (bytes)(hash & mask);
 
-    for (bytes i = 0; i < (*c).capacity; i++) {
+    for (bytes i = 0; i < cap; i++) {
         u8 *slot = slotAt(c, idx);
 
         u64 st = slotState(slot);
@@ -378,7 +414,7 @@ bool Map_containsKey(Map *map, u64 key) {
 
         if (st == STATE_OCCUPIED
             && *(u64*) (slot + 16) == hash
-            && keysEqual((*c).elementClass, *(u64*) slot, key))
+            && keysEqual(elemClass, *(u64*) slot, key))
             return true;
         idx = (idx + 1) & mask;
     }
@@ -391,17 +427,19 @@ u64 Map_remove(Map *map, u64 key) {
        return 0;
 
     Collection *c = asCollection(map);
+    u32 cap = Collection_capacityField(c);
 
-    if ((*c).capacity == 0) 
+    if (cap == 0) 
        return 0;
 
-    u64 hash = computeHash((*c).elementClass, key);
+    u32 elemClass = Collection_elementClass(c);
+    u64 hash = computeHash(elemClass, key);
 
-    bytes mask = (*c).capacity - 1;
+    bytes mask = cap - 1;
 
     bytes idx = (bytes)(hash & mask);
 
-    for (bytes i = 0; i < (*c).capacity; i++) {
+    for (bytes i = 0; i < cap; i++) {
         u8 *slot = slotAt(c, idx);
 
         u64 st = slotState(slot);
@@ -411,11 +449,11 @@ u64 Map_remove(Map *map, u64 key) {
 
         if (st == STATE_OCCUPIED
             && *(u64*) (slot + 16) == hash
-            && keysEqual((*c).elementClass, *(u64*) slot, key)) {
+            && keysEqual(elemClass, *(u64*) slot, key)) {
             u64 oldVal = *(u64*) (slot + 8);
             *(u64*) (slot + 24) = STATE_DELETED;
 
-            (*c).activeCount--;
+            Collection_setActiveCount(c, Collection_activeCount(c) - 1u);
 
             return oldVal;
         }
@@ -432,14 +470,15 @@ Array *Map_keys(Map *map) {
 
     Collection *c = asCollection(map);
 
-    Array *keys = Array((*c).elementClass, (*c).activeCount);
+    Array *keys = Array(Collection_elementClass(c), Collection_activeCount(c));
 
     if (!keys) 
        return nullptr;
 
     bytes out = 0;
+    u32 cap = Collection_capacityField(c);
 
-    for (bytes i = 0; i < (*c).capacity; i++) {
+    for (bytes i = 0; i < cap; i++) {
         u8 *slot = slotAt(c, i);
 
         if (slotState(slot) == STATE_OCCUPIED) 

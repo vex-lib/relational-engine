@@ -69,6 +69,23 @@
 
 // collection.c — Collection port (Legacy: struct/Collection.java).
 
+;;GETTER
+static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+;;GETTER
+static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+;;GETTER
+static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+;;GETTER
+static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+;;GETTER
+static inline u64 *Collection_exhaustionCountMut(Collection *c) { return &(*c).exhaustionCount; }
+;;GETTER
+static inline bool *Collection_exhaustionReportedMut(Collection *c) { return &(*c).exhaustionReported; }
+;;GETTER
+static inline u32 Collection_headField(const Collection *c) { return (*c).head; }
+;;GETTER
+static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+
 static u64 readSlotAt(const u8 *data, bytes stride) {
     switch (stride) {
         case 1:  return (u64)(*(const u8*) data);
@@ -98,7 +115,7 @@ u32 Collection_size(Collection *c) {
     if (!c) 
        return 0;
 
-    return (*c).activeCount;
+    return Collection_activeCount(c);
 }
 
 u32 Collection_length(Collection *c) {
@@ -113,7 +130,7 @@ u32 Collection_elementClassId(Collection *c) {
     if (!c) 
        return 0;
 
-    return (*c).elementClass;
+    return Collection_elementClass(c);
 }
 
 u32 Collection_keyClassId(Collection *c) {
@@ -124,7 +141,7 @@ u32 Collection_stride(Collection *c) {
     if (!c) 
        return 0;
 
-    return (*c).stride;
+    return Collection_strideField(c);
 }
 
 u32 Collection_valClassId(Collection *c) {
@@ -135,7 +152,7 @@ u32 Collection_capacity(Collection *c) {
     if (!c) 
        return 0;
 
-    return (*c).capacity;
+    return Collection_capacityField(c);
 }
 
 // --- Exhaustion observability (the Exhaustion Loudness Law) ---
@@ -149,9 +166,10 @@ bool Collection_reportExhaustion(Collection *c, bytes requestedBytes) {
         return false;
     }
     // One implementation for the whole ecosystem: the shared owner-agnostic seam.
-    return Struct_reportExhaustion(&(*c).exhaustionCount, &(*c).exhaustionReported,
+    return Struct_reportExhaustion(Collection_exhaustionCountMut(c),
+                                   Collection_exhaustionReportedMut(c),
                                    "collection", requestedBytes,
-                                   (bytes) (*c).capacity * (*c).stride);
+                                   (bytes) Collection_capacityField(c) * Collection_strideField(c));
 }
 
 /** Return the refused-grow count since construction or the last reset. */
@@ -166,21 +184,21 @@ fn Collection_resetExhaustion(Collection *c) {
     if (!c) 
        return;
 
-    Struct_resetExhaustion(&(*c).exhaustionCount, &(*c).exhaustionReported);
+    Struct_resetExhaustion(Collection_exhaustionCountMut(c), Collection_exhaustionReportedMut(c));
 }
 
 u32 Collection_head(Collection *c) {
     if (!c) 
        return 0;
 
-    return (*c).head;
+    return Collection_headField(c);
 }
 
 u8 *Collection_dataBuffer(Collection *c) {
     if (!c) 
        return nullptr;
 
-    return (*c).data;
+    return Collection_data(c);
 }
 
 // The BOUNDED read/write pair: an out-of-range index is refused with a safe
@@ -193,21 +211,23 @@ u64 Collection_readSlot(Collection *c, bytes index) {
     // Bound by CAPACITY (the physical memory bound), not activeCount: a
     // circular container (Queue/Deque) reads a PHYSICAL slot (head) that may
     // exceed the live count. Logical bounds are the callers' contract.
-    if (index >= (*c).capacity) {
+    u32 cap = Collection_capacityField(c);
+    if (index >= cap) {
         THROW("collection readSlot: index %zu out of capacity (%u)",
-              index, (*c).capacity);
+              index, cap);
         return 0;
     }
 
     bytes offset = 0;
+    u32 stride = Collection_strideField(c);
 
-    if (ckd_mul(&offset, index, (bytes) (*c).stride)) {
-        THROW("collection readSlot: index %zu * stride %u overflows", index, (*c).stride);
+    if (ckd_mul(&offset, index, (bytes) stride)) {
+        THROW("collection readSlot: index %zu * stride %u overflows", index, stride);
 
         return 0;
     }
 
-    return readSlotAt((*c).data + offset, (*c).stride);
+    return readSlotAt(Collection_data(c) + offset, stride);
 }
 
 fn Collection_writeSlot(Collection *c, bytes index, u64 value) {
@@ -216,21 +236,23 @@ fn Collection_writeSlot(Collection *c, bytes index, u64 value) {
     // Bound by CAPACITY, not activeCount: an append (List_add) writes the slot
     // at index == activeCount, a legal PHYSICAL slot. activeCount is the
     // caller's contract; capacity is the memory bound.
-    if (index >= (*c).capacity) {
+    u32 cap = Collection_capacityField(c);
+    if (index >= cap) {
         THROW("collection writeSlot: index %zu out of capacity (%u)",
-              index, (*c).capacity);
+              index, cap);
         return;
     }
 
     bytes offset = 0;
+    u32 stride = Collection_strideField(c);
 
-    if (ckd_mul(&offset, index, (bytes) (*c).stride)) {
-        THROW("collection writeSlot: index %zu * stride %u overflows", index, (*c).stride);
+    if (ckd_mul(&offset, index, (bytes) stride)) {
+        THROW("collection writeSlot: index %zu * stride %u overflows", index, stride);
 
         return;
     }
 
-    writeSlotAt((*c).data + offset, (*c).stride, value);
+    writeSlotAt(Collection_data(c) + offset, stride, value);
 }
 
 // Deliberately unchecked (trust-the-handle): NO bounds check on index — the
@@ -240,12 +262,14 @@ u64 Collection_readSlotUnsafe(Collection *c, bytes index) {
     if (!c) 
         return 0;
 
-    return readSlotAt((*c).data + index * (*c).stride, (*c).stride);
+    u32 stride = Collection_strideField(c);
+    return readSlotAt(Collection_data(c) + index * stride, stride);
 }
 
 fn Collection_writeSlotUnsafe(Collection *c, bytes index, u64 value) {
     if (!c) 
         return;
 
-    writeSlotAt((*c).data + index * (*c).stride, (*c).stride, value);
+    u32 stride = Collection_strideField(c);
+    writeSlotAt(Collection_data(c) + index * stride, stride, value);
 }

@@ -112,9 +112,24 @@ static bool locate(const char *name, u32 *outBucket, u32 *outSlot, char *outFold
     return true;
 }
 
+;;GETTER
+static inline bool VariableHashMap_active(const VariableHashMap *map) { return (*map).active; }
+;;SETTER
+static inline fn VariableHashMap_setActive(VariableHashMap *map, bool active) { (*map).active = active; }
+;;SETTER
+static inline fn VariableHashMap_setCount(VariableHashMap *map, u32 count) { (*map).count = count; }
+;;GETTER
+static inline ChunkedList **VariableHashMap_bandAt(const VariableHashMap *map, u32 bucket) {
+    return (*map).bands[bucket];
+}
+;;SETTER
+static inline fn VariableHashMap_setBandAt(VariableHashMap *map, u32 bucket, ChunkedList **band) {
+    (*map).bands[bucket] = band;
+}
+
 // Mint a band (the 1024 slot pointers for one first-char) on first use.
 static ChunkedList **ensureBand(VariableHashMap *map, u32 bucket) {
-    ChunkedList **band = (*map).bands[bucket];
+    ChunkedList **band = VariableHashMap_bandAt(map, bucket);
 
     if (band) 
         return band;
@@ -128,7 +143,7 @@ static ChunkedList **ensureBand(VariableHashMap *map, u32 bucket) {
 
     memset(band, 0, Bytes);
 
-    (*map).bands[bucket] = band;
+    VariableHashMap_setBandAt(map, bucket, band);
 
     return band;
 }
@@ -172,7 +187,7 @@ bool VariableHashMap_init(VariableHashMap *map) {
 
     memset(map, 0, sizeof(*map));
 
-    (*map).active = true;
+    VariableHashMap_setActive(map, true);
 
     return true;
 }
@@ -182,7 +197,7 @@ fn VariableHashMap_shutdown(VariableHashMap *map) {
         return;
 
     for (u32 b = 0; b < VARIABLE_HASH_BUCKETS; b++) {
-        ChunkedList **band = (*map).bands[b];
+        ChunkedList **band = VariableHashMap_bandAt(map, b);
 
         if (!band) 
             continue;
@@ -196,12 +211,12 @@ fn VariableHashMap_shutdown(VariableHashMap *map) {
 
         Memory_free(band);
 
-        (*map).bands[b] = nullptr;
+        VariableHashMap_setBandAt(map, b, nullptr);
     }
 
-    (*map).count = 0u;
+    VariableHashMap_setCount(map, 0u);
 
-    (*map).active = false;
+    VariableHashMap_setActive(map, false);
 }
 
 VariableHashMap *VariableHashMap_0() {
@@ -231,7 +246,7 @@ fn VariableHashMap_free(VariableHashMap *map) {
 // CORE FUNCTIONS
 
 bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer) {
-    if (!map || !(*map).active) 
+    if (!map || !VariableHashMap_active(map)) 
         return false;
 
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -269,13 +284,13 @@ bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer
     if (!VariableSlot_init(fresh, name, pointer)) 
         return false;
 
-    (*map).count++;
+    VariableHashMap_setCount(map, VariableHashMap_count(map) + 1u);
 
     return true;
 }
 
 pointer VariableHashMap_get(const VariableHashMap *map, const char *name) {
-    if (!map || !(*map).active) 
+    if (!map || !VariableHashMap_active(map)) 
         return 0u;
 
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -287,7 +302,7 @@ pointer VariableHashMap_get(const VariableHashMap *map, const char *name) {
     if (!locate(name, &bucket, &slot, folded)) 
         return 0u;
 
-    ChunkedList **band = (*map).bands[bucket];
+    ChunkedList **band = VariableHashMap_bandAt(map, bucket);
 
     if (!band) 
         return 0u;
@@ -306,7 +321,7 @@ pointer VariableHashMap_get(const VariableHashMap *map, const char *name) {
 }
 
 bool VariableHashMap_contains(const VariableHashMap *map, const char *name) {
-    if (!map || !(*map).active) 
+    if (!map || !VariableHashMap_active(map)) 
         return false;
 
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -318,7 +333,7 @@ bool VariableHashMap_contains(const VariableHashMap *map, const char *name) {
     if (!locate(name, &bucket, &slot, folded)) 
         return false;
 
-    ChunkedList **band = (*map).bands[bucket];
+    ChunkedList **band = VariableHashMap_bandAt(map, bucket);
 
     if (!band || !band[slot]) 
         return false;
@@ -327,11 +342,11 @@ bool VariableHashMap_contains(const VariableHashMap *map, const char *name) {
 }
 
 fn VariableHashMap_forEach(VariableHashMap *map, VariableHashMapVisitFn fn, any userdata) {
-    if (!map || !(*map).active || !fn) 
+    if (!map || !VariableHashMap_active(map) || !fn) 
         return;
 
     for (u32 b = 0u; b < VARIABLE_HASH_BUCKETS; b++) {
-        ChunkedList **band = (*map).bands[b];
+        ChunkedList **band = VariableHashMap_bandAt(map, b);
 
         if (!band) 
             continue;
@@ -364,7 +379,7 @@ bool VariableHashMap_isEmpty(const VariableHashMap *map) {
     if (!map) 
         return true;
 
-    return (*map).count == 0u;
+    return VariableHashMap_count(map) == 0u;
 }
 
 // STRING PROJECTIONS (the toString Law)
@@ -382,7 +397,7 @@ fn VariableHashMap_toString(const VariableHashMap *map, char *dest, bytes cap, b
         return;
     }
 
-    i32 written = snprintf(dest, cap, "VariableHashMap(count=%u)", (*map).count);
+    i32 written = snprintf(dest, cap, "VariableHashMap(count=%u)", VariableHashMap_count(map));
 
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
@@ -404,7 +419,7 @@ fn VariableHashMap_toStringStruct(const VariableHashMap *map, char *dest, bytes 
     }
 
     i32 written = snprintf(dest, cap, "VariableHashMap { active=%s, count=%u, bands=<array[%u]> }",
-                           (*map).active ? "true" : "false", (*map).count, VARIABLE_HASH_BUCKETS);
+                           VariableHashMap_active(map) ? "true" : "false", VariableHashMap_count(map), VARIABLE_HASH_BUCKETS);
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
             *outTruncated = true;

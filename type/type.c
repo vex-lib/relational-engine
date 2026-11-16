@@ -70,6 +70,19 @@ typedef struct TypeParentsRow {
     u32 count;              // 0 row = root; rows past count = root
 } TypeParentsRow;
 
+;;GETTER
+static inline u64 TypeParentsRow_proj(const TypeParentsRow *row) { return (*row).proj; }
+;;SETTER
+static inline fn TypeParentsRow_setProj(TypeParentsRow *row, u64 proj) { (*row).proj = proj; }
+;;GETTER
+static inline const u32 *TypeParentsRow_parents(const TypeParentsRow *row) { return (*row).parents; }
+;;SETTER
+static inline fn TypeParentsRow_setParents(TypeParentsRow *row, const u32 *parents) { (*row).parents = parents; }
+;;GETTER
+static inline u32 TypeParentsRow_count(const TypeParentsRow *row) { return (*row).count; }
+;;SETTER
+static inline fn TypeParentsRow_setCount(TypeParentsRow *row, u32 count) { (*row).count = count; }
+
 // Growable registration slate (the Dynamic Scalability & Anti-Hardcoding Law):
 // starts empty, f64s exponentially on demand, arena-backed. Rows beyond
 // g_typeTableCount are never scanned, so stale Bytes are harmless. Allocated
@@ -114,7 +127,7 @@ static const TypeParentsRow *findTable(u64 proj) {
     for (bytes i = 0; i < g_typeTableCount; ++i) {
         const TypeParentsRow *row = &g_typeTables[i];
 
-        if ((*row).proj == proj) 
+        if (TypeParentsRow_proj(row) == proj) 
             return row;
     }
 
@@ -161,7 +174,7 @@ static u32 chainCount(u64 proj) {
 
     const TypeParentsRow *row = findTable(proj);
 
-    return row != nullptr ? (*row).count : 0u;
+    return row != nullptr ? TypeParentsRow_count(row) : 0u;
 }
 
 /** Register or replace one non-Vexspoke project's validated class-parent table. */
@@ -181,10 +194,10 @@ bool Type_registerParents(u64 proj, const u32 *parents, u32 count) {
     for (bytes i = 0; i < g_typeTableCount; ++i) {
         TypeParentsRow *row = &g_typeTables[i];
 
-        if ((*row).proj == proj) {
-            (*row).parents = parents;
+        if (TypeParentsRow_proj(row) == proj) {
+            TypeParentsRow_setParents(row, parents);
 
-            (*row).count = count;
+            TypeParentsRow_setCount(row, count);
 
             return true;
         }
@@ -195,11 +208,11 @@ bool Type_registerParents(u64 proj, const u32 *parents, u32 count) {
 
     TypeParentsRow *row = &g_typeTables[g_typeTableCount++];
 
-    (*row).proj = proj;
+    TypeParentsRow_setProj(row, proj);
 
-    (*row).parents = parents;
+    TypeParentsRow_setParents(row, parents);
 
-    (*row).count = count;
+    TypeParentsRow_setCount(row, count);
 
     return true;
 }
@@ -234,8 +247,8 @@ u64 Type_getParentClass(u64 classId) {
 
     const TypeParentsRow *row = findTable(proj);
 
-    if (row != nullptr && cls != 0u && cls < (*row).count) {
-        u32 parent = (*row).parents[cls];
+    if (row != nullptr && cls != 0u && cls < TypeParentsRow_count(row)) {
+        u32 parent = TypeParentsRow_parents(row)[cls];
 
         return parent != 0u ? (u64) parent : cls;
     }

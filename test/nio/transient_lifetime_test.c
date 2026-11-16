@@ -16,6 +16,15 @@ typedef struct TestLabel {
     bool ownsText;
 } TestLabel;
 
+;;GETTER
+static inline char *TestLabel_text(const TestLabel *lbl) { return (*lbl).text; }
+;;SETTER
+static inline fn TestLabel_setTextField(TestLabel *lbl, char *text) { (*lbl).text = text; }
+;;GETTER
+static inline bool TestLabel_ownsText(const TestLabel *lbl) { return (*lbl).ownsText; }
+;;SETTER
+static inline fn TestLabel_setOwnsText(TestLabel *lbl, bool owns) { (*lbl).ownsText = owns; }
+
 /** Allocates and initializes the fallback label object from permanent memory. */
 static TestLabel *TestLabel_0() {
     TestLabel *lbl = (TestLabel*) Memory_alloc(100, sizeof(TestLabel));
@@ -23,9 +32,9 @@ static TestLabel *TestLabel_0() {
     if (!lbl) 
         return nullptr;
 
-    (*lbl).text = nullptr;
+    TestLabel_setTextField(lbl, nullptr);
 
-    (*lbl).ownsText = false;
+    TestLabel_setOwnsText(lbl, false);
 
     return lbl;
 }
@@ -35,22 +44,23 @@ static fn TestLabel_setText(TestLabel *lbl, const char *text) {
     if (!lbl) 
         return;
 
-    if ((*lbl).text && (*lbl).ownsText) 
-        Memory_free((*lbl).text);
+    if (TestLabel_text(lbl) && TestLabel_ownsText(lbl)) 
+        Memory_free(TestLabel_text(lbl));
 
     if (text) {
         bytes len = strlen(text) + 1;
 
-        (*lbl).text = (char*) Memory_alloc(101, len);
+        char *copy = (char*) Memory_alloc(101, len);
+        TestLabel_setTextField(lbl, copy);
 
-        if ((*lbl).text) 
-            memcpy((*lbl).text, text, len);
+        if (copy) 
+            memcpy(copy, text, len);
 
-        (*lbl).ownsText = true;
+        TestLabel_setOwnsText(lbl, true);
     } else {
-        (*lbl).text = nullptr;
+        TestLabel_setTextField(lbl, nullptr);
 
-        (*lbl).ownsText = false;
+        TestLabel_setOwnsText(lbl, false);
     }
 }
 
@@ -65,12 +75,12 @@ static fn TestLabel_setTextBorrowed(TestLabel *lbl, const char *text) {
         abort();
     }
 #endif
-    if ((*lbl).text && (*lbl).ownsText) 
-        Memory_free((*lbl).text);
+    if (TestLabel_text(lbl) && TestLabel_ownsText(lbl)) 
+        Memory_free(TestLabel_text(lbl));
 
-    (*lbl).text = (char*) text;
+    TestLabel_setTextField(lbl, (char*) text);
 
-    (*lbl).ownsText = false;
+    TestLabel_setOwnsText(lbl, false);
 }
 
 /** Releases owned text and the fallback label allocation. */
@@ -78,8 +88,8 @@ static fn TestLabel_free(TestLabel *lbl) {
     if (!lbl) 
         return;
 
-    if ((*lbl).text && (*lbl).ownsText) 
-        Memory_free((*lbl).text);
+    if (TestLabel_text(lbl) && TestLabel_ownsText(lbl)) 
+        Memory_free(TestLabel_text(lbl));
 
     Memory_free(lbl);
 }
@@ -133,13 +143,13 @@ i32 main() {
 
     Label_setText(lbl, transStr);
 
-    assert((*lbl).ownsText == true);
+    assert(TestLabel_ownsText(lbl) == true);
 
-    assert(Memory_getLifetime((*lbl).text) == MEMORY_LIFETIME_PERMANENT);
+    assert(Memory_getLifetime(TestLabel_text(lbl)) == MEMORY_LIFETIME_PERMANENT);
 
     Transient_reset();
 
-    assert(strcmp((*lbl).text, "transient_string_123") == 0);
+    assert(strcmp(TestLabel_text(lbl), "transient_string_123") == 0);
 
     printf("  [PASS] 2. Auto-promote: transient string copied to permanent, survives Transient_reset()\n");
 
@@ -147,15 +157,15 @@ i32 main() {
 
     Label_setTextBorrowed(lbl, staticStr);
 
-    assert((*lbl).ownsText == false);
+    assert(TestLabel_ownsText(lbl) == false);
 
-    assert((*lbl).text == staticStr);
+    assert(TestLabel_text(lbl) == staticStr);
 
     Label_setText(lbl, "next_owned_value");
 
-    assert((*lbl).ownsText == true);
+    assert(TestLabel_ownsText(lbl) == true);
 
-    assert(strcmp((*lbl).text, "next_owned_value") == 0);
+    assert(strcmp(TestLabel_text(lbl), "next_owned_value") == 0);
 
     Label_free(lbl);
 

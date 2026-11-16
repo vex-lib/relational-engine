@@ -37,6 +37,23 @@ typedef struct Row16 {
     u32 d;
 } Row16;
 
+;;GETTER
+static inline u32 Row16_a(const Row16 *r) { return (*r).a; }
+;;SETTER
+static inline fn Row16_setA(Row16 *r, u32 v) { (*r).a = v; }
+;;GETTER
+static inline u32 Row16_b(const Row16 *r) { return (*r).b; }
+;;SETTER
+static inline fn Row16_setB(Row16 *r, u32 v) { (*r).b = v; }
+;;GETTER
+static inline u32 Row16_c(const Row16 *r) { return (*r).c; }
+;;SETTER
+static inline fn Row16_setC(Row16 *r, u32 v) { (*r).c = v; }
+;;GETTER
+static inline u32 Row16_d(const Row16 *r) { return (*r).d; }
+;;SETTER
+static inline fn Row16_setD(Row16 *r, u32 v) { (*r).d = v; }
+
 // Checks empty-list defaults, row geometry, and initial capacity.
 static fn testDefaults() {
     printf("[1] defaults: 128-byte budget, 16-byte rows -> 8 rows/chunk\n");
@@ -120,13 +137,13 @@ static fn testStableAddresses() {
 
     Row16 *row0 = (Row16*) first;
 
-    (*row0).a = 0xA0u;
+    Row16_setA(row0, 0xA0u);
 
-    (*row0).b = 0xB0u;
+    Row16_setB(row0, 0xB0u);
 
-    (*row0).c = 0xC0u;
+    Row16_setC(row0, 0xC0u);
 
-    (*row0).d = 0xD0u;
+    Row16_setD(row0, 0xD0u);
 
     // Fill well past a chunk boundary (8 rows) and past the first directory
     // generation (64 chunks = 512 rows) so COW doubling happens too.
@@ -143,13 +160,13 @@ static fn testStableAddresses() {
 
         Row16 *r = (Row16*) row;
 
-        (*r).a = i;
+        Row16_setA(r, i);
 
-        (*r).b = i + 1u;
+        Row16_setB(r, i + 1u);
 
-        (*r).c = i + 2u;
+        Row16_setC(r, i + 2u);
 
-        (*r).d = i + 3u;
+        Row16_setD(r, i + 3u);
     }
 
     CHECK(ChunkedList_size(list) == total);
@@ -161,13 +178,13 @@ static fn testStableAddresses() {
     // The very first row must be untouched: same address, same Bytes.
     CHECK(ChunkedList_slot(list, 0u) == first);
 
-    CHECK((*row0).a == 0xA0u);
+    CHECK(Row16_a(row0) == 0xA0u);
 
-    CHECK((*row0).b == 0xB0u);
+    CHECK(Row16_b(row0) == 0xB0u);
 
-    CHECK((*row0).c == 0xC0u);
+    CHECK(Row16_c(row0) == 0xC0u);
 
-    CHECK((*row0).d == 0xD0u);
+    CHECK(Row16_d(row0) == 0xD0u);
 
     // Rows 7 and 8 straddle the chunk boundary -> different chunks.
     u8 *row7 = ChunkedList_slot(list, 7u);
@@ -188,7 +205,7 @@ static fn testStableAddresses() {
     for (u32 i = 1u; i < 64u; i++) {
         Row16 *r = (Row16*) ChunkedList_slot(list, i);
 
-        if (!r || (*r).a != i || (*r).d != i + 3u) {
+        if (!r || Row16_a(r) != i || Row16_d(r) != i + 3u) {
             intact = false;
 
             break;
@@ -263,13 +280,13 @@ static fn testPackInto() {
         if (!r) 
             break;
 
-        (*r).a = i;
+        Row16_setA(r, i);
 
-        (*r).b = i * 2u;
+        Row16_setB(r, i * 2u);
 
-        (*r).c = i * 3u;
+        Row16_setC(r, i * 3u);
 
-        (*r).d = i * 4u;
+        Row16_setD(r, i * 4u);
     }
 
     CHECK(ChunkedList_size(list) == 20u);

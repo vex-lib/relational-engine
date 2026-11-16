@@ -116,6 +116,11 @@ i32 main() {
 
     TestCustomVertex *vslot = (TestCustomVertex*) List_addSlot(verts);
 
+;;GETTER
+static inline u32 TestCustomVertex_color(const TestCustomVertex *v) { return (*v).color; }
+;;GETTER
+static inline d64 TestCustomVertex_weight(const TestCustomVertex *v) { return (*v).weight; }
+
     CHECK(vslot != nullptr && ((pointer) vslot & 15u) == 0u);
 
     if (vslot) 
@@ -128,7 +133,7 @@ i32 main() {
     if (aslot && vslot) 
         (*aslot) = (*vslot);
 
-    CHECK(aslot != nullptr && (*aslot).color == 0xFF00AA55u && (*aslot).weight == 0.5);
+    CHECK(aslot != nullptr && TestCustomVertex_color(aslot) == 0xFF00AA55u && TestCustomVertex_weight(aslot) == 0.5);
 
     List_free(verts);
 

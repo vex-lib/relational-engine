@@ -102,6 +102,31 @@ static FILE *map_open(const char *path, u32 mode) {
     return fopen(path, read ? "r+b.sh" : "rb+");
 }
 
+;;GETTER
+static char *File_nameMut(File *f) {
+    return (*f).name;
+}
+
+;;SETTER
+static fn File_setHandle(File *f, FILE *handle) {
+    (*f).handle = handle;
+}
+
+;;SETTER
+static fn File_setSize(File *f, i64 size) {
+    (*f).size = size;
+}
+
+;;SETTER
+static fn File_setPosition(File *f, i64 position) {
+    (*f).position = position;
+}
+
+;;SETTER
+static fn File_setMode(File *f, u32 mode) {
+    (*f).mode = mode;
+}
+
 /** Open a path using the requested mode flags and create its File in the engine arena. */
 File *File_open(const char *path, u32 mode) {
     if (!path) 
@@ -138,13 +163,15 @@ File *File_open(const char *path, u32 mode) {
         return nullptr;
     }
 
-    strncpy((*f).name, path, FILE_PATH_MAX - 1);
+    char *nameBuf = File_nameMut(f);
 
-    (*f).name[FILE_PATH_MAX - 1] = '\0';
+    strncpy(nameBuf, path, FILE_PATH_MAX - 1);
 
-    (*f).handle = handle;
+    nameBuf[FILE_PATH_MAX - 1] = '\0';
 
-    (*f).mode = mode;
+    File_setHandle(f, handle);
+
+    File_setMode(f, mode);
 
     bool append = (mode & FILE_MODE_APPEND) != 0;
 
@@ -155,14 +182,14 @@ File *File_open(const char *path, u32 mode) {
     if (sz < 0) 
         sz = 0;
 
-    (*f).size = (i64)sz;
+    File_setSize(f, (i64)sz);
 
     if (append) {
-        (*f).position = (i64)sz;
+        File_setPosition(f, (i64)sz);
 
         fseek(handle, 0, SEEK_END);
     } else {
-        (*f).position = 0;
+        File_setPosition(f, 0);
 
         fseek(handle, 0, SEEK_SET);
     }
@@ -175,10 +202,12 @@ bool File_close(File *f) {
     if (!f) 
         return false;
 
-    if ((*f).handle) 
-        fclose((*f).handle);
+    FILE *handle = File_handle(f);
 
-    (*f).handle = nullptr;
+    if (handle) 
+        fclose(handle);
+
+    File_setHandle(f, nullptr);
 
     Memory_free(f);
 
@@ -187,7 +216,7 @@ bool File_close(File *f) {
 
 /** Read up to max_len bytes at the current cursor, returning bytes read or -1 on error. */
 i64 File_read(File *f, any dest, i64 max_len) {
-    if (!f || !(*f).handle || !dest) 
+    if (!f || !File_handle(f) || !dest) 
         return -1;
 
     if (max_len < 0) 
@@ -196,19 +225,21 @@ i64 File_read(File *f, any dest, i64 max_len) {
     if (max_len == 0) 
         return 0;
 
-    bytes n = fread(dest, 1, (bytes) max_len, (*f).handle);
+    FILE *handle = File_handle(f);
 
-    if (n == 0 && ferror((*f).handle)) 
+    bytes n = fread(dest, 1, (bytes) max_len, handle);
+
+    if (n == 0 && ferror(handle)) 
         return -1;
 
-    (*f).position += (i64) n;
+    File_setPosition(f, File_pos(f) + (i64) n);
 
     return (i64) n;
 }
 
 /** Write up to len bytes at the current cursor and update tracked position and size. */
 i64 File_write(File *f, const_any src, i64 len) {
-    if (!f || !(*f).handle || !src) 
+    if (!f || !File_handle(f) || !src) 
         return -1;
 
     if (len < 0) 
@@ -217,85 +248,96 @@ i64 File_write(File *f, const_any src, i64 len) {
     if (len == 0) 
         return 0;
 
-    bytes n = fwrite(src, 1, (bytes) len, (*f).handle);
+    FILE *handle = File_handle(f);
 
-    if (n == 0 && ferror((*f).handle)) 
+    bytes n = fwrite(src, 1, (bytes) len, handle);
+
+    if (n == 0 && ferror(handle)) 
         return -1;
 
-    (*f).position += (i64) n;
+    i64 pos = File_pos(f) + (i64) n;
 
-    if ((*f).position > (*f).size) 
-        (*f).size = (*f).position;
+    File_setPosition(f, pos);
+
+    if (pos > File_size(f)) 
+        File_setSize(f, pos);
 
     return (i64)n;
 }
 
 /** Seek to an absolute nonnegative byte offset and update the tracked cursor on success. */
 bool File_seek(File *f, i64 position) {
-    if (!f || !(*f).handle || position < 0) 
+    if (!f || !File_handle(f) || position < 0) 
         return false;
 
-    if (fseek((*f).handle, position, SEEK_SET) != 0) 
+    if (fseek(File_handle(f), position, SEEK_SET) != 0) 
         return false;
 
-    (*f).position = position;
+    File_setPosition(f, position);
 
     return true;
 }
 
 /** Refresh the tracked file size from the open handle, returning -1 on failure. */
 i64 File_refreshSize(File *f) {
-    if (!f || !(*f).handle) 
+    if (!f || !File_handle(f)) 
         return -1;
 
-    fseek((*f).handle, 0, SEEK_END);
+    FILE *handle = File_handle(f);
 
-    i64 sz = ftell((*f).handle);
+    fseek(handle, 0, SEEK_END);
+
+    i64 sz = ftell(handle);
 
     if (sz < 0) 
         return -1;
 
-    (*f).size = (i64)sz;
+    File_setSize(f, (i64)sz);
 
-    return (*f).size;
+    return File_size(f);
 }
 
 /** Flush buffered output for an open file handle. */
 bool File_flush(File *f) {
-    if (!f || !(*f).handle) 
+    if (!f || !File_handle(f)) 
         return false;
 
-    return fflush((*f).handle) == 0;
+    return fflush(File_handle(f)) == 0;
 }
 
 /** Return the stdio handle borrowed from the File object. */
+;;GETTER
 FILE *File_handle(const File *f) {
     return (*f).handle;
 }
 
 /** Return the File object's stored path. */
+;;GETTER
 const char *File_name(const File *f) {
     return (*f).name;
 }
 
 /** Return the object's tracked file size. */
+;;GETTER
 i64 File_size(const File *f) {
     return (*f).size;
 }
 
 /** Return the object's tracked cursor position. */
+;;GETTER
 i64 File_pos(const File *f) {
     return (*f).position;
 }
 
 /** Return the mode flags supplied when the File was opened. */
+;;GETTER
 u32 File_mode(const File *f) {
     return (*f).mode;
 }
 
 /** Report whether the tracked cursor has reached or passed the tracked file size. */
 bool File_eof(const File *f) {
-    return (*f).position >= (*f).size;
+    return File_pos(f) >= File_size(f);
 }
 
 /** Return whether stat succeeds for the supplied filesystem path. */
@@ -510,6 +552,96 @@ struct FIndexSlot {
 
 _Static_assert(sizeof(FIndexSlot) == 32, "FIndexSlot must be one 32-byte slot");
 
+;;GETTER
+static FIndexSlot *FIndex_slots(const FIndex *self) {
+    return (*self).slots;
+}
+
+;;GETTER
+static bytes FIndex_capacity(const FIndex *self) {
+    return (*self).capacity;
+}
+
+;;GETTER
+static bytes FIndex_countRaw(const FIndex *self) {
+    return (*self).count;
+}
+
+;;GETTER
+static bytes FIndex_used(const FIndex *self) {
+    return (*self).used;
+}
+
+;;GETTER
+static MemoryArena *FIndex_arena(const FIndex *self) {
+    return (*self).arena;
+}
+
+;;SETTER
+static fn FIndex_setSlots(FIndex *self, FIndexSlot *slots) {
+    (*self).slots = slots;
+}
+
+;;SETTER
+static fn FIndex_setCapacity(FIndex *self, bytes capacity) {
+    (*self).capacity = capacity;
+}
+
+;;SETTER
+static fn FIndex_setCount(FIndex *self, bytes count) {
+    (*self).count = count;
+}
+
+;;SETTER
+static fn FIndex_setUsed(FIndex *self, bytes used) {
+    (*self).used = used;
+}
+
+;;SETTER
+static fn FIndex_setArena(FIndex *self, MemoryArena *arena) {
+    (*self).arena = arena;
+}
+
+;;GETTER
+static u64 FIndexSlot_keyHash(const FIndexSlot *slot) {
+    return (*slot).keyHash;
+}
+
+;;GETTER
+static u64 FIndexSlot_offset(const FIndexSlot *slot) {
+    return (*slot).offset;
+}
+
+;;GETTER
+static u64 FIndexSlot_length(const FIndexSlot *slot) {
+    return (*slot).length;
+}
+
+;;GETTER
+static u8 FIndexSlot_state(const FIndexSlot *slot) {
+    return (*slot).state;
+}
+
+;;SETTER
+static fn FIndexSlot_setKeyHash(FIndexSlot *slot, u64 keyHash) {
+    (*slot).keyHash = keyHash;
+}
+
+;;SETTER
+static fn FIndexSlot_setOffset(FIndexSlot *slot, u64 offset) {
+    (*slot).offset = offset;
+}
+
+;;SETTER
+static fn FIndexSlot_setLength(FIndexSlot *slot, u64 length) {
+    (*slot).length = length;
+}
+
+;;SETTER
+static fn FIndexSlot_setState(FIndexSlot *slot, u8 state) {
+    (*slot).state = state;
+}
+
 /** Round a requested slot count up to a power-of-two table capacity. */
 static bytes findexCapacity(bytes requested) {
     bytes capacity = 8;
@@ -526,8 +658,10 @@ static bytes findexCapacity(bytes requested) {
 
 /** Allocate one table from the index's arena, or the default arena. */
 static any findexAlloc(FIndex *self, bytes bytesCount) {
-    if ((*self).arena) 
-        return MemoryArena_alloc((*self).arena, TYPE_FINDEX_SINGLETON, bytesCount);
+    MemoryArena *arena = FIndex_arena(self);
+
+    if (arena) 
+        return MemoryArena_alloc(arena, TYPE_FINDEX_SINGLETON, bytesCount);
 
     return Memory_alloc(TYPE_FINDEX_SINGLETON, bytesCount);
 }
@@ -537,8 +671,10 @@ static fn findexRelease(FIndex *self, any ptr) {
     if (!ptr) 
         return;
 
-    if ((*self).arena) 
-        MemoryArena_free((*self).arena, ptr);
+    MemoryArena *arena = FIndex_arena(self);
+
+    if (arena) 
+        MemoryArena_free(arena, ptr);
     else 
         Memory_free(ptr);
 }
@@ -550,25 +686,31 @@ static bytes findexProbe(u64 keyHash, bytes capacity) {
 
 /** Find a key, or the first reusable slot when it is absent. */
 static bytes findexFindSlot(const FIndex *self, u64 keyHash, bool *outFound) {
-    bytes mask = (*self).capacity - 1;
+    bytes capacity = FIndex_capacity(self);
 
-    bytes index = findexProbe(keyHash, (*self).capacity);
+    bytes mask = capacity - 1;
+
+    bytes index = findexProbe(keyHash, capacity);
 
     bytes firstTombstone = SIZE_MAX;
 
-    for (bytes probes = 0; probes < (*self).capacity; probes++) {
-        const FIndexSlot *slot = &(*self).slots[index];
+    const FIndexSlot *slots = FIndex_slots(self);
 
-        if ((*slot).state == FINDEX_SLOT_EMPTY) {
+    for (bytes probes = 0; probes < capacity; probes++) {
+        const FIndexSlot *slot = &slots[index];
+
+        u8 state = FIndexSlot_state(slot);
+
+        if (state == FINDEX_SLOT_EMPTY) {
             *outFound = false;
 
             return firstTombstone != SIZE_MAX ? firstTombstone : index;
         }
 
-        if ((*slot).state == FINDEX_SLOT_TOMBSTONE) {
+        if (state == FINDEX_SLOT_TOMBSTONE) {
             if (firstTombstone == SIZE_MAX) 
                 firstTombstone = index;
-        } else if ((*slot).keyHash == keyHash) {
+        } else if (FIndexSlot_keyHash(slot) == keyHash) {
             *outFound = true;
 
             return index;
@@ -584,7 +726,9 @@ static bytes findexFindSlot(const FIndex *self, u64 keyHash, bool *outFound) {
 
 /** Allocate a larger table, rehash live slots, and release the old table. */
 static bool findexGrow(FIndex *self, bytes minCapacity) {
-    bytes capacity = (*self).capacity ? (*self).capacity : 8;
+    bytes oldCapacity = FIndex_capacity(self);
+
+    bytes capacity = oldCapacity ? oldCapacity : 8;
 
     while (capacity < minCapacity) {
         if (capacity > SIZE_MAX / 2) 
@@ -605,13 +749,15 @@ static bool findexGrow(FIndex *self, bytes minCapacity) {
 
     bytes mask = capacity - 1;
 
-    for (bytes i = 0; i < (*self).capacity; i++) {
-        FIndexSlot *old = &(*self).slots[i];
+    FIndexSlot *oldSlots = FIndex_slots(self);
 
-        if ((*old).state != FINDEX_SLOT_OCCUPIED) 
+    for (bytes i = 0; i < oldCapacity; i++) {
+        FIndexSlot *old = &oldSlots[i];
+
+        if (FIndexSlot_state(old) != FINDEX_SLOT_OCCUPIED) 
             continue;
 
-        bytes index = findexProbe((*old).keyHash, capacity);
+        bytes index = findexProbe(FIndexSlot_keyHash(old), capacity);
 
         while (slots[index].state == FINDEX_SLOT_OCCUPIED) 
             index = (index + 1) & mask;
@@ -619,13 +765,13 @@ static bool findexGrow(FIndex *self, bytes minCapacity) {
         slots[index] = (*old);
     }
 
-    findexRelease(self, (*self).slots);
+    findexRelease(self, oldSlots);
 
-    (*self).slots = slots;
+    FIndex_setSlots(self, slots);
 
-    (*self).capacity = capacity;
+    FIndex_setCapacity(self, capacity);
 
-    (*self).used = (*self).count;
+    FIndex_setUsed(self, FIndex_countRaw(self));
 
     return true;
 }
@@ -663,17 +809,17 @@ fn FIndex_shutdown(FIndex *self) {
     if (!self) 
         return;
 
-    findexRelease(self, (*self).slots);
+    findexRelease(self, FIndex_slots(self));
 
-    (*self).slots = nullptr;
+    FIndex_setSlots(self, nullptr);
 
-    (*self).capacity = 0;
+    FIndex_setCapacity(self, 0);
 
-    (*self).count = 0;
+    FIndex_setCount(self, 0);
 
-    (*self).used = 0;
+    FIndex_setUsed(self, 0);
 
-    (*self).arena = nullptr;
+    FIndex_setArena(self, nullptr);
 }
 
 bool FIndex_find(FIndex *self, u64 keyHash, u64 *outOffset, u64 *outLength) {
@@ -687,13 +833,13 @@ bool FIndex_find(FIndex *self, u64 keyHash, u64 *outOffset, u64 *outLength) {
     if (!found || index == SIZE_MAX) 
         return false;
 
-    const FIndexSlot *slot = &(*self).slots[index];
+    const FIndexSlot *slot = &FIndex_slots(self)[index];
 
     if (outOffset) 
-        *outOffset = (*slot).offset;
+        *outOffset = FIndexSlot_offset(slot);
 
     if (outLength) 
-        *outLength = (*slot).length;
+        *outLength = FIndexSlot_length(slot);
 
     return true;
 }
@@ -702,9 +848,11 @@ bool FIndex_insert(FIndex *self, u64 keyHash, u64 offset, u64 length) {
     if (!self) 
         return false;
 
-    if ((*self).capacity == 0 || (*self).used + 1 > ((*self).capacity * 7) / 10) {
-        if (!findexGrow(self, (*self).capacity ? (*self).capacity * 2 : 8) &&
-            (*self).used >= (*self).capacity)
+    bytes capacity = FIndex_capacity(self);
+
+    if (capacity == 0 || FIndex_used(self) + 1 > (capacity * 7) / 10) {
+        if (!findexGrow(self, capacity ? capacity * 2 : 8) &&
+            FIndex_used(self) >= FIndex_capacity(self))
             return false;
     }
 
@@ -715,28 +863,28 @@ bool FIndex_insert(FIndex *self, u64 keyHash, u64 offset, u64 length) {
     if (index == SIZE_MAX) 
         return false;
 
-    FIndexSlot *slot = &(*self).slots[index];
+    FIndexSlot *slot = &FIndex_slots(self)[index];
 
     if (found) {
-        (*slot).offset = offset;
+        FIndexSlot_setOffset(slot, offset);
 
-        (*slot).length = length;
+        FIndexSlot_setLength(slot, length);
 
         return true;
     }
 
-    if ((*slot).state == FINDEX_SLOT_EMPTY) 
-        (*self).used++;
+    if (FIndexSlot_state(slot) == FINDEX_SLOT_EMPTY) 
+        FIndex_setUsed(self, FIndex_used(self) + 1);
 
-    (*slot).keyHash = keyHash;
+    FIndexSlot_setKeyHash(slot, keyHash);
 
-    (*slot).offset = offset;
+    FIndexSlot_setOffset(slot, offset);
 
-    (*slot).length = length;
+    FIndexSlot_setLength(slot, length);
 
-    (*slot).state = FINDEX_SLOT_OCCUPIED;
+    FIndexSlot_setState(slot, FINDEX_SLOT_OCCUPIED);
 
-    (*self).count++;
+    FIndex_setCount(self, FIndex_countRaw(self) + 1);
 
     return true;
 }
@@ -752,22 +900,27 @@ fn FIndex_remove(FIndex *self, u64 keyHash) {
     if (!found || index == SIZE_MAX) 
         return;
 
-    (*self).slots[index].state = FINDEX_SLOT_TOMBSTONE;
+    FIndexSlot_setState(&FIndex_slots(self)[index], FINDEX_SLOT_TOMBSTONE);
 
-    if ((*self).count > 0) 
-        (*self).count--;
+    bytes count = FIndex_countRaw(self);
 
-    if ((*self).count == 0) {
-        memset((*self).slots, 0, (*self).capacity * sizeof(FIndexSlot));
+    if (count > 0) {
+        count--;
 
-        (*self).used = 0;
+        FIndex_setCount(self, count);
+    }
+
+    if (count == 0) {
+        memset(FIndex_slots(self), 0, FIndex_capacity(self) * sizeof(FIndexSlot));
+
+        FIndex_setUsed(self, 0);
     }
 }
 
 u64 FIndex_count(const FIndex *self) {
-    return self ? (*self).count : 0;
+    return self ? FIndex_countRaw(self) : 0;
 }
 
 bool FIndex_live(const FIndex *self) {
-    return self && (*self).slots && (*self).capacity > 0;
+    return self && FIndex_slots(self) && FIndex_capacity(self) > 0;
 }

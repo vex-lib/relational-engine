@@ -363,6 +363,9 @@ u32 StringPool_count() {
     return n;
 }
 
+;;GETTER
+static inline u64 StringSlot_self(const StringSlot *slot) { return (*slot).self; }
+
 bool StringPool_isSlot(const_any ptr) {
     if (!ptr) 
         return false;
@@ -374,7 +377,7 @@ bool StringPool_isSlot(const_any ptr) {
     if (s_pool.magic == STRING_POOL_MAGIC) {
         const StringSlot *slot = (const StringSlot*) ptr;
 
-        if ((*slot).self == (u64) (pointer) ptr) {
+        if (StringSlot_self(slot) == (u64) (pointer) ptr) {
             const StringSlot *base = s_pool.slots;
 
             ok = slot >= base && slot < base + s_pool.capacity;

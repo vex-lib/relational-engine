@@ -339,7 +339,9 @@ static fn hostile() {
 
     MemoryHeader saved = *header;
 
-    (*header).hash ^= 2u;
+    MemoryHeader tampered = saved;
+    tampered.hash ^= 2u;
+    *header = tampered;
 
     assert(Memory_type(p) == 0 && Memory_length(p) == 0);
 
@@ -348,12 +350,16 @@ static fn hostile() {
     Memory_free(p);
     *header = saved;
 
-    (*header).typeId ^= UINT64_C(0x100000000);
+    tampered = saved;
+    tampered.typeId ^= UINT64_C(0x100000000);
+    *header = tampered;
 
     assert(Memory_type(p) == 0);
     *header = saved;
 
-    (*header).length++;
+    tampered = saved;
+    tampered.length++;
+    *header = tampered;
 
     assert(Memory_length(p) == 0);
     *header = saved;

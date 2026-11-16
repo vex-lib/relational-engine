@@ -36,6 +36,9 @@ static i32 g_failures = 0;
 } while (0)
 
 // Exercises static StringPool lifecycle, validation, deduplication, growth, and relinking.
+;;GETTER
+static inline u64 StringSlot_self(const StringSlot *slot) { return (*slot).self; }
+
 i32 main() {
     printf("=== Running Variable Pool Test Suite ===\n");
 
@@ -81,7 +84,7 @@ i32 main() {
         CHECK("23-char accepted", e >= 0);
         CHECK("name round-trip", strcmp(StringPool_name((u32) e), edge23) == 0);
         const StringSlot *slot = StringPool_slot((u32) a);
-        CHECK("slot self link", slot != nullptr && (*slot).self == (u64) (pointer) slot);
+        CHECK("slot self link", slot != nullptr && StringSlot_self(slot) == (u64) (pointer) slot);
         CHECK("isSlot live", StringPool_isSlot(slot) == true);
         char nearby[32];
         memset(nearby, 0, sizeof(nearby));

@@ -32,16 +32,29 @@ typedef struct {
     u32 count;
 } AddArg;
 
+;;GETTER
+static inline u32 AddArg_count(const AddArg *arg) { return (*arg).count; }
+;;GETTER
+static inline pthread_mutex_t *AddArg_lock(const AddArg *arg) { return (*arg).lock; }
+;;GETTER
+static inline List *AddArg_list(const AddArg *arg) { return (*arg).list; }
+;;GETTER
+static inline u32 AddArg_base(const AddArg *arg) { return (*arg).base; }
+
 // Appends this worker's assigned value range while holding the shared list mutex.
 static any adder(any userData) {
     AddArg *arg = userData;
 
-    for (u32 i = 0; i < (*arg).count; i++) {
-        pthread_mutex_lock((*arg).lock);
+    u32 count = AddArg_count(arg);
+    pthread_mutex_t *lock = AddArg_lock(arg);
+    List *list = AddArg_list(arg);
+    u32 base = AddArg_base(arg);
+    for (u32 i = 0; i < count; i++) {
+        pthread_mutex_lock(lock);
 
-        List_add((*arg).list, (u64) ((*arg).base + i));
+        List_add(list, (u64) (base + i));
 
-        pthread_mutex_unlock((*arg).lock);
+        pthread_mutex_unlock(lock);
     }
 
     return nullptr;

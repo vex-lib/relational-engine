@@ -41,6 +41,23 @@ typedef struct Row16 {
     u32 d;
 } Row16;
 
+;;GETTER
+static inline u32 Row16_a(const Row16 *r) { return (*r).a; }
+;;SETTER
+static inline fn Row16_setA(Row16 *r, u32 v) { (*r).a = v; }
+;;GETTER
+static inline u32 Row16_b(const Row16 *r) { return (*r).b; }
+;;SETTER
+static inline fn Row16_setB(Row16 *r, u32 v) { (*r).b = v; }
+;;GETTER
+static inline u32 Row16_c(const Row16 *r) { return (*r).c; }
+;;SETTER
+static inline fn Row16_setC(Row16 *r, u32 v) { (*r).c = v; }
+;;GETTER
+static inline u32 Row16_d(const Row16 *r) { return (*r).d; }
+;;SETTER
+static inline fn Row16_setD(Row16 *r, u32 v) { (*r).d = v; }
+
 // Confirms the public sentinel values used by paged chunk traversal.
 static fn testSentinels() {
     printf("[1] sentinels: FourCC sugars are negative and byte-exact\n");
@@ -175,13 +192,13 @@ static fn testDeepGrowth() {
         if (i == 0u) 
             first = (u8*) r;
 
-        (*r).a = i;
+        Row16_setA(r, i);
 
-        (*r).b = i + 1u;
+        Row16_setB(r, i + 1u);
 
-        (*r).c = i + 2u;
+        Row16_setC(r, i + 2u);
 
-        (*r).d = i + 3u;
+        Row16_setD(r, i + 3u);
     }
 
     CHECK(ChunkedList_size(list) == total);
@@ -198,7 +215,7 @@ static fn testDeepGrowth() {
     if (first) {
         Row16 *r0 = (Row16*) first;
 
-        CHECK((*r0).a == 0u && (*r0).b == 1u && (*r0).c == 2u && (*r0).d == 3u);
+        CHECK(Row16_a(r0) == 0u && Row16_b(r0) == 1u && Row16_c(r0) == 2u && Row16_d(r0) == 3u);
     }
 
     // Every row resolves at its original contents (no holes below size).
@@ -207,7 +224,7 @@ static fn testDeepGrowth() {
     for (u32 i = 0u; i < total; i++) {
         Row16 *r = (Row16*) ChunkedList_slot(list, i);
 
-        if (!r || (*r).a != i || (*r).d != i + 3u) {
+        if (!r || Row16_a(r) != i || Row16_d(r) != i + 3u) {
             intact = false;
 
             break;
@@ -250,14 +267,21 @@ typedef struct ChainProbe {
     bool ok;
 } ChainProbe;
 
+;;GETTER
+static inline u32 ChainProbe_chunks(const ChainProbe *p) { return (*p).chunks; }
+;;SETTER
+static inline fn ChainProbe_setChunks(ChainProbe *p, u32 c) { (*p).chunks = c; }
+;;SETTER
+static inline fn ChainProbe_setOk(ChainProbe *p, bool ok) { (*p).ok = ok; }
+
 // Records each chunk and index visited by the chain traversal callback.
 static fn chainFn(u8 *chunk, u32 index, any userdata) {
     ChainProbe *p = (ChainProbe*) userdata;
+    u32 chunks = ChainProbe_chunks(p);
+    if (!chunk || index != chunks) 
+        ChainProbe_setOk(p, false);
 
-    if (!chunk || index != (*p).chunks) 
-        (*p).ok = false;
-
-    (*p).chunks++;
+    ChainProbe_setChunks(p, chunks + 1u);
 }
 
 // Verifies chain traversal visits the expected chunks in order.
@@ -283,7 +307,7 @@ static fn testChain() {
             break;
         }
 
-        (*r).a = i;
+        Row16_setA(r, i);
     }
 
     u32 chunks = ChunkedList_getChunkCount(list);
@@ -341,9 +365,9 @@ static fn testChain() {
 
     Row16 *r29 = (Row16*) ChunkedList_slot(list, 29u);
 
-    CHECK(r0 != nullptr && (*r0).a == 0u);
+    CHECK(r0 != nullptr && Row16_a(r0) == 0u);
 
-    CHECK(r29 != nullptr && (*r29).a == 29u);
+    CHECK(r29 != nullptr && Row16_a(r29) == 29u);
 
     ChunkedList_free(list);
 }

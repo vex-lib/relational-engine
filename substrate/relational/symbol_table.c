@@ -107,11 +107,44 @@ static bool clean_name(const char *name, char *lowered) {
     return true;
 }
 
+;;GETTER
+static inline bool SymbolTable_active(const SymbolTable *v) { return (*v).active; }
+;;SETTER
+static inline fn SymbolTable_setActive(SymbolTable *v, bool active) { (*v).active = active; }
+;;GETTER
+static inline SymbolRow *SymbolTable_rows(const SymbolTable *v) { return (*v).rows; }
+;;SETTER
+static inline fn SymbolTable_setRows(SymbolTable *v, SymbolRow *rows) { (*v).rows = rows; }
+;;GETTER
+static inline u32 SymbolTable_count(const SymbolTable *v) { return (*v).count; }
+;;SETTER
+static inline fn SymbolTable_setCount(SymbolTable *v, u32 count) { (*v).count = count; }
+;;GETTER
+static inline u32 SymbolTable_capacity(const SymbolTable *v) { return (*v).capacity; }
+;;SETTER
+static inline fn SymbolTable_setCapacity(SymbolTable *v, u32 cap) { (*v).capacity = cap; }
+;;GETTER
+static inline i32 *SymbolTable_bySlot(const SymbolTable *v) { return (*v).bySlot; }
+;;SETTER
+static inline fn SymbolTable_setBySlot(SymbolTable *v, i32 *bySlot) { (*v).bySlot = bySlot; }
+;;GETTER
+static inline u32 SymbolTable_bySlotCap(const SymbolTable *v) { return (*v).bySlotCap; }
+;;SETTER
+static inline fn SymbolTable_setBySlotCap(SymbolTable *v, u32 cap) { (*v).bySlotCap = cap; }
+;;GETTER
+static inline pointer SymbolRow_pointer(const SymbolRow *row) { return (*row).pointer; }
+;;SETTER
+static inline fn SymbolRow_setPointer(SymbolRow *row, pointer ptr) { (*row).pointer = ptr; }
+;;GETTER
+static inline u32 SymbolRow_classId(const SymbolRow *row) { return (*row).classId; }
+;;GETTER
+static inline i32 SymbolRow_slot(const SymbolRow *row) { return (*row).slot; }
+
 static SymbolRow *row_at(SymbolTable *v, i32 varId) {
-    if (!v || !(*v).active || !(*v).rows || varId < 0 || (u32) varId >= (*v).count) 
+    if (!v || !SymbolTable_active(v) || !SymbolTable_rows(v) || varId < 0 || (u32) varId >= SymbolTable_count(v)) 
         return nullptr;
 
-    SymbolRow *rows = (*v).rows;
+    SymbolRow *rows = SymbolTable_rows(v);
 
     return &rows[varId];
 }
@@ -119,19 +152,20 @@ static SymbolRow *row_at(SymbolTable *v, i32 varId) {
 // Pool slot -> var id through the sparse hop. -1 when unmapped (a pool slot
 // may exist globally without belonging to this scope).
 static i32 slot_var(SymbolTable *v, i32 slot) {
-    if (slot < 0 || (u32) slot >= (*v).bySlotCap) 
+    if (slot < 0 || (u32) slot >= SymbolTable_bySlotCap(v)) 
         return -1;
 
-    i32 *bySlot = (*v).bySlot;
+    i32 *bySlot = SymbolTable_bySlot(v);
 
     return bySlot[slot];
 }
 
 static bool ensure_byslot(SymbolTable *v, u32 need) {
-    if (need < (*v).bySlotCap) 
+    u32 curCap = SymbolTable_bySlotCap(v);
+    if (need < curCap) 
         return true;
 
-    u32 cap = (*v).bySlotCap ? (*v).bySlotCap * 2 : 64;
+    u32 cap = curCap ? curCap * 2 : 64;
 
     while (cap <= need) {
         if (cap > UINT32_MAX / 2) 
@@ -148,15 +182,16 @@ static bool ensure_byslot(SymbolTable *v, u32 need) {
     for (u32 i = 0; i < cap; i++) 
         next[i] = -1;
 
-    if ((*v).bySlot) {
-        memcpy(next, (*v).bySlot, (bytes)(*v).bySlotCap * sizeof(i32));
+    i32 *oldBySlot = SymbolTable_bySlot(v);
+    if (oldBySlot) {
+        memcpy(next, oldBySlot, (bytes) curCap * sizeof(i32));
 
-        Memory_free((*v).bySlot);
+        Memory_free(oldBySlot);
     }
 
-    (*v).bySlot = next;
+    SymbolTable_setBySlot(v, next);
 
-    (*v).bySlotCap = cap;
+    SymbolTable_setBySlotCap(v, cap);
 
     return true;
 }
@@ -187,28 +222,28 @@ SymbolTable SymbolTable_0() {
 }
 
 fn SymbolTable_shutdown(SymbolTable *v) {
-    if (!v || !(*v).active) 
+    if (!v || !SymbolTable_active(v)) 
         return;
 
-    Memory_free((*v).rows);
+    Memory_free(SymbolTable_rows(v));
 
-    Memory_free((*v).bySlot);
+    Memory_free(SymbolTable_bySlot(v));
 
-    (*v).rows = nullptr;
+    SymbolTable_setRows(v, nullptr);
 
-    (*v).bySlot = nullptr;
+    SymbolTable_setBySlot(v, nullptr);
 
-    (*v).count = 0;
+    SymbolTable_setCount(v, 0);
 
-    (*v).capacity = 0;
+    SymbolTable_setCapacity(v, 0);
 
-    (*v).bySlotCap = 0;
+    SymbolTable_setBySlotCap(v, 0);
 
-    (*v).active = false;
+    SymbolTable_setActive(v, false);
 }
 
 i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer targetPointer) {
-    if (!v || !(*v).active) {
+    if (!v || !SymbolTable_active(v)) {
         fprintf(stderr, "[variable] instant: inactive registry\n");
 
         return -1;
@@ -258,10 +293,12 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
         return -1;
     }
 
-    if ((*v).count >= (*v).capacity) {
-        bytes newCap = (bytes)(*v).capacity + SYMBOL_TABLE_DEFAULT_CAPACITY;
+    u32 count = SymbolTable_count(v);
+    u32 cap = SymbolTable_capacity(v);
+    if (count >= cap) {
+        bytes newCap = (bytes)cap + SYMBOL_TABLE_DEFAULT_CAPACITY;
 
-        SymbolRow *next = (SymbolRow*) Memory_realloc((*v).rows, newCap * sizeof(SymbolRow));
+        SymbolRow *next = (SymbolRow*) Memory_realloc(SymbolTable_rows(v), newCap * sizeof(SymbolRow));
 
         if (!next) {
             fprintf(stderr, "[variable] instant: out of memory ('%s')\n", lowered);
@@ -269,14 +306,14 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
             return -1;
         }
 
-        (*v).rows = next;
+        SymbolTable_setRows(v, next);
 
-        (*v).capacity = (u32) newCap;
+        SymbolTable_setCapacity(v, (u32) newCap);
     }
 
-    u32 id = (*v).count;
+    u32 id = count;
 
-    SymbolRow *rows = (*v).rows;
+    SymbolRow *rows = SymbolTable_rows(v);
 
     rows[id].slot = slot;
 
@@ -284,17 +321,17 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
 
     rows[id].pointer = targetPointer;
 
-    i32 *bySlot = (*v).bySlot;
+    i32 *bySlot = SymbolTable_bySlot(v);
 
     bySlot[slot] = (i32) id;
 
-    (*v).count++;
+    SymbolTable_setCount(v, count + 1u);
 
     return (i32) id;
 }
 
 i32 SymbolTable_getId(SymbolTable *v, const char *name) {
-    if (!v || !(*v).active || !name) 
+    if (!v || !SymbolTable_active(v) || !name) 
         return -1;
 
     char lowered[24];
@@ -311,7 +348,7 @@ i32 SymbolTable_getId(SymbolTable *v, const char *name) {
 }
 
 bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName) {
-    if (!v || !(*v).active) {
+    if (!v || !SymbolTable_active(v)) {
         fprintf(stderr, "[variable] rename: inactive registry\n");
 
         return false;
@@ -365,15 +402,15 @@ bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName
         return false;
     }
 
-    SymbolRow *rows = (*v).rows;
+    SymbolRow *rows = SymbolTable_rows(v);
 
-    i32 *bySlot = (*v).bySlot;
+    i32 *bySlot = SymbolTable_bySlot(v);
 
     i32 oldSlotIdx = rows[id].slot;
 
     rows[id].slot = newSlot;
 
-    if (oldSlotIdx >= 0 && (u32) oldSlotIdx < (*v).bySlotCap && bySlot[oldSlotIdx] == id) 
+    if (oldSlotIdx >= 0 && (u32) oldSlotIdx < SymbolTable_bySlotCap(v) && bySlot[oldSlotIdx] == id) 
         bySlot[oldSlotIdx] = -1;
 
     bySlot[newSlot] = id;
@@ -382,14 +419,15 @@ bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName
 }
 
 bytes SymbolTable_findByClass(SymbolTable *v, u32 classId, i32 *outIds, bytes cap) {
-    if (!v || !(*v).active) 
+    if (!v || !SymbolTable_active(v)) 
         return 0;
 
     bytes total = 0;
 
-    SymbolRow *rows = (*v).rows;
+    SymbolRow *rows = SymbolTable_rows(v);
+    u32 count = SymbolTable_count(v);
 
-    for (u32 i = 0; i < (*v).count; i++) {
+    for (u32 i = 0; i < count; i++) {
         if (rows[i].classId == classId) {
             if (outIds && total < cap) 
                 outIds[total] = (i32) i;
@@ -404,7 +442,7 @@ bytes SymbolTable_findByClass(SymbolTable *v, u32 classId, i32 *outIds, bytes ca
 pointer SymbolTable_getPointer(SymbolTable *v, i32 varId) {
     SymbolRow *row = row_at(v, varId);
 
-    return row ? (*row).pointer : 0;
+    return row ? SymbolRow_pointer(row) : 0;
 }
 
 fn SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer) {
@@ -413,7 +451,7 @@ fn SymbolTable_setPointer(SymbolTable *v, i32 varId, pointer targetPointer) {
     if (!row) 
         return;
 
-    (*row).pointer = targetPointer;
+    SymbolRow_setPointer(row, targetPointer);
 }
 
 bool SymbolTable_compareAndSetPointer(SymbolTable *v, i32 varId, pointer expected, pointer newPointer) {
@@ -422,10 +460,10 @@ bool SymbolTable_compareAndSetPointer(SymbolTable *v, i32 varId, pointer expecte
     if (!row) 
         return false;
 
-    if ((*row).pointer != expected) 
+    if (SymbolRow_pointer(row) != expected) 
         return false;
 
-    (*row).pointer = newPointer;
+    SymbolRow_setPointer(row, newPointer);
 
     return true;
 }
@@ -433,7 +471,7 @@ bool SymbolTable_compareAndSetPointer(SymbolTable *v, i32 varId, pointer expecte
 u32 SymbolTable_getClassId(SymbolTable *v, i32 varId) {
     SymbolRow *row = row_at(v, varId);
 
-    return row ? (*row).classId : 0;
+    return row ? SymbolRow_classId(row) : 0;
 }
 
 const char *SymbolTable_getName(const SymbolTable *v, i32 varId) {
@@ -442,12 +480,12 @@ const char *SymbolTable_getName(const SymbolTable *v, i32 varId) {
     if (!row) 
         return nullptr;
 
-    return StringPool_name((u32) (*row).slot);
+    return StringPool_name((u32) SymbolRow_slot(row));
 }
 
 bytes SymbolTable_getActiveCount(SymbolTable *v) {
-    if (!v || !(*v).active) 
+    if (!v || !SymbolTable_active(v)) 
         return 0;
 
-    return (*v).count;
+    return SymbolTable_count(v);
 }

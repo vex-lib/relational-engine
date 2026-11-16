@@ -162,10 +162,17 @@ i32 VariableSlot_bucketOf(char c) {
     return -1;
 }
 
+;;GETTER
+static inline char *VariableSlot_nameMut(VariableSlot *self) { return (*self).name; }
+;;GETTER
+static inline const char *VariableSlot_name(const VariableSlot *self) { return (*self).name; }
+;;GETTER
+static inline pointer VariableSlot_pointer(const VariableSlot *self) { return (*self).pointer; }
+
 // Store a validated folded name into the slot, zero-padding the tail so the
 // 24-byte buffer has no stale Bytes.
 static fn storeName(VariableSlot *self, const char *folded) {
-    char *dest = (*self).name;
+    char *dest = VariableSlot_nameMut(self);
 
     memset(dest, 0, VARIABLE_SLOT_NAME_BYTES);
 
@@ -185,7 +192,7 @@ bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer) {
 
     storeName(self, folded);
 
-    (*self).pointer = pointer;
+    VariableSlot_setPointer(self, pointer);
 
     return true;
 }
@@ -251,21 +258,21 @@ fn VariableSlot_setPointer(VariableSlot *self, pointer pointer) {
 // GETTERS (PUBLIC & PRIVATE)
 
 const char *VariableSlot_getName(const VariableSlot *self) {
-    return self ? (*self).name : nullptr;
+    return self ? VariableSlot_name(self) : nullptr;
 }
 
 pointer VariableSlot_getPointer(const VariableSlot *self) {
     if (self == nullptr) 
         return 0;
 
-    return (*self).pointer;
+    return VariableSlot_pointer(self);
 }
 
 bool VariableSlot_isEmpty(const VariableSlot *self) {
     if (self == nullptr) 
         return true;
 
-    return (*self).name[0] == '\0';
+    return VariableSlot_name(self)[0] == '\0';
 }
 
 bool VariableSlot_nameEquals(const VariableSlot *self, const char *name) {
@@ -277,11 +284,12 @@ bool VariableSlot_nameEquals(const VariableSlot *self, const char *name) {
     if (!VariableSlot_foldName(name, folded)) 
         return false;
 
+    const char *sname = VariableSlot_name(self);
     for (bytes i = 0; i < VARIABLE_SLOT_NAME_BYTES; i++) {
-        if ((*self).name[i] != folded[i]) 
+        if (sname[i] != folded[i]) 
             return false;
 
-        if ((*self).name[i] == '\0') 
+        if (sname[i] == '\0') 
             return true;
     }
 
@@ -304,13 +312,13 @@ fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *
         return;
     }
 
-    const char *name = (*self).name;
+    const char *name = VariableSlot_name(self);
 
     if (name[0] == '\0') 
         name = "?";
 
     i32 written = snprintf(dest, cap, "VariableSlot(%s => 0x%llx)", name,
-                           (u64) (*self).pointer);
+                           (u64) VariableSlot_pointer(self));
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated != nullptr) 
             *outTruncated = true;
@@ -330,8 +338,8 @@ fn VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, 
         return;
     }
 
-    i32 written = snprintf(dest, cap, "VariableSlot { name=\"%s\", pointer=0x%llx }", (*self).name,
-                           (u64) (*self).pointer);
+    i32 written = snprintf(dest, cap, "VariableSlot { name=\"%s\", pointer=0x%llx }", VariableSlot_name(self),
+                           (u64) VariableSlot_pointer(self));
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated != nullptr) 
             *outTruncated = true;

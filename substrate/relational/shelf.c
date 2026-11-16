@@ -91,12 +91,37 @@
  * ============================================================================
  */
 
+;;GETTER
+static inline bool Shelf_active(const Shelf *shelf) { return (*shelf).active; }
+;;SETTER
+static inline fn Shelf_setActive(Shelf *shelf, bool active) { (*shelf).active = active; }
+;;SETTER
+static inline fn Shelf_setCount(Shelf *shelf, u32 count) { (*shelf).count = count; }
+;;GETTER
+static inline u32 Shelf_head(const Shelf *shelf) { return (*shelf).head; }
+;;SETTER
+static inline fn Shelf_setHeadField(Shelf *shelf, u32 head) { (*shelf).head = head; }
+;;GETTER
+static inline ChunkedList *Shelf_nodes(const Shelf *shelf) { return (*shelf).nodes; }
+;;SETTER
+static inline fn Shelf_setNodes(Shelf *shelf, ChunkedList *nodes) { (*shelf).nodes = nodes; }
+;;GETTER
+static inline pointer ShelfNode_cell(const ShelfNode *row) { return (*row).cell; }
+;;SETTER
+static inline fn ShelfNode_setCell(ShelfNode *row, pointer cell) { (*row).cell = cell; }
+;;GETTER
+static inline u32 ShelfNode_next(const ShelfNode *row) { return (*row).next; }
+;;SETTER
+static inline fn ShelfNode_setNext(ShelfNode *row, u32 next) { (*row).next = next; }
+;;SETTER
+static inline fn ShelfNode_setPad(ShelfNode *row, u32 pad) { (*row).pad = pad; }
+
 // Bounds-checked node resolve: null on a null shelf or an out-of-range index.
 static ShelfNode *nodeAt(const Shelf *shelf, u32 index) {
-    if (!shelf || index >= (*shelf).count) 
+    if (!shelf || index >= Shelf_count(shelf)) 
         return nullptr;
 
-    return (ShelfNode*) ChunkedList_slot((*shelf).nodes, index);
+    return (ShelfNode*) ChunkedList_slot(Shelf_nodes(shelf), index);
 }
 
 // CONSTRUCTORS
@@ -110,13 +135,13 @@ bool Shelf_init(Shelf *shelf) {
     if (!nodes) 
         return false;
 
-    (*shelf).active = true;
+    Shelf_setActive(shelf, true);
 
-    (*shelf).count = 0u;
+    Shelf_setCount(shelf, 0u);
 
-    (*shelf).head = SHELF_INDEX_NONE;
+    Shelf_setHeadField(shelf, SHELF_INDEX_NONE);
 
-    (*shelf).nodes = nodes;
+    Shelf_setNodes(shelf, nodes);
 
     return true;
 }
@@ -125,7 +150,7 @@ fn Shelf_shutdown(Shelf *shelf) {
     if (!shelf) 
         return;
 
-    ChunkedList *nodes = (*shelf).nodes;
+    ChunkedList *nodes = Shelf_nodes(shelf);
 
     if (nodes) {
         u32 rows = ChunkedList_size(nodes);
@@ -133,20 +158,20 @@ fn Shelf_shutdown(Shelf *shelf) {
         for (u32 i = 0; i < rows; i++) {
             ShelfNode *row = (ShelfNode*) ChunkedList_slot(nodes, i);
 
-            if (row && (*row).cell) 
-                Cell_free((Cell*) (*row).cell);
+            if (row && ShelfNode_cell(row)) 
+                Cell_free((Cell*) ShelfNode_cell(row));
         }
 
         ChunkedList_free(nodes);
     }
 
-    (*shelf).nodes = nullptr;
+    Shelf_setNodes(shelf, nullptr);
 
-    (*shelf).count = 0u;
+    Shelf_setCount(shelf, 0u);
 
-    (*shelf).head = SHELF_INDEX_NONE;
+    Shelf_setHeadField(shelf, SHELF_INDEX_NONE);
 
-    (*shelf).active = false;
+    Shelf_setActive(shelf, false);
 }
 
 Shelf *Shelf_0() {
@@ -176,23 +201,24 @@ fn Shelf_free(Shelf *shelf) {
 // CORE FUNCTIONS
 
 u32 Shelf_addNode(Shelf *shelf, pointer cell) {
-    if (!shelf || !(*shelf).active) 
+    if (!shelf || !Shelf_active(shelf)) 
         return SHELF_INDEX_NONE;
 
-    ShelfNode *row = (ShelfNode*) ChunkedList_addSlot((*shelf).nodes);
+    ChunkedList *nodes = Shelf_nodes(shelf);
+    ShelfNode *row = (ShelfNode*) ChunkedList_addSlot(nodes);
 
     if (!row) 
         return SHELF_INDEX_NONE;
 
-    (*row).cell = cell;
+    ShelfNode_setCell(row, cell);
 
-    (*row).next = SHELF_INDEX_NONE;
+    ShelfNode_setNext(row, SHELF_INDEX_NONE);
 
-    (*row).pad = 0u;
+    ShelfNode_setPad(row, 0u);
 
-    u32 index = ChunkedList_size((*shelf).nodes) - 1u;
+    u32 index = ChunkedList_size(nodes) - 1u;
 
-    (*shelf).count = index + 1u;
+    Shelf_setCount(shelf, index + 1u);
 
     return index;
 }
@@ -217,7 +243,7 @@ pointer Shelf_getCell(const Shelf *shelf, u32 index) {
     if (!row) 
         return 0u;
 
-    return (*row).cell;
+    return ShelfNode_cell(row);
 }
 
 u32 Shelf_getNext(const Shelf *shelf, u32 index) {
@@ -226,7 +252,7 @@ u32 Shelf_getNext(const Shelf *shelf, u32 index) {
     if (!row) 
         return SHELF_INDEX_NONE;
 
-    return (*row).next;
+    return ShelfNode_next(row);
 }
 
 bool Shelf_setNext(Shelf *shelf, u32 index, u32 next) {
@@ -235,7 +261,7 @@ bool Shelf_setNext(Shelf *shelf, u32 index, u32 next) {
     if (!row) 
         return false;
 
-    (*row).next = next;
+    ShelfNode_setNext(row, next);
 
     return true;
 }
@@ -250,10 +276,10 @@ bool Shelf_setHead(Shelf *shelf, u32 index) {
     if (!shelf) 
         return false;
 
-    if (index != SHELF_INDEX_NONE && index >= (*shelf).count) 
+    if (index != SHELF_INDEX_NONE && index >= Shelf_count(shelf)) 
         return false;
 
-    (*shelf).head = index;
+    Shelf_setHeadField(shelf, index);
 
     return true;
 }
@@ -264,7 +290,7 @@ u32 Shelf_getHead(const Shelf *shelf) {
     if (!shelf) 
         return SHELF_INDEX_NONE;
 
-    return (*shelf).head;
+    return Shelf_head(shelf);
 }
 
 u32 Shelf_count(const Shelf *shelf) {
@@ -275,7 +301,7 @@ bool Shelf_isEmpty(const Shelf *shelf) {
     if (!shelf) 
         return true;
 
-    return (*shelf).count == 0u;
+    return Shelf_count(shelf) == 0u;
 }
 
 // STRING PROJECTIONS (the toString Law)
@@ -293,7 +319,7 @@ fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated)
         return;
     }
 
-    i32 written = snprintf(dest, cap, "Shelf(count=%u)", (*shelf).count);
+    i32 written = snprintf(dest, cap, "Shelf(count=%u)", Shelf_count(shelf));
 
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
@@ -315,8 +341,8 @@ fn Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTrun
     }
 
     i32 written = snprintf(dest, cap, "Shelf { active=%s, count=%u, head=%d, nodes=0x%llx }",
-                           (*shelf).active ? "true" : "false", (*shelf).count,
-                           (i32) (*shelf).head, (u64) (pointer) (*shelf).nodes);
+                           Shelf_active(shelf) ? "true" : "false", Shelf_count(shelf),
+                           (i32) Shelf_head(shelf), (u64) (pointer) Shelf_nodes(shelf));
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
             *outTruncated = true;

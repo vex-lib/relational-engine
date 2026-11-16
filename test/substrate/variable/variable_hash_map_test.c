@@ -342,6 +342,9 @@ static fn testStrings() {
 }
 
 // Exercises the zero-argument constructor chooser and null-safe freeing.
+;;GETTER
+static inline bool VariableHashMap_active(const VariableHashMap *map) { return (*map).active; }
+
 static fn testArity() {
     printf("[8] arity constructor + free\n");
 
@@ -350,7 +353,7 @@ static fn testArity() {
     CHECK(map != nullptr);
 
     if (map) {
-        CHECK((*map).active == true);
+        CHECK(VariableHashMap_active(map) == true);
 
         CHECK(VariableHashMap_add(map, "score", 0x42u) == true);
 
@@ -370,16 +373,27 @@ typedef struct VisitProbe {
     bool sawDotted;
 } VisitProbe;
 
+;;GETTER
+static inline u32 VisitProbe_visited(const VisitProbe *p) { return (*p).visited; }
+;;SETTER
+static inline fn VisitProbe_setVisited(VisitProbe *p, u32 v) { (*p).visited = v; }
+;;GETTER
+static inline u32 VisitProbe_sum(const VisitProbe *p) { return (*p).sum; }
+;;SETTER
+static inline fn VisitProbe_setSum(VisitProbe *p, u32 s) { (*p).sum = s; }
+;;SETTER
+static inline fn VisitProbe_setSawDotted(VisitProbe *p, bool b) { (*p).sawDotted = b; }
+
 // Accumulates visited pointers and records whether the dotted-name entry was seen.
 static fn visitFn(VariableSlot *slot, any userdata) {
     VisitProbe *p = (VisitProbe*) userdata;
 
-    (*p).visited++;
+    VisitProbe_setVisited(p, VisitProbe_visited(p) + 1u);
 
-    (*p).sum += (u32) VariableSlot_getPointer(slot);
+    VisitProbe_setSum(p, VisitProbe_sum(p) + (u32) VariableSlot_getPointer(slot));
 
     if (VariableSlot_nameEquals(slot, "character.position.x")) 
-        (*p).sawDotted = true;
+        VisitProbe_setSawDotted(p, true);
 }
 
 // Checks forEach visits each live entry and safely ignores null callback/receiver.

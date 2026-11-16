@@ -125,18 +125,28 @@ static u64 Memory_headerHash(u64 typeId, u64 length, u64 pointer) {
     return hash | 1ull;
 }
 
+;;SETTER
+static inline fn MemoryHeader_setTypeId(MemoryHeader *h, u64 typeId) { (*h).typeId = typeId; }
+;;SETTER
+static inline fn MemoryHeader_setLength(MemoryHeader *h, u64 length) { (*h).length = length; }
+;;SETTER
+static inline fn MemoryHeader_setPointer(MemoryHeader *h, u64 ptr) { (*h).pointer = ptr; }
+;;SETTER
+static inline fn MemoryHeader_setHash(MemoryHeader *h, u64 hash) { (*h).hash = hash; }
+
 /** Stamp a header: identity, length, the block's redirect, and the veto.
  * The redirect is the object's own address here; a primitive form redirects
  * to its value cell instead, which the id's form bits decide (Type_isPrimitive).
  */
 static fn Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
-    (*h).typeId = typeId;
+    u64 ptr = (u64) (pointer) ((u8*) h + sizeof(MemoryHeader));
+    MemoryHeader_setTypeId(h, typeId);
 
-    (*h).length = (u64) numBytes;
+    MemoryHeader_setLength(h, (u64) numBytes);
 
-    (*h).pointer = (u64) (pointer) ((u8*) h + sizeof(MemoryHeader));
+    MemoryHeader_setPointer(h, ptr);
 
-    (*h).hash = Memory_headerHash((*h).typeId, (*h).length, (*h).pointer);
+    MemoryHeader_setHash(h, Memory_headerHash(typeId, (u64) numBytes, ptr));
 }
 
 #endif

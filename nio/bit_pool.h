@@ -101,9 +101,28 @@ BitPool BitPool_2(bytes elementSize, bytes capacity);
 BitPool BitPool_3(bytes elementSize, bytes capacity, bytes chunkSlots, MemoryArena *arena);
 #define BitPool(...) CONSTRUCTOR_DISPATCH(BitPool, __VA_ARGS__)
 
+;;GETTER
+static inline bool BitPool_liveField(const BitPool *pool) { return (*pool).live; }
+;;GETTER
+static inline MemoryArena *BitPool_arena(const BitPool *pool) { return (*pool).arena; }
+;;GETTER
+static inline u32 BitPool_totalSlots(const BitPool *pool) { return (*pool).totalSlots; }
+;;GETTER
+static inline u32 BitPool_chunkSlots(const BitPool *pool) { return (*pool).chunkSlots; }
+;;GETTER
+static inline bytes BitPool_chunkCount(const BitPool *pool) { return (*pool).chunkCount; }
+;;GETTER
+static inline const BitChunk *BitPool_chunkAt(const BitPool *pool, u32 i) { return &(*pool).chunks[i]; }
+;;GETTER
+static inline bytes BitPool_stride(const BitPool *pool) { return (*pool).stride; }
+;;GETTER
+static inline u32 BitChunk_count(const BitChunk *chunk) { return (*chunk).count; }
+;;GETTER
+static inline u8 *BitChunk_base(const BitChunk *chunk) { return (*chunk).base; }
+
 // True when the pool was successfully constructed and not shut down.
 static inline bool BitPool_live(const BitPool *pool) {
-    return pool && (*pool).live && (*pool).arena != nullptr;
+    return pool && BitPool_liveField(pool) && BitPool_arena(pool) != nullptr;
 }
 
 // Release all chunk backing to the owning arena and reset the pool.
@@ -129,24 +148,24 @@ bytes BitPool_length(const BitPool *pool, const_any userPtr);
 // Payload base of the slot at global index (chunk-local + directory).
 // Returns nullptr when index is out of range.
 static inline any BitPool_slotAt(const BitPool *pool, u32 index) {
-    if (!pool || index >= (*pool).totalSlots) 
+    if (!pool || index >= BitPool_totalSlots(pool)) 
         return nullptr;
 
-    u32 chunkSlots = (*pool).chunkSlots;
+    u32 chunkSlots = BitPool_chunkSlots(pool);
 
     u32 chunkIndex = index / chunkSlots;
 
     u32 within = index % chunkSlots;
 
-    if (chunkIndex >= (*pool).chunkCount) 
+    if (chunkIndex >= BitPool_chunkCount(pool)) 
         return nullptr;
 
-    const BitChunk *chunk = &(*pool).chunks[chunkIndex];
+    const BitChunk *chunk = BitPool_chunkAt(pool, chunkIndex);
 
-    if (within >= (*chunk).count) 
+    if (within >= BitChunk_count(chunk)) 
         return nullptr;
 
-    return (u8*) (*chunk).base + (bytes) within * (*pool).stride + sizeof(BitSlot);
+    return (u8*) BitChunk_base(chunk) + (bytes) within * BitPool_stride(pool) + sizeof(BitSlot);
 }
 
 #endif

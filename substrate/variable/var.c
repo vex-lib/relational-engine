@@ -41,6 +41,35 @@
  * ============================================================================
  */
 
+;;GETTER
+static inline VariableSlot *Var_slotMut(var *self) { return &(*self).slot; }
+;;GETTER
+static inline const VariableSlot *Var_slot(const var *self) { return &(*self).slot; }
+;;SETTER
+static inline fn Var_setArena(var *self, MemoryArena *arena) { (*self).arena = arena; }
+;;SETTER
+static inline fn Var_setValue(var *self, pointer value) { (*self).value = value; }
+;;GETTER
+static inline VarObserver Var_observerAt(const var *self, bytes i) { return (*self).observers[i]; }
+;;SETTER
+static inline fn Var_setObserverAt(var *self, bytes i, VarObserver obs) { (*self).observers[i] = obs; }
+;;GETTER
+static inline any Var_observerContextAt(const var *self, bytes i) { return (*self).observerContext[i]; }
+;;SETTER
+static inline fn Var_setObserverContextAt(var *self, bytes i, any ctx) { (*self).observerContext[i] = ctx; }
+;;GETTER
+static inline VarObserver *Var_observersMut(var *self) { return (*self).observers; }
+;;GETTER
+static inline any *Var_observerContextMut(var *self) { return (*self).observerContext; }
+;;SETTER
+static inline fn Var_setObserverCount(var *self, bytes count) { (*self).observerCount = count; }
+;;GETTER
+static inline pointer Var_valueRaw(const var *self) { return (*self).value; }
+;;GETTER
+static inline bytes Var_observerCountRaw(const var *self) { return (*self).observerCount; }
+;;GETTER
+static inline MemoryArena *Var_arenaRaw(const var *self) { return (*self).arena; }
+
 var *var_2(const char *name, MemoryArena *arena) {
     if (!name || !arena) 
         return nullptr;
@@ -52,13 +81,13 @@ var *var_2(const char *name, MemoryArena *arena) {
 
     memset(self, 0, sizeof(*self));
 
-    if (!VariableSlot_init(&(*self).slot, name, (pointer) self)) {
+    if (!VariableSlot_init(Var_slotMut(self), name, (pointer) self)) {
         MemoryArena_free(arena, self);
 
         return nullptr;
     }
 
-    (*self).arena = arena;
+    Var_setArena(self, arena);
 
     return self;
 }
@@ -67,15 +96,16 @@ bool var_set(var *self, pointer value) {
     if (!self) 
         return false;
 
-    VariableSlot_setPointer(&(*self).slot, (pointer) self);
+    VariableSlot_setPointer(Var_slotMut(self), (pointer) self);
 
-    (*self).value = value;
+    Var_setValue(self, value);
 
-    for (bytes i = 0; i < (*self).observerCount; i++) {
-        VarObserver observer = (*self).observers[i];
+    bytes count = var_observerCount(self);
+    for (bytes i = 0; i < count; i++) {
+        VarObserver observer = Var_observerAt(self, i);
 
         if (observer) 
-            observer(self, value, (*self).observerContext[i]);
+            observer(self, value, Var_observerContextAt(self, i));
     }
 
     return true;
@@ -85,16 +115,15 @@ bool var_subscribe(var *self, VarObserver observer, any context) {
     if (!self || !observer) 
         return false;
 
-    if ((*self).observerCount >= VAR_MAX_OBSERVERS) 
+    bytes index = var_observerCount(self);
+    if (index >= VAR_MAX_OBSERVERS) 
         return false;
 
-    bytes index = (*self).observerCount;
+    Var_setObserverAt(self, index, observer);
 
-    (*self).observers[index] = observer;
+    Var_setObserverContextAt(self, index, context);
 
-    (*self).observerContext[index] = context;
-
-    (*self).observerCount += 1u;
+    Var_setObserverCount(self, index + 1u);
 
     return true;
 }
@@ -104,52 +133,54 @@ fn var_unsubscribe(var *self, VarObserver observer, any context) {
         return;
 
     bytes write = 0u;
+    bytes count = var_observerCount(self);
 
-    for (bytes read = 0; read < (*self).observerCount; read++) {
-        if ((*self).observers[read] == observer &&
-            (*self).observerContext[read] == context)
+    for (bytes read = 0; read < count; read++) {
+        VarObserver obs = Var_observerAt(self, read);
+        any ctx = Var_observerContextAt(self, read);
+        if (obs == observer && ctx == context)
             continue;
-        (*self).observers[write] = (*self).observers[read];
+        Var_setObserverAt(self, write, obs);
 
-        (*self).observerContext[write] = (*self).observerContext[read];
+        Var_setObserverContextAt(self, write, ctx);
 
         write += 1u;
     }
 
     for (bytes i = write; i < VAR_MAX_OBSERVERS; i++) {
-        (*self).observers[i] = nullptr;
+        Var_setObserverAt(self, i, nullptr);
 
-        (*self).observerContext[i] = nullptr;
+        Var_setObserverContextAt(self, i, nullptr);
     }
 
-    (*self).observerCount = write;
+    Var_setObserverCount(self, write);
 }
 
 fn var_unsubscribeAll(var *self) {
     if (!self) 
         return;
 
-    memset((*self).observers, 0, sizeof((*self).observers));
+    memset(Var_observersMut(self), 0, sizeof(((var) {0}).observers));
 
-    memset((*self).observerContext, 0, sizeof((*self).observerContext));
+    memset(Var_observerContextMut(self), 0, sizeof(((var) {0}).observerContext));
 
-    (*self).observerCount = 0u;
+    Var_setObserverCount(self, 0u);
 }
 
 const char *var_name(const var *self) {
-    return self ? VariableSlot_getName(&(*self).slot) : nullptr;
+    return self ? VariableSlot_getName(Var_slot(self)) : nullptr;
 }
 
 pointer var_value(const var *self) {
-    return self ? (*self).value : 0u;
+    return self ? Var_valueRaw(self) : 0u;
 }
 
 bytes var_observerCount(const var *self) {
-    return self ? (*self).observerCount : 0u;
+    return self ? Var_observerCountRaw(self) : 0u;
 }
 
 MemoryArena *var_arena(const var *self) {
-    return self ? (*self).arena : nullptr;
+    return self ? Var_arenaRaw(self) : nullptr;
 }
 
 fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
@@ -166,9 +197,9 @@ fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
     }
 
     i32 written = snprintf(dest, cap, "var(%s => 0x%llx, subscribers=%zu)",
-                           VariableSlot_getName(&(*self).slot),
-                           (u64) (*self).value,
-                           (*self).observerCount);
+                           VariableSlot_getName(var_slot(self)),
+                           (u64) var_value(self),
+                           var_observerCount(self));
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
             *outTruncated = true;
@@ -189,9 +220,9 @@ fn var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated
     }
 
     i32 written = snprintf(dest, cap, "var { name=\"%s\", value=0x%llx, subscribers=%zu }",
-                           VariableSlot_getName(&(*self).slot),
-                           (u64) (*self).value,
-                           (*self).observerCount);
+                           VariableSlot_getName(var_slot(self)),
+                           (u64) var_value(self),
+                           var_observerCount(self));
     if (written < 0 || (bytes) written >= cap) {
         if (outTruncated) 
             *outTruncated = true;

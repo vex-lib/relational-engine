@@ -66,6 +66,35 @@
 
 static const bytes DEFAULT_CAPACITY = 1024;
 
+;;SETTER
+static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+;;GETTER
+static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+;;SETTER
+static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+;;GETTER
+static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+;;SETTER
+static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+;;GETTER
+static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+;;SETTER
+static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+;;GETTER
+static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+;;SETTER
+static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+;;SETTER
+static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+;;SETTER
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+;;SETTER
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+;;GETTER
+static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+;;SETTER
+static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+
 static Collection *asCollection(Stack *stack) {
     return (Collection*) stack;
 }
@@ -85,29 +114,30 @@ Stack *Stack_3(u32 elementClass, bytes capacity, bytes count) {
 
     Collection *c = asCollection(stack);
 
-    (*c).typeId = TYPE_STACK;
+    Collection_setTypeId(c, TYPE_STACK);
 
-    (*c).activeCount = (u32)count;
+    Collection_setActiveCount(c, (u32)count);
 
-    (*c).elementClass = elementClass;
+    Collection_setElementClass(c, elementClass);
 
-    (*c).stride = (u32)stride;
+    Collection_setStride(c, (u32)stride);
 
-    (*c).capacity = (u32)cap;
+    Collection_setCapacity(c, (u32)cap);
 
-    (*c).head = 0;
+    Collection_setHead(c, 0);
 
-    (*c).exhaustionCount = 0;
+    Collection_setExhaustionCount(c, 0);
 
-    (*c).exhaustionReported = false;
+    Collection_setExhaustionReported(c, false);
 
     bytes Bytes = cap * stride;
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    (*c).data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    Collection_setData(c, data);
 
-    if (!(*c).data) {
+    if (!data) {
         (discard) Struct_reportConstructionExhaustion("stack", Bytes);
 
         Memory_free(stack);
@@ -115,7 +145,7 @@ Stack *Stack_3(u32 elementClass, bytes capacity, bytes count) {
         return nullptr;
     }
 
-    memset((*c).data, 0, Bytes);
+    memset(data, 0, Bytes);
 
     return stack;
 }
@@ -129,9 +159,9 @@ fn Stack_free(Stack *stack) {
        return;
 
     Collection *c = asCollection(stack);
-
-    if ((*c).data) 
-        Memory_free((*c).data);
+    u8 *data = Collection_data(c);
+    if (data) 
+        Memory_free(data);
 
     Memory_free(stack);
 }
@@ -150,13 +180,16 @@ TryValue Stack_pushTry(Stack *stack, u64 valueOrPointer) {
     }
 
     Collection *c = asCollection(stack);
+    u32 activeCount = Collection_activeCount(c);
+    u32 cap = Collection_capacityField(c);
+    u32 stride = Collection_strideField(c);
 
-    if ((*c).activeCount >= (*c).capacity) {
+    if (activeCount >= cap) {
         // d64, like the sibling containers (Deque/Queue/List). Growing by a
         // fixed step allocates a fresh buffer on every growth, and freed bump
         // storage is reclaimed only wholesale -- so a large push run exhausts
         // the arena i64 before the buffer fits (the No Hardcoding Law).
-        bytes newCap = (*c).capacity ? (bytes)(*c).capacity * 2 : DEFAULT_CAPACITY;
+        bytes newCap = cap ? (bytes)cap * 2 : DEFAULT_CAPACITY;
 
         if (newCap > UINT32_MAX) {
             THROW("stack pushTry: capacity %zu would exceed uint32", newCap);
@@ -164,9 +197,9 @@ TryValue Stack_pushTry(Stack *stack, u64 valueOrPointer) {
             return TryValue_error(TRY_OVERFLOW);
         }
 
-        bytes Bytes = newCap * (*c).stride;
+        bytes Bytes = newCap * stride;
 
-        u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, (*c).elementClass);
+        u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, Collection_elementClass(c));
 
         u8 *next = (u8*) Memory_alloc(bufType, Bytes);
 
@@ -178,18 +211,19 @@ TryValue Stack_pushTry(Stack *stack, u64 valueOrPointer) {
             return TryValue_error(TRY_NO_MEMORY);
         }
 
-        memcpy(next, (*c).data, (*c).activeCount * (*c).stride);
+        u8 *oldData = Collection_data(c);
+        memcpy(next, oldData, activeCount * stride);
 
-        Memory_free((*c).data);
+        Memory_free(oldData);
 
-        (*c).data = next;
+        Collection_setData(c, next);
 
-        (*c).capacity = (u32)newCap;
+        Collection_setCapacity(c, (u32)newCap);
     }
 
-    Collection_writeSlot(c, (*c).activeCount, valueOrPointer);
+    Collection_writeSlot(c, activeCount, valueOrPointer);
 
-    (*c).activeCount++;
+    Collection_setActiveCount(c, activeCount + 1u);
 
     return TryValue_ok(valueOrPointer);
 }
@@ -199,13 +233,15 @@ u64 Stack_pop(Stack *stack) {
        return 0;
 
     Collection *c = asCollection(stack);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount == 0) 
+    if (activeCount == 0) 
         return 0;
 
-    (*c).activeCount--;
+    activeCount--;
+    Collection_setActiveCount(c, activeCount);
 
-    return Collection_readSlot(c, (*c).activeCount);
+    return Collection_readSlot(c, activeCount);
 }
 
 u64 Stack_peek(Stack *stack) {
@@ -213,11 +249,12 @@ u64 Stack_peek(Stack *stack) {
        return 0;
 
     Collection *c = asCollection(stack);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount == 0) 
+    if (activeCount == 0) 
         return 0;
 
-    return Collection_readSlot(c, (*c).activeCount - 1);
+    return Collection_readSlot(c, activeCount - 1);
 }
 
 u8 *Stack_slot(Stack *stack, bytes index) {
@@ -226,10 +263,10 @@ u8 *Stack_slot(Stack *stack, bytes index) {
 
     Collection *c = asCollection(stack);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return nullptr;
 
-    return (*c).data + index * (*c).stride;
+    return Collection_data(c) + index * Collection_strideField(c);
 }
 
 bool Stack_isEmpty(Stack *stack) {

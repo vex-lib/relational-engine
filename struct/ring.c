@@ -135,12 +135,41 @@ RingBuffer RingBuffer_2(bytes elem_size, bytes capacity) {
     return ring;
 }
 
+;;GETTER
+static inline u8 *RingBuffer_slots(const RingBuffer *ring) { return (*ring).slots; }
+;;SETTER
+static inline fn RingBuffer_setSlots(RingBuffer *ring, u8 *slots) { (*ring).slots = slots; }
+;;GETTER
+static inline SpinLock *RingBuffer_lockMut(RingBuffer *ring) { return &(*ring).lock; }
+;;GETTER
+static inline bytes RingBuffer_tailLoad(const RingBuffer *ring) {
+    return atomic_load_explicit(&(*ring).tail, memory_order_relaxed);
+}
+;;GETTER
+static inline fn RingBuffer_storeTail(RingBuffer *ring, bytes v) {
+    atomic_store_explicit(&(*ring).tail, v, memory_order_release);
+}
+;;GETTER
+static inline bytes RingBuffer_headLoad(const RingBuffer *ring) {
+    return atomic_load_explicit(&(*ring).head, memory_order_relaxed);
+}
+;;GETTER
+static inline fn RingBuffer_storeHead(RingBuffer *ring, bytes v) {
+    atomic_store_explicit(&(*ring).head, v, memory_order_release);
+}
+;;GETTER
+static inline bytes RingBuffer_capacity(const RingBuffer *ring) { return (*ring).capacity; }
+;;GETTER
+static inline bytes RingBuffer_mask(const RingBuffer *ring) { return (*ring).mask; }
+;;GETTER
+static inline bytes RingBuffer_elemSize(const RingBuffer *ring) { return (*ring).elem_size; }
+
 // Frees ring storage and clears its storage pointer.
 fn RingBuffer_shutdown(RingBuffer *ring) {
-    if (ring && (*ring).slots) {
-        Memory_free((*ring).slots);
+    if (ring && RingBuffer_slots(ring)) {
+        Memory_free(RingBuffer_slots(ring));
 
-        (*ring).slots = nullptr;
+        RingBuffer_setSlots(ring, nullptr);
     }
 }
 
@@ -149,25 +178,27 @@ bool RingBuffer_push(RingBuffer *ring, const_any item) {
     if (!ring || !item) 
        return false;
 
-    SpinLock_lock(&(*ring).lock);
+    SpinLock *lock = RingBuffer_lockMut(ring);
+    SpinLock_lock(lock);
 
-    bytes tail = atomic_load_explicit(&(*ring).tail, memory_order_relaxed);
+    bytes tail = RingBuffer_tailLoad(ring);
 
-    bytes head = atomic_load_explicit(&(*ring).head, memory_order_relaxed);
+    bytes head = RingBuffer_headLoad(ring);
 
-    if (tail - head >= (*ring).capacity) {
-        SpinLock_unlock(&(*ring).lock);
+    if (tail - head >= RingBuffer_capacity(ring)) {
+        SpinLock_unlock(lock);
 
         return false; // full
     }
 
-    bytes slot = tail & (*ring).mask;
+    bytes slot = tail & RingBuffer_mask(ring);
+    bytes elemSize = RingBuffer_elemSize(ring);
 
-    memcpy((*ring).slots + slot * (*ring).elem_size, item, (*ring).elem_size);
+    memcpy(RingBuffer_slots(ring) + slot * elemSize, item, elemSize);
 
-    atomic_store_explicit(&(*ring).tail, tail + 1, memory_order_release);
+    RingBuffer_storeTail(ring, tail + 1);
 
-    SpinLock_unlock(&(*ring).lock);
+    SpinLock_unlock(lock);
 
     return true;
 }
@@ -177,25 +208,27 @@ bool RingBuffer_pop(RingBuffer *ring, any out) {
     if (!ring || !out) 
        return false;
 
-    SpinLock_lock(&(*ring).lock);
+    SpinLock *lock = RingBuffer_lockMut(ring);
+    SpinLock_lock(lock);
 
-    bytes head = atomic_load_explicit(&(*ring).head, memory_order_relaxed);
+    bytes head = RingBuffer_headLoad(ring);
 
-    bytes tail = atomic_load_explicit(&(*ring).tail, memory_order_relaxed);
+    bytes tail = RingBuffer_tailLoad(ring);
 
     if (head == tail) {
-        SpinLock_unlock(&(*ring).lock);
+        SpinLock_unlock(lock);
 
         return false; // empty
     }
 
-    bytes slot = head & (*ring).mask;
+    bytes slot = head & RingBuffer_mask(ring);
+    bytes elemSize = RingBuffer_elemSize(ring);
 
-    memcpy(out, (*ring).slots + slot * (*ring).elem_size, (*ring).elem_size);
+    memcpy(out, RingBuffer_slots(ring) + slot * elemSize, elemSize);
 
-    atomic_store_explicit(&(*ring).head, head + 1, memory_order_release);
+    RingBuffer_storeHead(ring, head + 1);
 
-    SpinLock_unlock(&(*ring).lock);
+    SpinLock_unlock(lock);
 
     return true;
 }

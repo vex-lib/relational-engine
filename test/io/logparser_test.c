@@ -67,22 +67,33 @@ typedef struct Collector {
     i64 ts[8];
 } Collector;
 
+;;GETTER
+static inline i32 Collector_count(const Collector *c) { return (*c).count; }
+;;SETTER
+static inline fn Collector_setCount(Collector *c, i32 count) { (*c).count = count; }
+;;SETTER
+static inline fn Collector_setKindAt(Collector *c, i32 idx, i32 kind) { (*c).kinds[idx] = kind; }
+;;SETTER
+static inline fn Collector_setV0At(Collector *c, i32 idx, i64 v0) { (*c).v0[idx] = v0; }
+;;SETTER
+static inline fn Collector_setTsAt(Collector *c, i32 idx, i64 ts) { (*c).ts[idx] = ts; }
+
 /* Saves selected callback fields so parsing order and values can be asserted. */
 static fn collect(any userdata, i32 kind, i64 ts,
                     i64 v0, i64 v1, i64 v2, i64 v3, i64 v4) {
     (discard) v1; (discard) v2; (discard) v3; (discard) v4;
 
     Collector *c = (Collector*) userdata;
+    i32 count = Collector_count(c);
+    if (count < 8) {
+        Collector_setKindAt(c, count, kind);
 
-    if ((*c).count < 8) {
-        (*c).kinds[(*c).count] = kind;
+        Collector_setTsAt(c, count, ts);
 
-        (*c).ts[(*c).count] = ts;
-
-        (*c).v0[(*c).count] = v0;
+        Collector_setV0At(c, count, v0);
     }
 
-    (*c).count++;
+    Collector_setCount(c, count + 1);
 }
 
 /* Verifies valid records, callback values, counts, and safe handling of a partial trailing record. */

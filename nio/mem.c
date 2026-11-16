@@ -99,12 +99,17 @@ fn Memory_free(any userPtr) {
     MemoryArena_free(a, userPtr);
 }
 
+;;GETTER
+static inline u64 MemoryHeader_length(const MemoryHeader *h) { return (*h).length; }
+;;GETTER
+static inline u64 MemoryHeader_typeId(const MemoryHeader *h) { return (*h).typeId; }
+
 /** Return a validated block's payload length, or zero when the pointer is rejected. */
 bytes Memory_length(any userPtr) {
     const MemoryHeader *h = Memory_safeHeader(userPtr);
 
     if (h) 
-        return (bytes) (*h).length;
+        return (bytes) MemoryHeader_length(h);
 
     return 0;
 }
@@ -113,7 +118,7 @@ u64 Memory_type(any userPtr) {
     const MemoryHeader *h = Memory_safeHeader(userPtr);
 
     if (h) 
-        return (*h).typeId;
+        return MemoryHeader_typeId(h);
 
     return 0;
 }
@@ -132,7 +137,7 @@ bool Memory_similar(const_any a, const_any b) {
     if (!hb) 
         return false;
 
-    return (*ha).typeId == (*hb).typeId;
+    return MemoryHeader_typeId(ha) == MemoryHeader_typeId(hb);
 }
 /** Classify a pointer as transient, permanent, or unknown using registered address ranges. */
 MemoryLifetime Memory_getLifetime(const_any ptr) {

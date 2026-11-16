@@ -75,6 +75,37 @@ static Collection *asCollection(Deque *deque) {
     return (Collection*) deque;
 }
 
+;;SETTER
+static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+;;GETTER
+static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+;;SETTER
+static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+;;GETTER
+static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+;;SETTER
+static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+;;GETTER
+static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+;;SETTER
+static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+;;GETTER
+static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+;;SETTER
+static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+;;GETTER
+static inline u32 Collection_headField(const Collection *c) { return (*c).head; }
+;;SETTER
+static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+;;SETTER
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+;;SETTER
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+;;GETTER
+static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+;;SETTER
+static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+
 Deque *Deque_3(u32 elementClass, bytes capacity, bytes count) {
     bytes stride = Stride_get(elementClass);
 
@@ -90,29 +121,30 @@ Deque *Deque_3(u32 elementClass, bytes capacity, bytes count) {
 
     Collection *c = asCollection(deque);
 
-    (*c).typeId = TYPE_DEQUE;
+    Collection_setTypeId(c, TYPE_DEQUE);
 
-    (*c).activeCount = (u32)count;
+    Collection_setActiveCount(c, (u32)count);
 
-    (*c).elementClass = elementClass;
+    Collection_setElementClass(c, elementClass);
 
-    (*c).stride = (u32)stride;
+    Collection_setStride(c, (u32)stride);
 
-    (*c).capacity = (u32)cap;
+    Collection_setCapacity(c, (u32)cap);
 
-    (*c).head = 0;
+    Collection_setHead(c, 0);
 
-    (*c).exhaustionCount = 0;
+    Collection_setExhaustionCount(c, 0);
 
-    (*c).exhaustionReported = false;
+    Collection_setExhaustionReported(c, false);
 
     bytes Bytes = cap * stride;
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    (*c).data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    Collection_setData(c, data);
 
-    if (!(*c).data) {
+    if (!data) {
         (discard) Struct_reportConstructionExhaustion("deque", Bytes);
 
         Memory_free(deque);
@@ -120,20 +152,23 @@ Deque *Deque_3(u32 elementClass, bytes capacity, bytes count) {
         return nullptr;
     }
 
-    memset((*c).data, 0, Bytes);
+    memset(data, 0, Bytes);
 
     return deque;
 }
 
 static i32 ensureCapacity(Collection *c) {
-    if ((*c).activeCount < (*c).capacity) 
+    u32 activeCount = Collection_activeCount(c);
+    u32 cap = Collection_capacityField(c);
+    if (activeCount < cap) 
         return 1;
 
-    bytes newCap = (*c).capacity * 2;
+    bytes newCap = (bytes) cap * 2;
+    u32 stride = Collection_strideField(c);
 
-    bytes Bytes = newCap * (*c).stride;
+    bytes Bytes = newCap * stride;
 
-    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, (*c).elementClass);
+    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, Collection_elementClass(c));
 
     u8 *next = (u8*) Memory_alloc(bufType, Bytes);
 
@@ -143,29 +178,30 @@ static i32 ensureCapacity(Collection *c) {
         return 0;
     }
 
-    bytes count = (*c).activeCount;
+    u8 *oldData = Collection_data(c);
+    u32 head = Collection_headField(c);
 
-    if (count > 0) {
-        if ((*c).head == 0) {
-            memcpy(next, (*c).data, count * (*c).stride);
+    if (activeCount > 0) {
+        if (head == 0) {
+            memcpy(next, oldData, activeCount * stride);
         } else {
-            bytes len1 = (*c).capacity - (*c).head;
+            bytes len1 = cap - head;
 
-            bytes len2 = (*c).head;
+            bytes len2 = head;
 
-            memcpy(next, (*c).data + (*c).head * (*c).stride, len1 * (*c).stride);
+            memcpy(next, oldData + head * stride, len1 * stride);
 
-            memcpy(next + len1 * (*c).stride, (*c).data, len2 * (*c).stride);
+            memcpy(next + len1 * stride, oldData, len2 * stride);
         }
     }
 
-    Memory_free((*c).data);
+    Memory_free(oldData);
 
-    (*c).data = next;
+    Collection_setData(c, next);
 
-    (*c).capacity = (u32)newCap;
+    Collection_setCapacity(c, (u32)newCap);
 
-    (*c).head = 0;
+    Collection_setHead(c, 0);
 
     return 1;
 }
@@ -179,9 +215,9 @@ fn Deque_free(Deque *deque) {
        return;
 
     Collection *c = asCollection(deque);
-
-    if ((*c).data) 
-        Memory_free((*c).data);
+    u8 *data = Collection_data(c);
+    if (data) 
+        Memory_free(data);
 
     Memory_free(deque);
 }
@@ -195,20 +231,23 @@ fn Deque_addFirst(Deque *deque, u64 valueOrPointer) {
     if (!ensureCapacity(c)) 
         return;
 
-    bytes newHead = ((*c).head - 1 + (*c).capacity) % (*c).capacity;
+    u32 head = Collection_headField(c);
+    u32 cap = Collection_capacityField(c);
+    u32 stride = Collection_strideField(c);
+    bytes newHead = (head - 1 + cap) % cap;
 
-    u8 *slot = (*c).data + newHead * (*c).stride;
+    u8 *slot = Collection_data(c) + newHead * stride;
 
-    switch ((*c).stride) {
+    switch (stride) {
         case 1:  *(u8*) slot = (u8)valueOrPointer;  break;
         case 2:  *(u16*) slot = (u16)valueOrPointer; break;
         case 4:  *(u32*) slot = (u32)valueOrPointer; break;
         default: *(u64*) slot = valueOrPointer;          break;
     }
 
-    (*c).head = (u32)newHead;
+    Collection_setHead(c, (u32)newHead);
 
-    (*c).activeCount++;
+    Collection_setActiveCount(c, Collection_activeCount(c) + 1u);
 }
 
 fn Deque_addLast(Deque *deque, u64 valueOrPointer) {
@@ -220,11 +259,12 @@ fn Deque_addLast(Deque *deque, u64 valueOrPointer) {
     if (!ensureCapacity(c)) 
         return;
 
-    bytes tail = ((*c).head + (*c).activeCount) % (*c).capacity;
+    u32 activeCount = Collection_activeCount(c);
+    bytes tail = (Collection_headField(c) + activeCount) % Collection_capacityField(c);
 
     Collection_writeSlot(c, tail, valueOrPointer);
 
-    (*c).activeCount++;
+    Collection_setActiveCount(c, activeCount + 1u);
 }
 
 u64 Deque_removeFirst(Deque *deque) {
@@ -232,15 +272,17 @@ u64 Deque_removeFirst(Deque *deque) {
        return 0;
 
     Collection *c = asCollection(deque);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount == 0) 
+    if (activeCount == 0) 
         return 0;
 
-    u64 value = Collection_readSlot(c, (*c).head);
+    u32 head = Collection_headField(c);
+    u64 value = Collection_readSlot(c, head);
 
-    (*c).head = (u32)(((*c).head + 1) % (*c).capacity);
+    Collection_setHead(c, (u32)((head + 1) % Collection_capacityField(c)));
 
-    (*c).activeCount--;
+    Collection_setActiveCount(c, activeCount - 1u);
 
     return value;
 }
@@ -250,15 +292,16 @@ u64 Deque_removeLast(Deque *deque) {
        return 0;
 
     Collection *c = asCollection(deque);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount == 0) 
+    if (activeCount == 0) 
         return 0;
 
-    bytes tail = ((*c).head + (*c).activeCount - 1) % (*c).capacity;
+    bytes tail = (Collection_headField(c) + activeCount - 1) % Collection_capacityField(c);
 
     u64 value = Collection_readSlot(c, tail);
 
-    (*c).activeCount--;
+    Collection_setActiveCount(c, activeCount - 1u);
 
     return value;
 }
@@ -269,10 +312,10 @@ u64 Deque_peekFirst(Deque *deque) {
 
     Collection *c = asCollection(deque);
 
-    if ((*c).activeCount == 0) 
+    if (Collection_activeCount(c) == 0) 
         return 0;
 
-    return Collection_readSlot(c, (*c).head);
+    return Collection_readSlot(c, Collection_headField(c));
 }
 
 u64 Deque_peekLast(Deque *deque) {
@@ -280,11 +323,12 @@ u64 Deque_peekLast(Deque *deque) {
        return 0;
 
     Collection *c = asCollection(deque);
+    u32 activeCount = Collection_activeCount(c);
 
-    if ((*c).activeCount == 0) 
+    if (activeCount == 0) 
         return 0;
 
-    bytes tail = ((*c).head + (*c).activeCount - 1) % (*c).capacity;
+    bytes tail = (Collection_headField(c) + activeCount - 1) % Collection_capacityField(c);
 
     return Collection_readSlot(c, tail);
 }
@@ -295,10 +339,10 @@ u64 Deque_get(Deque *deque, bytes index) {
 
     Collection *c = asCollection(deque);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return 0;
 
-    bytes phys = ((*c).head + index) % (*c).capacity;
+    bytes phys = (Collection_headField(c) + index) % Collection_capacityField(c);
 
     return Collection_readSlot(c, phys);
 }
@@ -309,12 +353,12 @@ u8 *Deque_slot(Deque *deque, bytes index) {
 
     Collection *c = asCollection(deque);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return nullptr;
 
-    bytes phys = ((*c).head + index) % (*c).capacity;
+    bytes phys = (Collection_headField(c) + index) % Collection_capacityField(c);
 
-    return (*c).data + phys * (*c).stride;
+    return Collection_data(c) + phys * Collection_strideField(c);
 }
 
 bool Deque_isEmpty(Deque *deque) {

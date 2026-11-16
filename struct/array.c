@@ -63,6 +63,29 @@
 
 // array.c — Array port (Legacy: struct/Array.java).
 
+;;SETTER
+static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+;;GETTER
+static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+;;SETTER
+static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+;;SETTER
+static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+;;SETTER
+static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+;;SETTER
+static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+;;SETTER
+static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+;;SETTER
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+;;SETTER
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+;;GETTER
+static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+;;SETTER
+static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+
 static Collection *asCollection(Array *array) {
     return (Collection*) array;
 }
@@ -80,29 +103,30 @@ Array *Array_2(u32 elementClass, bytes length) {
 
     Collection *c = asCollection(array);
 
-    (*c).typeId = TYPE_ARRAY;
+    Collection_setTypeId(c, TYPE_ARRAY);
 
-    (*c).activeCount = (u32)length;
+    Collection_setActiveCount(c, (u32)length);
 
-    (*c).elementClass = elementClass;
+    Collection_setElementClass(c, elementClass);
 
-    (*c).stride = (u32)stride;
+    Collection_setStride(c, (u32)stride);
 
-    (*c).capacity = (u32)length;
+    Collection_setCapacity(c, (u32)length);
 
-    (*c).head = 0;
+    Collection_setHead(c, 0);
 
-    (*c).exhaustionCount = 0;
+    Collection_setExhaustionCount(c, 0);
 
-    (*c).exhaustionReported = false;
+    Collection_setExhaustionReported(c, false);
 
     bytes Bytes = length * stride;
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    (*c).data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    Collection_setData(c, data);
 
-    if (!(*c).data) {
+    if (!data) {
         (discard) Struct_reportConstructionExhaustion("array", Bytes);
 
         Memory_free(array);
@@ -110,7 +134,7 @@ Array *Array_2(u32 elementClass, bytes length) {
         return nullptr;
     }
 
-    memset((*c).data, 0, Bytes);
+    memset(data, 0, Bytes);
 
     return array;
 }
@@ -120,9 +144,9 @@ fn Array_free(Array *array) {
        return;
 
     Collection *c = asCollection(array);
-
-    if ((*c).data) 
-        Memory_free((*c).data);
+    u8 *data = Collection_data(c);
+    if (data) 
+        Memory_free(data);
 
     Memory_free(array);
 }
@@ -134,7 +158,7 @@ u64 Array_get(Array *array, bytes index) {
 
     Collection *c = asCollection(array);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return 0;
 
     return Collection_readSlot(c, index);
@@ -149,9 +173,9 @@ TryValue Array_getTry(Array *array, bytes index) {
     }
 
     Collection *c = asCollection(array);
-
-    if (index >= (*c).activeCount) {
-        THROW("array getTry: index %zu out of range (count %u)", index, (*c).activeCount);
+    u32 activeCount = Collection_activeCount(c);
+    if (index >= activeCount) {
+        THROW("array getTry: index %zu out of range (count %u)", index, activeCount);
 
         return TryValue_error(TRY_BOUNDS);
     }
@@ -165,7 +189,7 @@ fn Array_set(Array *array, bytes index, u64 value) {
 
     Collection *c = asCollection(array);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return;
 
     Collection_writeSlot(c, index, value);
@@ -177,10 +201,10 @@ u8 *Array_slot(Array *array, bytes index) {
 
     Collection *c = asCollection(array);
 
-    if (index >= (*c).activeCount) 
+    if (index >= Collection_activeCount(c)) 
         return nullptr;
 
-    return (*c).data + index * (*c).stride;
+    return Collection_data(c) + index * Collection_stride(c);
 }
 
 bool Array_isEmpty(Array *array) {
