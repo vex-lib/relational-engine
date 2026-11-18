@@ -108,35 +108,18 @@ static bytes strideFor(bytes elementSize) {
     return rounded == 0 ? BITPOOL_ALIGN : rounded;
 }
 
-;;GETTER
-static MemoryArena *BitPool_arena(const BitPool *pool) {
-    return (*pool).arena;
-}
 
 ;;GETTER
 static bytes BitPool_elementSize(const BitPool *pool) {
     return (*pool).elementSize;
 }
 
-;;GETTER
-static bytes BitPool_stride(const BitPool *pool) {
-    return (*pool).stride;
-}
-
-;;GETTER
-static u32 BitPool_chunkSlots(const BitPool *pool) {
-    return (*pool).chunkSlots;
-}
 
 ;;GETTER
 static BitChunk *BitPool_chunks(const BitPool *pool) {
     return (*pool).chunks;
 }
 
-;;GETTER
-static bytes BitPool_chunkCount(const BitPool *pool) {
-    return (*pool).chunkCount;
-}
 
 ;;GETTER
 static bytes BitPool_chunkCap(const BitPool *pool) {
@@ -148,10 +131,6 @@ static u32 BitPool_freeHead(const BitPool *pool) {
     return (*pool).freeHead;
 }
 
-;;GETTER
-static u32 BitPool_totalSlots(const BitPool *pool) {
-    return (*pool).totalSlots;
-}
 
 ;;GETTER
 static u32 BitPool_liveCount(const BitPool *pool) {
@@ -193,15 +172,6 @@ static fn BitPool_setLiveCount(BitPool *pool, u32 liveCount) {
     (*pool).liveCount = liveCount;
 }
 
-;;GETTER
-static u8 *BitChunk_base(const BitChunk *chunk) {
-    return (*chunk).base;
-}
-
-;;GETTER
-static u32 BitChunk_count(const BitChunk *chunk) {
-    return (*chunk).count;
-}
 
 ;;GETTER
 static u32 BitChunk_live(const BitChunk *chunk) {

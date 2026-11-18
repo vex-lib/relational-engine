@@ -85,7 +85,7 @@ static bytes MemoryHeader_length(const MemoryHeader *h) {
 }
 
 ;;GETTER
-static any MemoryHeader_pointer(const MemoryHeader *h) {
+static u64 MemoryHeader_pointer(const MemoryHeader *h) {
     return (*h).pointer;
 }
 
