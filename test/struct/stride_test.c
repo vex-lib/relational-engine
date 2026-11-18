@@ -33,6 +33,11 @@ typedef struct TestCustomVertex {
     d64 weight;
 } TestCustomVertex;
 
+;;GETTER
+static inline u32 TestCustomVertex_color(const TestCustomVertex *v) { return (*v).color; }
+;;GETTER
+static inline d64 TestCustomVertex_weight(const TestCustomVertex *v) { return (*v).weight; }
+
 // Checks built-in mappings, custom struct registration, and container integration.
 i32 main() {
     // Scalar widths.
@@ -115,11 +120,6 @@ i32 main() {
     CHECK(arr != nullptr && Array_stride(arr) == sizeof(TestCustomVertex));
 
     TestCustomVertex *vslot = (TestCustomVertex*) List_addSlot(verts);
-
-;;GETTER
-static inline u32 TestCustomVertex_color(const TestCustomVertex *v) { return (*v).color; }
-;;GETTER
-static inline d64 TestCustomVertex_weight(const TestCustomVertex *v) { return (*v).weight; }
 
     CHECK(vslot != nullptr && ((pointer) vslot & 15u) == 0u);
 

@@ -340,10 +340,6 @@ static u32 ChunkDir_capacity(const ChunkDir *dir) {
     return (*dir).capacity;
 }
 
-;;GETTER
-static const _Atomic(u8*) *ChunkDir_slotsConst(const ChunkDir *dir) {
-    return (*dir).slots;
-}
 
 ;;GETTER
 static _Atomic(u8*) *ChunkDir_slotsMut(ChunkDir *dir) {
