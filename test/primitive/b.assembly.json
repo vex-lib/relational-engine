@@ -1,0 +1,28 @@
+{
+  "application": {
+    "id": "local.vexgraph.re.primitive",
+    "name": "re_primitive",
+    "displayName": "RE Primitive",
+    "version": "",
+    "type": "cli",
+    "authors": ["vexgraph"],
+    "publisher": "vexgraph",
+    "description": "",
+    "license": "UNLICENSED",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "buffer_test.c",
+    "sources": ["buffer_test.c", "vex-string_test.c"],
+    "includes": ["re", "lifetime"],
+    "dependencies": ["lifetime", "re"],
+    "defines": [],
+    "options": [],
+    "link": "executable"
+  },
+  "payload": { "files": [] },
+  "targets": {},
+  "formats": ["portable"],
+  "statePolicy": "clean"
+}

@@ -1,0 +1,45 @@
+{
+  "application": {
+    "id": "local.vexgraph.re.charsequence",
+    "name": "char_sequence_test",
+    "displayName": "Char Sequence",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Non-owning text views: compare, prefix, suffix, search",
+    "license": "UNLICENSED",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "char_sequence_test.c",
+    "sources": [
+      "char_sequence_test.c",
+      "../../../primitive/char_sequence.c",
+      "../../../primitive/vex-string.c",
+      "../../../nio/mem.c"
+    ],
+    "includes": [
+      "re",
+      "lifetime"
+    ],
+    "dependencies": [],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}
