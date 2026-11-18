@@ -12,6 +12,7 @@
 #include "hash/hash.h"
 #include "io/io.h"
 #include "nio/nio.h"
+#include "primitive/primitive.h"
 #include "struct/struct.h"
 #include "substrate/substrate.h"
 #include "substrate/variable/variable.h"
