@@ -197,7 +197,7 @@ fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
     }
 
     i32 written = snprintf(dest, cap, "var(%s => 0x%llx, subscribers=%zu)",
-                           VariableSlot_getName(var_slot(self)),
+                           VariableSlot_getName(Var_slot(self)),
                            (u64) var_value(self),
                            var_observerCount(self));
     if (written < 0 || (bytes) written >= cap) {
@@ -220,7 +220,7 @@ fn var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated
     }
 
     i32 written = snprintf(dest, cap, "var { name=\"%s\", value=0x%llx, subscribers=%zu }",
-                           VariableSlot_getName(var_slot(self)),
+                           VariableSlot_getName(Var_slot(self)),
                            (u64) var_value(self),
                            var_observerCount(self));
     if (written < 0 || (bytes) written >= cap) {
