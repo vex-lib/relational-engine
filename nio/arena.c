@@ -3,10 +3,10 @@
 #include "vex.h"
 #include "nio/mem.h"
 
+#include <sys/mman.h>
+
 #include "atomic/atomic.h"
 #include "debug/throw.h"
-
-#include <string.h>
 
 ;;DEFINITION
 /**
@@ -46,6 +46,7 @@ typedef struct SlabClass {
     u32 slot_size;
     u32 capacity;
     u32 count;
+    u32 next_index;
     u8 *arena;
     FreeNode *free_head;
     SpinLock lock;
@@ -59,6 +60,8 @@ typedef struct MemoryArena {
     u8 *bumpArena;
     bytes bumpCapacity;
     bytes bumpOffset;
+    MemoryHeader *largeFreeHead;
+    bytes largeFreeBytes;
     SpinLock bumpLock;
     SpinLock initLock;
     bool live;
@@ -89,6 +92,40 @@ static u64 MemoryHeader_pointer(const MemoryHeader *h) {
     return (*h).pointer;
 }
 
+static MemoryHeader *FreeLarge_prev(const MemoryHeader *h) {
+    return (MemoryHeader*) (pointer) MemoryHeader_typeId(h);
+}
+
+static MemoryHeader *FreeLarge_next(const MemoryHeader *h) {
+    return (MemoryHeader*) (pointer) MemoryHeader_pointer(h);
+}
+
+static bytes FreeLarge_blockSize(const MemoryHeader *h) {
+    return sizeof(MemoryHeader) + MemoryHeader_length(h);
+}
+
+static fn FreeLarge_setPrev(MemoryHeader *h, MemoryHeader *prev) {
+    MemoryHeader_setTypeId(h, (u64) (pointer) prev);
+}
+
+static fn FreeLarge_setNext(MemoryHeader *h, MemoryHeader *next) {
+    MemoryHeader_setPointer(h, (u64) (pointer) next);
+}
+
+static fn FreeLarge_setBlockSize(MemoryHeader *h, bytes blockSize) {
+    MemoryHeader_setLength(h, (u64) (blockSize - sizeof(MemoryHeader)));
+}
+
+static fn FreeLarge_init(MemoryHeader *h, bytes blockSize, MemoryHeader *prev, MemoryHeader *next) {
+    MemoryHeader_setTypeId(h, (u64) (pointer) prev);
+
+    MemoryHeader_setHash(h, 0);
+
+    MemoryHeader_setLength(h, (u64) (blockSize - sizeof(MemoryHeader)));
+
+    MemoryHeader_setPointer(h, (u64) (pointer) next);
+}
+
 ;;GETTER
 static FreeNode *FreeNode_next(const FreeNode *node) {
     return (*node).next;
@@ -112,6 +149,11 @@ static u32 SlabClass_capacity(const SlabClass *slab) {
 ;;GETTER
 static u32 SlabClass_count(const SlabClass *slab) {
     return (*slab).count;
+}
+
+;;GETTER
+static u32 SlabClass_nextIndex(const SlabClass *slab) {
+    return (*slab).next_index;
 }
 
 ;;GETTER
@@ -142,6 +184,11 @@ static fn SlabClass_setCapacity(SlabClass *slab, u32 capacity) {
 ;;SETTER
 static fn SlabClass_setCount(SlabClass *slab, u32 count) {
     (*slab).count = count;
+}
+
+;;SETTER
+static fn SlabClass_setNextIndex(SlabClass *slab, u32 nextIndex) {
+    (*slab).next_index = nextIndex;
 }
 
 ;;SETTER
@@ -195,6 +242,16 @@ static bytes MemoryArena_bumpOffset(const MemoryArena *a) {
 }
 
 ;;GETTER
+static MemoryHeader *MemoryArena_largeFreeHead(const MemoryArena *a) {
+    return (*a).largeFreeHead;
+}
+
+;;GETTER
+static bytes MemoryArena_largeFreeBytes(const MemoryArena *a) {
+    return (*a).largeFreeBytes;
+}
+
+;;GETTER
 static SpinLock *MemoryArena_bumpLockMut(MemoryArena *a) {
     return &(*a).bumpLock;
 }
@@ -242,6 +299,16 @@ static fn MemoryArena_setBumpCapacity(MemoryArena *a, bytes bumpCapacity) {
 ;;SETTER
 static fn MemoryArena_setBumpOffset(MemoryArena *a, bytes bumpOffset) {
     (*a).bumpOffset = bumpOffset;
+}
+
+;;SETTER
+static fn MemoryArena_setLargeFreeHead(MemoryArena *a, MemoryHeader *head) {
+    (*a).largeFreeHead = head;
+}
+
+;;SETTER
+static fn MemoryArena_setLargeFreeBytes(MemoryArena *a, bytes freeBytes) {
+    (*a).largeFreeBytes = freeBytes;
 }
 
 ;;SETTER
@@ -358,6 +425,8 @@ static fn slab_template(SlabClass *slab, u32 idx) {
 
     SlabClass_setCount(slab, 0);
 
+    SlabClass_setNextIndex(slab, 0);
+
     SlabClass_setArena(slab, nullptr);
 
     SlabClass_setFreeHead(slab, nullptr);
@@ -387,12 +456,15 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
 
     bytes alignedCap = (cap + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
 
-    u8 *raw = Memory_systemAlloc(alignedCap + MEMORY_PAYLOAD_ALIGN);
+    void *mapped = mmap(nullptr, alignedCap, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANON, -1, 0);
 
-    if (!raw) 
+    if (mapped == MAP_FAILED) 
         return false;
 
-    u8 *master = Memory_alignUp(raw);
+    u8 *raw = (u8*) mapped;
+
+    u8 *master = raw;
 
     u8 *cur = master;
 
@@ -408,7 +480,7 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
         bytes need = (bytes)slabCap * sz;
 
         if (need > left) {
-            Memory_systemFree(raw);
+            munmap(raw, alignedCap);
 
             return false;
         }
@@ -419,19 +491,7 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
 
         SlabClass_setCount(slab, 0);
 
-        for (bytes i = slabCap; i > 0; i--) {
-            u8 *slot_ptr = cur + (i - 1) * sz;
-
-            MemoryHeader *h = (MemoryHeader*) slot_ptr;
-
-            memset(h, 0, sizeof(MemoryHeader));
-
-            FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
-
-            FreeNode_setNext(node, SlabClass_freeHead(slab));
-
-            SlabClass_setFreeHead(slab, node);
-        }
+        SlabClass_setNextIndex(slab, 0);
 
         cur += need;
 
@@ -449,6 +509,10 @@ static bool arena_init(MemoryArena *a, bytes totalBytes) {
     MemoryArena_setBumpCapacity(a, left);
 
     MemoryArena_setBumpOffset(a, 0);
+
+    MemoryArena_setLargeFreeHead(a, nullptr);
+
+    MemoryArena_setLargeFreeBytes(a, 0);
 
     MemoryArena_setLive(a, true);
 
@@ -484,21 +548,34 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
         SpinLock_lock(SlabClass_lockMut(slab));
 
         FreeNode *node = SlabClass_freeHead(slab);
+        u8 *slot_ptr = nullptr;
 
         if (node) {
             SlabClass_setFreeHead(slab, FreeNode_next(node));
 
             SlabClass_setCount(slab, SlabClass_count(slab) + 1);
+
+            slot_ptr = (u8*) node - sizeof(MemoryHeader);
+        } else {
+            u32 nextIdx = SlabClass_nextIndex(slab);
+
+            if (nextIdx < SlabClass_capacity(slab)) {
+                slot_ptr = SlabClass_arena(slab) + (bytes) nextIdx * SlabClass_slotSize(slab);
+
+                SlabClass_setNextIndex(slab, nextIdx + 1u);
+
+                SlabClass_setCount(slab, SlabClass_count(slab) + 1);
+            }
         }
 
         SpinLock_unlock(SlabClass_lockMut(slab));
 
-        if (node) {
-            MemoryHeader *h = (MemoryHeader*) ((u8*) node - sizeof(MemoryHeader));
+        if (slot_ptr) {
+            MemoryHeader *h = (MemoryHeader*) slot_ptr;
 
             Memory_headerStamp(h, typeId, numBytes);
 
-            return node;
+            return (any) (slot_ptr + sizeof(MemoryHeader));
         }
     }
 
@@ -508,11 +585,59 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
 
     SpinLock_lock(MemoryArena_bumpLockMut(a));
 
+    MemoryHeader *freeNode = MemoryArena_largeFreeHead(a);
+
+    while (freeNode) {
+        bytes nodeSize = FreeLarge_blockSize(freeNode);
+
+        if (nodeSize >= total) {
+            MemoryHeader *prev = FreeLarge_prev(freeNode);
+
+            MemoryHeader *next = FreeLarge_next(freeNode);
+
+            u8 *slot_ptr = (u8*) freeNode;
+
+            if (nodeSize == total) {
+                if (prev)
+                    FreeLarge_setNext(prev, next);
+                else
+                    MemoryArena_setLargeFreeHead(a, next);
+
+                if (next)
+                    FreeLarge_setPrev(next, prev);
+            } else {
+                bytes remSize = nodeSize - total;
+
+                MemoryHeader *rem = (MemoryHeader*) (slot_ptr + total);
+
+                FreeLarge_init(rem, remSize, prev, next);
+
+                if (prev)
+                    FreeLarge_setNext(prev, rem);
+                else
+                    MemoryArena_setLargeFreeHead(a, rem);
+
+                if (next)
+                    FreeLarge_setPrev(next, rem);
+            }
+
+            MemoryArena_setLargeFreeBytes(a, MemoryArena_largeFreeBytes(a) - total);
+
+            SpinLock_unlock(MemoryArena_bumpLockMut(a));
+
+            Memory_headerStamp(freeNode, typeId, numBytes);
+
+            return (any) (slot_ptr + sizeof(MemoryHeader));
+        }
+
+        freeNode = FreeLarge_next(freeNode);
+    }
+
     bytes bumpOffset = MemoryArena_bumpOffset(a);
 
     bytes bumpCap = MemoryArena_bumpCapacity(a);
 
-    if (bumpOffset + total <= bumpCap) {
+    if (total <= bumpCap - bumpOffset) {
         u8 *slot_ptr = MemoryArena_bumpArena(a) + bumpOffset;
 
         MemoryArena_setBumpOffset(a, bumpOffset + total);
@@ -566,6 +691,8 @@ static fn arena_free(MemoryArena *a, any userPtr) {
     if (!header_valid(h)) 
         return;
 
+    bytes origLen = MemoryHeader_length(h);
+
     SlabClass *slab = nullptr;
 
     SlabClass *slabs = MemoryArena_slabs(a);
@@ -581,7 +708,7 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
         if (u >= base + sizeof(MemoryHeader) && u < base + extent) {
             if ((u - base) % slotSize != sizeof(MemoryHeader)
-                || MemoryHeader_length(h) > slotSize - sizeof(MemoryHeader))
+                || origLen > slotSize - sizeof(MemoryHeader))
                 return;
             slab = candidate;
 
@@ -591,8 +718,106 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
     memset(h, 0, sizeof(MemoryHeader));
 
-    if (!slab) 
+    if (!slab) {
+        SpinLock_lock(MemoryArena_bumpLockMut(a));
+
+        u8 *bumpArena = MemoryArena_bumpArena(a);
+
+        bytes bumpOffset = MemoryArena_bumpOffset(a);
+
+        u8 *blockStart = (u8*) h;
+
+        bytes alignedLen = (origLen + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
+
+        bytes blockSize = sizeof(MemoryHeader) + alignedLen;
+
+        if (!bumpArena || blockStart < bumpArena || blockStart >= bumpArena + bumpOffset
+            || blockSize > (bytes) ((bumpArena + bumpOffset) - blockStart)) {
+            SpinLock_unlock(MemoryArena_bumpLockMut(a));
+
+            return;
+        }
+
+        MemoryHeader *prev = nullptr;
+
+        MemoryHeader *curr = MemoryArena_largeFreeHead(a);
+
+        while (curr && (u8*) curr < blockStart) {
+            prev = curr;
+
+            curr = FreeLarge_next(curr);
+        }
+
+        FreeLarge_init(h, blockSize, prev, curr);
+
+        if (prev)
+            FreeLarge_setNext(prev, h);
+        else
+            MemoryArena_setLargeFreeHead(a, h);
+
+        if (curr)
+            FreeLarge_setPrev(curr, h);
+
+        MemoryArena_setLargeFreeBytes(a, MemoryArena_largeFreeBytes(a) + blockSize);
+
+        if (curr && blockStart + blockSize == (u8*) curr) {
+            bytes merged = blockSize + FreeLarge_blockSize(curr);
+
+            MemoryHeader *after = FreeLarge_next(curr);
+
+            FreeLarge_setBlockSize(h, merged);
+
+            FreeLarge_setNext(h, after);
+
+            if (after)
+                FreeLarge_setPrev(after, h);
+
+            blockSize = merged;
+        }
+
+        MemoryHeader *node = h;
+
+        if (prev && (u8*) prev + FreeLarge_blockSize(prev) == blockStart) {
+            bytes merged = FreeLarge_blockSize(prev) + blockSize;
+
+            MemoryHeader *after = FreeLarge_next(h);
+
+            FreeLarge_setBlockSize(prev, merged);
+
+            FreeLarge_setNext(prev, after);
+
+            if (after)
+                FreeLarge_setPrev(after, prev);
+
+            node = prev;
+
+            blockStart = (u8*) prev;
+
+            blockSize = merged;
+        }
+
+        if (blockStart + blockSize == bumpArena + bumpOffset) {
+            MemoryHeader *before = FreeLarge_prev(node);
+
+            MemoryHeader *after = FreeLarge_next(node);
+
+            if (before)
+                FreeLarge_setNext(before, after);
+            else
+                MemoryArena_setLargeFreeHead(a, after);
+
+            if (after)
+                FreeLarge_setPrev(after, before);
+
+            MemoryArena_setLargeFreeBytes(a, MemoryArena_largeFreeBytes(a) - blockSize);
+
+            MemoryArena_setBumpOffset(a, bumpOffset - blockSize);
+        }
+
+        SpinLock_unlock(MemoryArena_bumpLockMut(a));
+
         return;
+    }
 
     FreeNode *node = (FreeNode*) userPtr;
 
@@ -625,32 +850,29 @@ static fn arena_freeAll(MemoryArena *a) {
 
         SlabClass_setCount(slab, 0);
 
-        u32 sz = SlabClass_slotSize(slab);
-
-        u8 *slabArena = SlabClass_arena(slab);
-
-        for (bytes i = SlabClass_capacity(slab); i > 0; i--) {
-            u8 *slot_ptr = slabArena + (i - 1) * sz;
-
-            MemoryHeader *h = (MemoryHeader*) slot_ptr;
-
-            memset(h, 0, sizeof(MemoryHeader));
-
-            FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
-
-            FreeNode_setNext(node, SlabClass_freeHead(slab));
-
-            SlabClass_setFreeHead(slab, node);
-        }
+        SlabClass_setNextIndex(slab, 0);
 
         SpinLock_unlock(SlabClass_lockMut(slab));
     }
 
     SpinLock_lock(MemoryArena_bumpLockMut(a));
 
-    memset(MemoryArena_bumpArena(a), 0, MemoryArena_bumpOffset(a));
+    u8 *master = MemoryArena_masterArena(a);
+
+    bytes masterCap = MemoryArena_masterCapacity(a);
+
+    if (master && masterCap > 0) {
+        void *remapped = mmap(master, masterCap, PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
+        if (remapped == MAP_FAILED)
+            memset(master, 0, masterCap);
+    }
 
     MemoryArena_setBumpOffset(a, 0);
+
+    MemoryArena_setLargeFreeHead(a, nullptr);
+
+    MemoryArena_setLargeFreeBytes(a, 0);
 
     SpinLock_unlock(MemoryArena_bumpLockMut(a));
 
@@ -802,7 +1024,7 @@ MemoryArena *MemoryArena_create(bytes totalBytes) {
     SpinLock_unlock(&s_registryLock);
 
     if (!placed) {
-        Memory_systemFree(MemoryArena_masterRaw(a));
+        munmap(MemoryArena_masterRaw(a), MemoryArena_masterCapacity(a));
 
         Memory_systemFree(a);
 
@@ -830,7 +1052,8 @@ fn MemoryArena_destroy(MemoryArena *a) {
 
     MemoryArena_setLive(a, false);
 
-    Memory_systemFree(MemoryArena_masterRaw(a));
+    if (MemoryArena_masterRaw(a) && MemoryArena_masterCapacity(a) > 0)
+        munmap(MemoryArena_masterRaw(a), MemoryArena_masterCapacity(a));
 
     MemoryArena_setMasterRaw(a, nullptr);
 
@@ -907,7 +1130,7 @@ bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCo
 
         u8 *slabArena = SlabClass_arena(slab);
 
-        u32 cap = SlabClass_capacity(slab);
+        u32 cap = SlabClass_nextIndex(slab);
 
         for (bytes i = 0; i < cap; i++) {
             u8 *slot_ptr = slabArena + i * sz;
@@ -985,7 +1208,7 @@ bytes MemoryArena_activeBytes(MemoryArena *a) {
 
     SpinLock_lock(MemoryArena_bumpLockMut(a));
 
-    total += MemoryArena_bumpOffset(a);
+    total += MemoryArena_bumpOffset(a) - MemoryArena_largeFreeBytes(a);
 
     SpinLock_unlock(MemoryArena_bumpLockMut(a));
 

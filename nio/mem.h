@@ -55,9 +55,11 @@ typedef struct MemoryHeader {
 } MemoryHeader;
 _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
 
+typedef struct MemoryArena MemoryArena;
+
 bool Memory_init(bytes totalBytes);
 
-any Memory_alloc(u64 typeId, bytes numBytes);
+any Memory_alloc(u64 typeId, MemoryArena *arena, bytes numBytes);
 
 any Memory_realloc(any userPtr, bytes newBytes);
 
@@ -81,9 +83,9 @@ bytes Memory_findAll(u64 typeId, any *outArray, bytes maxCount);
 // Initialized disjoint alloc/free use per-region locks. Init/create/destroy,
 // reset/enumeration and shared-block access require caller exclusion. Freed raw
 // addresses have no generations: reuse may alias them; not a stale-handle API.
-// Slab blocks recycle individually. Bump blocks (including small overflow spill)
-// invalidate on free but reclaim capacity only on freeAll, never individually.
-typedef struct MemoryArena MemoryArena;
+// Slab blocks recycle individually in O(1). Large and spill blocks in the bump
+// region invalidate on free, coalesce with adjacent free neighbors, and reclaim
+// capacity individually (retracting the bump cursor when the tail clears).
 
 // Private allocator seam, kept here so nio has one public header. The system
 // wrappers are the only libc allocation path; arena.c and transient.c call
@@ -99,7 +101,7 @@ MemoryArena *Memory_arenaFor(any userPtr);
 #ifdef NIO_MEM_IMPLEMENTATION
 
 /** Round a freshly allocated base forward to the payload floor. */
-static u8 *Memory_alignUp(const u8 *raw) {
+static inline u8 *Memory_alignUp(const u8 *raw) {
     return (u8*) (((pointer) raw + MEMORY_ALIGN_MASK) & ~(pointer) MEMORY_ALIGN_MASK);
 }
 
@@ -152,6 +154,7 @@ static fn Memory_headerStamp(MemoryHeader *h, u64 typeId, bytes numBytes) {
 #endif
 
 MemoryArena *Memory_defaultArena();
+MemoryArena *Re_arena();
 
 MemoryArena *MemoryArena_create(bytes totalBytes);
 bytes MemoryArena_capacityFor(bytes payloadBytes);

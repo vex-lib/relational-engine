@@ -46,31 +46,39 @@ fn Memory_systemFree(any ptr) {
     free(ptr);
 }
 
-/** Allocate a default-arena payload with a 32-byte self-describing header. */
-any Memory_alloc(u64 typeId, bytes numBytes) {
-    MemoryArena *arena = Memory_defaultArena();
+/** Return Relational Engine's own arena. */
+MemoryArena *Re_arena() {
+    return Memory_defaultArena();
+}
 
-    if (!arena) 
+/** Allocate a typed payload in an explicit non-null arena with a 32-byte self-describing header. */
+any Memory_alloc(u64 typeId, MemoryArena *arena, bytes numBytes) {
+    if (!arena)
         return nullptr;
 
     return MemoryArena_alloc(arena, typeId, numBytes);
 }
 
-/** Allocate a replacement in the default arena, copy the shorter length, and free the old arena block. */
+/** Allocate a replacement in the pointer's owning arena, copy the shorter length, and free the old block. */
 any Memory_realloc(any userPtr, bytes newBytes) {
-    if (!userPtr) 
-        return Memory_alloc(0, newBytes);
+    if (!userPtr)
+        return nullptr;
 
-    if (!Memory_safeHeader(userPtr)) 
+    if (!Memory_safeHeader(userPtr))
+        return nullptr;
+
+    MemoryArena *arena = Memory_arenaFor(userPtr);
+
+    if (!arena)
         return nullptr;
 
     u64 typeId = Memory_type(userPtr);
 
     bytes oldLen = Memory_length(userPtr);
 
-    any next = Memory_alloc(typeId, newBytes);
+    any next = Memory_alloc(typeId, arena, newBytes);
 
-    if (!next) 
+    if (!next)
         return nullptr;
 
     memcpy(next, userPtr, oldLen < newBytes ? oldLen : newBytes);
