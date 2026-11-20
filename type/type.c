@@ -108,7 +108,7 @@ static bool growSlate(bytes needed) {
        newCap *= 2;
 
     TypeParentsRow *nb = (TypeParentsRow*) Memory_alloc(
-        0u, newCap * sizeof(TypeParentsRow));
+        0u, Re_arena(), newCap * sizeof(TypeParentsRow));
     if (nb == nullptr) 
        return false;
 
