@@ -57,7 +57,7 @@ static inline bytes Buffer_lengthRaw(const Buffer *s) { return (*s).length; }
 static inline fn Buffer_setLengthRaw(Buffer *s, bytes v) { (*s).length = v; }
 
 Buffer *Buffer_0() {
-    Buffer *self = (Buffer*) Memory_alloc(TYPE_BYTE_ARRAY, sizeof(Buffer));
+    Buffer *self = (Buffer*) Memory_alloc(TYPE_BYTE_ARRAY, Re_arena(), sizeof(Buffer));
 
     if (!self)
         return nullptr;
@@ -76,7 +76,7 @@ Buffer *Buffer_1(bytes n) {
         return nullptr;
 
     if (n > 0) {
-        Buffer_setData(self, (u8*) Memory_alloc(TYPE_BYTE_ARRAY, n));
+        Buffer_setData(self, (u8*) Memory_alloc(TYPE_BYTE_ARRAY, Re_arena(), n));
 
         if (!Buffer_data(self)) {
             Memory_free(self);

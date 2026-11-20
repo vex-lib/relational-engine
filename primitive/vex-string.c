@@ -68,7 +68,7 @@
 // vex-string.c — the string class, ported from primitive/string.java.
 
 static u8 *allocate_raw(bytes len) {
-    u8 *ptr = (u8*) Memory_alloc(TYPE_STRING_ARRAY, len + 1);
+    u8 *ptr = (u8*) Memory_alloc(TYPE_STRING_ARRAY, Re_arena(), len + 1);
     if (ptr)
         memset(ptr, 0, len + 1);
     return ptr;
