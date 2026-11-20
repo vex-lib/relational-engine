@@ -190,7 +190,7 @@ static fn rehash(Collection *c, bytes newCap) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_MAP);
 
-    u8 *newData = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *newData = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
     if (!newData) {
         Collection_reportExhaustion(c, Bytes);
@@ -238,7 +238,7 @@ Map *Map_3(u32 keyClass, u32 valClass, bytes capacity) {
     if (cap < 4) 
        cap = 4;
 
-    Map *map = (Map*) Memory_alloc(TYPE_MAP, sizeof(Map));
+    Map *map = (Map*) Memory_alloc(TYPE_MAP, Re_arena(), sizeof(Map));
 
     if (!map) {
         (discard) Struct_reportConstructionExhaustion("map", sizeof(Map));
@@ -268,7 +268,7 @@ Map *Map_3(u32 keyClass, u32 valClass, bytes capacity) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_MAP);
 
-    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
     Collection_setData(c, data);
 
     if (!data) {

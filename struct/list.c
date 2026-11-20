@@ -119,7 +119,7 @@ static u8 *bufferGrow(Collection *c, bytes needed) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, Collection_elementClass(c));
 
-    u8 *next = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *next = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
     if (!next) {
         // Loud, counted refusal (the Exhaustion Loudness Law): the element is
@@ -174,7 +174,7 @@ bool List_initStride(List *self, u32 elementClass, bytes stride, bytes capacity)
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
     if (!data) {
         (discard) Struct_reportConstructionExhaustion("list", Bytes);
@@ -194,7 +194,7 @@ bool List_init(List *self, u32 elementClass, bytes capacity) {
 }
 
 List *List_3(u32 elementClass, bytes capacity, bytes count) {
-    List *list = (List*) Memory_alloc(TYPE_LIST, sizeof(List));
+    List *list = (List*) Memory_alloc(TYPE_LIST, Re_arena(), sizeof(List));
 
     if (!list) {
         (discard) Struct_reportConstructionExhaustion("list", sizeof(List));

@@ -187,7 +187,7 @@ static fn rehash(Collection *c, bytes newCap) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_SET);
 
-    u8 *newData = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *newData = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
     if (!newData) {
         Collection_reportExhaustion(c, Bytes);
@@ -232,7 +232,7 @@ Set *Set_2(u32 elementClass, bytes capacity) {
     if (cap < 4) 
        cap = 4;
 
-    Set *set = (Set*) Memory_alloc(TYPE_SET, sizeof(Set));
+    Set *set = (Set*) Memory_alloc(TYPE_SET, Re_arena(), sizeof(Set));
 
     if (!set) {
         (discard) Struct_reportConstructionExhaustion("set", sizeof(Set));
@@ -262,7 +262,7 @@ Set *Set_2(u32 elementClass, bytes capacity) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_SET);
 
-    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
     Collection_setData(c, data);
 
     if (!data) {

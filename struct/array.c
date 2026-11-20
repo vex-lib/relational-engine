@@ -93,7 +93,7 @@ static Collection *asCollection(Array *array) {
 Array *Array_2(u32 elementClass, bytes length) {
     bytes stride = Stride_get(elementClass);
 
-    Array *array = (Array*) Memory_alloc(TYPE_ARRAY, sizeof(Array));
+    Array *array = (Array*) Memory_alloc(TYPE_ARRAY, Re_arena(), sizeof(Array));
 
     if (!array) {
         (discard) Struct_reportConstructionExhaustion("array", sizeof(Array));
@@ -123,7 +123,7 @@ Array *Array_2(u32 elementClass, bytes length) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
     Collection_setData(c, data);
 
     if (!data) {

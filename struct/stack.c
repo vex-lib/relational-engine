@@ -104,7 +104,7 @@ Stack *Stack_3(u32 elementClass, bytes capacity, bytes count) {
 
     bytes cap = capacity < DEFAULT_CAPACITY ? DEFAULT_CAPACITY : capacity;
 
-    Stack *stack = (Stack*) Memory_alloc(TYPE_STACK, sizeof(Stack));
+    Stack *stack = (Stack*) Memory_alloc(TYPE_STACK, Re_arena(), sizeof(Stack));
 
     if (!stack) {
         (discard) Struct_reportConstructionExhaustion("stack", sizeof(Stack));
@@ -134,7 +134,7 @@ Stack *Stack_3(u32 elementClass, bytes capacity, bytes count) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
     Collection_setData(c, data);
 
     if (!data) {
@@ -201,7 +201,7 @@ TryValue Stack_pushTry(Stack *stack, u64 valueOrPointer) {
 
         u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, Collection_elementClass(c));
 
-        u8 *next = (u8*) Memory_alloc(bufType, Bytes);
+        u8 *next = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
         if (!next) {
             // Shared loud, counted refusal (the Exhaustion Loudness Law); the

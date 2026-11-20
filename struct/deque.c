@@ -111,7 +111,7 @@ Deque *Deque_3(u32 elementClass, bytes capacity, bytes count) {
 
     bytes cap = capacity < DEFAULT_CAPACITY ? DEFAULT_CAPACITY : capacity;
 
-    Deque *deque = (Deque*) Memory_alloc(TYPE_DEQUE, sizeof(Deque));
+    Deque *deque = (Deque*) Memory_alloc(TYPE_DEQUE, Re_arena(), sizeof(Deque));
 
     if (!deque) {
         (discard) Struct_reportConstructionExhaustion("deque", sizeof(Deque));
@@ -141,7 +141,7 @@ Deque *Deque_3(u32 elementClass, bytes capacity, bytes count) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, elementClass);
 
-    u8 *data = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
     Collection_setData(c, data);
 
     if (!data) {
@@ -170,7 +170,7 @@ static i32 ensureCapacity(Collection *c) {
 
     u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, Collection_elementClass(c));
 
-    u8 *next = (u8*) Memory_alloc(bufType, Bytes);
+    u8 *next = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
     if (!next) {
         Collection_reportExhaustion(c, Bytes);

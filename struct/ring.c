@@ -127,7 +127,7 @@ RingBuffer RingBuffer_2(bytes elem_size, bytes capacity) {
 
     ring.elem_size = elem_size;
 
-    ring.slots = (u8*) Memory_alloc(TYPE_RING_BUFFER, total);
+    ring.slots = (u8*) Memory_alloc(TYPE_RING_BUFFER, Re_arena(), total);
 
     if (ring.slots == nullptr) 
         memset(&ring, 0, sizeof ring);

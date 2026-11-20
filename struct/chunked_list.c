@@ -499,7 +499,7 @@ static u8 *nodeAlloc(const ChunkedList *self, u32 depth) {
 
         u64 chunkType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ClColl_elementClass(coll));
 
-        u8 *leaf = (u8*) Memory_alloc(chunkType, Bytes);
+        u8 *leaf = (u8*) Memory_alloc(chunkType, Re_arena(), Bytes);
 
         if (leaf) 
             memset(leaf, 0, Bytes);
@@ -509,7 +509,7 @@ static u8 *nodeAlloc(const ChunkedList *self, u32 depth) {
 
     bytes Bytes = (bytes)radix * sizeof(_Atomic(u8*));
 
-    u8 *node = (u8*) Memory_alloc(TYPE_CHUNKED_LIST, Bytes);
+    u8 *node = (u8*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), Bytes);
 
     if (node) 
         memset(node, 0, Bytes);
@@ -532,7 +532,7 @@ static bool dirGrow(ChunkedList *self) {
 
     bytes Bytes = sizeof(ChunkDir) + (bytes)newCap * sizeof(_Atomic(u8*));
 
-    ChunkDir *next = (ChunkDir*) Memory_alloc(TYPE_CHUNKED_LIST, Bytes);
+    ChunkDir *next = (ChunkDir*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), Bytes);
 
     if (!next) {
         // Loud, counted refusal through the embedded Collection mirror.
@@ -730,7 +730,7 @@ static ChunkedList *buildPaged(u32 elementClass, bytes stride, const u32 *radixI
     if (stride > (bytes)UINT32_MAX) 
         return nullptr;
 
-    ChunkedList *self = (ChunkedList*) Memory_alloc(TYPE_CHUNKED_LIST, sizeof(ChunkedList));
+    ChunkedList *self = (ChunkedList*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), sizeof(ChunkedList));
 
     if (!self) {
         (discard) Struct_reportConstructionExhaustion("chunked_list", sizeof(ChunkedList));
@@ -740,11 +740,11 @@ static ChunkedList *buildPaged(u32 elementClass, bytes stride, const u32 *radixI
 
     memset(self, 0, sizeof(*self));
 
-    u32 *radices = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, (bytes)levels * sizeof(u32));
+    u32 *radices = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), (bytes)levels * sizeof(u32));
 
-    u32 *shifts = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, (bytes)levels * sizeof(u32));
+    u32 *shifts = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), (bytes)levels * sizeof(u32));
 
-    u32 *masks = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, (bytes)levels * sizeof(u32));
+    u32 *masks = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), (bytes)levels * sizeof(u32));
 
     if (!radices || !shifts || !masks) {
         (discard) Struct_reportConstructionExhaustion("chunked_list", (bytes)levels * sizeof(u32) * 3u);
@@ -879,7 +879,7 @@ ChunkedList *ChunkedList_paged(u32 elementClass, u32 stride, const i32 *radices,
 
     bytes cap = count > 3u ? count : 3u;
 
-    u32 *shape = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, cap * sizeof(u32));
+    u32 *shape = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), cap * sizeof(u32));
 
     if (!shape) 
         return nullptr;
