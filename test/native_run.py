@@ -1,4 +1,4 @@
-"""Strict migrated native IO/NIO owners, with assertions and ASan/UBSan.
+"""Strict migrated native IO/NIO owner suite, with assertions and ASan/UBSan.
 
 The engine owns every storage/I/O object; only SpinLock and Crypto computation
 come from Vexspoke. Vexspoke may own higher-level io policy (VexHome) above re,
@@ -24,11 +24,10 @@ sources = [ENGINE / "nio/mem.c", ENGINE / "nio/arena.c", ENGINE / "nio/transient
            *sorted((ENGINE / "io").rglob("*.c")),
            *sorted((ENGINE / "clipboard").glob("*.c")),
            ENGINE / "clipboard/clipboard_mac.m"]
-owners = [*sorted((SUITE / "io").glob("*_test.c")),
-          SUITE / "nio/mem_test.c", SUITE / "nio/mem_exhaustion_test.c",
-          SUITE / "nio/transient_lifetime_test.c"]
+owners = [SUITE / "re_test.c", SUITE / "re_manual_test.c"]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--owner", choices=[p.stem for p in owners])
+parser.add_argument("--suite", help="optional single suite filter passed to re_test")
 parser.add_argument("--mode", choices=["strict", "release", "sanitized", "thread"])
 args = parser.parse_args()
 if args.owner:
@@ -58,9 +57,10 @@ with tempfile.TemporaryDirectory(prefix="re-native-", dir=os.environ.get("TMPDIR
             binary = tmp / f"{mode}-{owner.stem}"
             owner_objects = objects
             owner_flags = []
-            if owner.stem == "mem_exhaustion_test":
-                # Compile-time allocator substitution only in this test's mem.o:
-                # no production test hooks, and other owners retain real libc.
+            run_args = [str(binary)]
+            if owner.stem == "re_test":
+                # Compile-time allocator substitution only in re_test's mem.o:
+                # no production test hooks, and re_manual_test retains real libc.
                 injected = tmp / f"{mode}-injected-mem.o"
                 subprocess.run(["clang", *flags, "-Dmalloc=MemTest_malloc",
                                 "-Dcalloc=MemTest_calloc", "-Drealloc=MemTest_realloc",
@@ -68,11 +68,13 @@ with tempfile.TemporaryDirectory(prefix="re-native-", dir=os.environ.get("TMPDIR
                                check=True, timeout=60)
                 owner_objects = [str(injected), *objects[1:]]
                 owner_flags = ["-DMEM_TEST_FAULTS=1"]
+                if args.suite:
+                    run_args.append(args.suite)
             subprocess.run(["clang", *flags, *owner_flags, str(owner), *owner_objects, "-framework", "AppKit", "-o", str(binary)],
                            check=True, timeout=60)
-            result = subprocess.run([str(binary)], timeout=15)
+            result = subprocess.run(run_args, timeout=15)
             if result.returncode == 77:
-                assert owner.name == "clipboard_test.c", owner
+                assert owner.name == "re_manual_test.c", owner
                 print(f"SKIP: {mode} {owner.relative_to(SUITE)} (system clipboard)", flush=True)
                 continue
             result.check_returncode()
