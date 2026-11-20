@@ -198,7 +198,7 @@ bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer) {
 }
 
 VariableSlot *VariableSlot_0() {
-    VariableSlot *self = (VariableSlot*) Memory_alloc(TYPE_VARIABLE_SLOT, sizeof(VariableSlot));
+    VariableSlot *self = (VariableSlot*) Memory_alloc(TYPE_VARIABLE_SLOT, Re_arena(), sizeof(VariableSlot));
 
     if (self == nullptr) 
         return nullptr;

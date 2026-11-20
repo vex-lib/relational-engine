@@ -152,7 +152,7 @@ fn VariableMiniMap_shutdown(VariableMiniMap *map) {
 }
 
 VariableMiniMap *VariableMiniMap_0() {
-    VariableMiniMap *map = (VariableMiniMap*) Memory_alloc(TYPE_VARIABLE_MINI_MAP, sizeof(VariableMiniMap));
+    VariableMiniMap *map = (VariableMiniMap*) Memory_alloc(TYPE_VARIABLE_MINI_MAP, Re_arena(), sizeof(VariableMiniMap));
 
     if (!map) 
         return nullptr;

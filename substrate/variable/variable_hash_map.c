@@ -136,7 +136,7 @@ static ChunkedList **ensureBand(VariableHashMap *map, u32 bucket) {
 
     bytes Bytes = (bytes) VARIABLE_HASH_SLOTS * sizeof(ChunkedList*);
 
-    band = (ChunkedList**) Memory_alloc(TYPE_VARIABLE_HASH_MAP, Bytes);
+    band = (ChunkedList**) Memory_alloc(TYPE_VARIABLE_HASH_MAP, Re_arena(), Bytes);
 
     if (!band) 
         return nullptr;
@@ -220,7 +220,7 @@ fn VariableHashMap_shutdown(VariableHashMap *map) {
 }
 
 VariableHashMap *VariableHashMap_0() {
-    VariableHashMap *map = (VariableHashMap*) Memory_alloc(TYPE_VARIABLE_HASH_MAP, sizeof(VariableHashMap));
+    VariableHashMap *map = (VariableHashMap*) Memory_alloc(TYPE_VARIABLE_HASH_MAP, Re_arena(), sizeof(VariableHashMap));
 
     if (!map) 
         return nullptr;
