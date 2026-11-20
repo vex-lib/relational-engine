@@ -549,7 +549,7 @@ static FileEventWatcher *FileEventWatcher_init(const char *path, FileEventType m
     if (!path || !path[0] || (!legacyCb && !watchCb))
         return nullptr;
 
-    FileEventWatcher *watcher = (FileEventWatcher*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, sizeof(FileEventWatcher));
+    FileEventWatcher *watcher = (FileEventWatcher*) Memory_alloc(TYPE_FILE_EVENT_WATCHER, Re_arena(), sizeof(FileEventWatcher));
     if (!watcher)
         return nullptr;
     memset(watcher, 0, sizeof(FileEventWatcher));

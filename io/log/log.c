@@ -344,7 +344,7 @@ bool Log_init(Log *log, const char *path, bytes slot_count) {
 
     bytes arenaBytes = LOG_SLOT_BASE + sc * LOG_SLOT_SIZE;
 
-    u8 *arena = (u8*) Memory_alloc(TYPE_LOG_SINGLETON, arenaBytes);
+    u8 *arena = (u8*) Memory_alloc(TYPE_LOG_SINGLETON, Re_arena(), arenaBytes);
     Log_setArena(log, arena);
 
     if (!arena) {

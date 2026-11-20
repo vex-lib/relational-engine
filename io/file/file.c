@@ -155,7 +155,7 @@ File *File_open(const char *path, u32 mode) {
     if (!handle) 
         return nullptr;
 
-    File *f = Memory_alloc(TYPE_FILE_SINGLETON, sizeof(File));
+    File *f = Memory_alloc(TYPE_FILE_SINGLETON, Re_arena(), sizeof(File));
 
     if (!f) {
         fclose(handle);
@@ -663,7 +663,7 @@ static any findexAlloc(FIndex *self, bytes bytesCount) {
     if (arena) 
         return MemoryArena_alloc(arena, TYPE_FINDEX_SINGLETON, bytesCount);
 
-    return Memory_alloc(TYPE_FINDEX_SINGLETON, bytesCount);
+    return Memory_alloc(TYPE_FINDEX_SINGLETON, Re_arena(), bytesCount);
 }
 
 /** Release a table through the same owner that allocated it. */
