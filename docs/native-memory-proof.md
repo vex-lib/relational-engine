@@ -13,12 +13,15 @@ complete production-readiness certificate.
   The old heap fallback returned pointers outside every registered owner range:
   metadata/free rejected them, leaking storage. The exhaustion probe reproduced
   the unwanted success before this repair.
-- Physical slab slots recycle individually. Bump blocks invalidate individually
-  but retain reserved capacity until reset. Small bump spills must not be linked
-  into a slab freelist: that mixed storage provenance, counts and reset behavior.
+- Physical slab slots recycle individually in O(1). Large and spilled blocks in
+  the bump region invalidate individually, link into an address-ordered
+  coalescing free-list (merging adjacent free neighbors, splitting on reuse, and
+  retracting the bump cursor when the tail clears), and never mix into slab
+  freelists.
 - Enumeration includes both live slab and bump blocks, returns the total count,
-  and writes only the requested output capacity. Freed bump headers retain length
-  for traversal, but their cleared sugar excludes them from live results.
+  and writes only the requested output capacity. Freed large-block headers retain
+  their block length for traversal while zeroing their hash veto so they are
+  excluded from live results.
 - Reset clears used bump storage as well as resetting slabs. Rewinding alone
   left old bump headers accepted. Reset work is proportional to slab capacity
   plus used bump bytes, not constant time.
@@ -39,7 +42,8 @@ and now checks every copied byte instead of only byte zero.
 
 | Factor | Implemented test |
 | :--- | :--- |
-| Capacity | Exhaust each of seven slab classes; exhaust slab plus exact bump spill; repeated rejection and free/reuse recovery |
+| Capacity | Exhaust each of seven slab classes; exhaust slab plus exact bump spill; repeated rejection, spill reclamation, and free/reuse recovery |
+| Coalescing | Free adjacent 8 KiB blocks behind a live tail, allocate 16 KiB into the merged gap with zero heap calls, then free tail and verify full-region tail retraction |
 | Ownership | True A-to-B realloc, wrong-owner free preservation, bump spill not recycled as a slab |
 | Preservation | Full-payload byte checks after rejection, growth/shrink and cross-owner transfer |
 | Metadata | Large/spilled blocks enumerated; output canaries; freed/reset bump headers rejected |

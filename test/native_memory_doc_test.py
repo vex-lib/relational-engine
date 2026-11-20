@@ -20,11 +20,11 @@ class NativeMemoryDocumentation(unittest.TestCase):
         self.assertIn("return nullptr;", alloc)
         reset = source.split("static fn arena_freeAll(", 1)[1].split(
             "MemoryArena *Memory_arenaFor(", 1)[0]
-        self.assertIn("memset((*a).bumpArena, 0, (*a).bumpOffset)", reset)
+        self.assertIn("memset(MemoryArena_bumpArena(a), 0, MemoryArena_bumpOffset(a))", reset)
         enumerate_blocks = source.split("bytes MemoryArena_findAll(", 1)[1].split(
             "bytes MemoryArena_activeBytes(", 1)[0]
-        self.assertIn("(*a).slabs[s]", enumerate_blocks)
-        self.assertIn("offset < (*a).bumpOffset", enumerate_blocks)
+        self.assertIn("MemoryArena_slabs(a)", enumerate_blocks)
+        self.assertIn("MemoryArena_bumpOffset(a)", enumerate_blocks)
         self.assertIn("count < maxCount", enumerate_blocks)
         doc = (ENGINE / "docs/native-memory-proof.md").read_text()
         for statement in ("without heap allocation", "not constant time",
@@ -34,15 +34,15 @@ class NativeMemoryDocumentation(unittest.TestCase):
 
     def test_proof_claims_have_registered_cases_and_limits(self):
         suite = WORKSPACE / "re/test"
-        owner = (suite / "nio/mem_exhaustion_test.c").read_text()
-        for scenario in ("construction();", "exhaustion();", "boundaries();",
-                         "allClasses();", "hostile();", "model();", "concurrent();"):
+        owner = (suite / "re_test.c").read_text()
+        for scenario in ("ex_construction();", "ex_exhaustion();", "ex_boundaries();",
+                         "ex_allClasses();", "ex_hostile();", "ex_model();", "ex_concurrent();"):
             self.assertIn(scenario, owner)
-        for oracle in ("heapCalls == calls", "SIZE_MAX", "UINT32_MAX",
+        for oracle in ("g_heapCalls == calls", "SIZE_MAX", "UINT32_MAX",
                        "checkBytes", "MODEL_STEPS = 10000", "WORKER_STEPS = 4000"):
             self.assertIn(oracle, owner)
         runner = (suite / "native_run.py").read_text()
-        for registration in ("nio/mem_exhaustion_test.c", "-DMEM_TEST_FAULTS=1",
+        for registration in ("re_test.c", "-DMEM_TEST_FAULTS=1",
                              "-Dmalloc=MemTest_malloc", "-fsanitize=thread",
                              "-fsanitize=address,undefined", "timeout=15"):
             self.assertIn(registration, runner)
