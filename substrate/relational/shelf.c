@@ -175,7 +175,7 @@ fn Shelf_shutdown(Shelf *shelf) {
 }
 
 Shelf *Shelf_0() {
-    Shelf *shelf = Memory_alloc(TYPE_SHELF, sizeof(Shelf));
+    Shelf *shelf = Memory_alloc(TYPE_SHELF, Re_arena(), sizeof(Shelf));
 
     if (!shelf) 
         return nullptr;

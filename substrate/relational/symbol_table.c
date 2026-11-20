@@ -174,7 +174,7 @@ static bool ensure_byslot(SymbolTable *v, u32 need) {
         cap *= 2;
     }
 
-    i32 *next = (i32*) Memory_alloc(TYPE_SYMBOL_TABLE, (bytes) cap * sizeof(i32));
+    i32 *next = (i32*) Memory_alloc(TYPE_SYMBOL_TABLE, Re_arena(), (bytes) cap * sizeof(i32));
 
     if (!next) 
         return false;
@@ -209,7 +209,7 @@ SymbolTable SymbolTable_0() {
     if (!StringPool_init(arena)) 
         return v;
 
-    v.rows = (SymbolRow*) Memory_alloc(TYPE_SYMBOL_TABLE, SYMBOL_TABLE_DEFAULT_CAPACITY * sizeof(SymbolRow));
+    v.rows = (SymbolRow*) Memory_alloc(TYPE_SYMBOL_TABLE, Re_arena(), SYMBOL_TABLE_DEFAULT_CAPACITY * sizeof(SymbolRow));
 
     if (!v.rows) 
         return v;

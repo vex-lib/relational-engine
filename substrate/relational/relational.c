@@ -221,7 +221,7 @@ static u8 *Relational_stringAlloc(const char *value) {
 
     bytes length = (bytes) strlen(value) + 1u;
 
-    u8 *block = (u8*) Memory_alloc(TYPE_RELATIONAL_STRING, length);
+    u8 *block = (u8*) Memory_alloc(TYPE_RELATIONAL_STRING, Re_arena(), length);
 
     if (!block) 
         return nullptr;

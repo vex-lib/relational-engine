@@ -84,7 +84,7 @@ static inline fn Cell_setPad(Cell *cell, u64 pad) { (*cell).pad = pad; }
 static inline u64 Cell_pad(const Cell *cell) { return (*cell).pad; }
 
 Cell *Cell_2(u64 typeId, pointer value) {
-    Cell *cell = Memory_alloc(typeId, CELL_PAYLOAD_BYTES);
+    Cell *cell = Memory_alloc(typeId, Re_arena(), CELL_PAYLOAD_BYTES);
 
     if (!cell) 
         return nullptr;
