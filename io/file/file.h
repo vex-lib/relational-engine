@@ -2,8 +2,6 @@
 #define IO_FILE_FILE_H
 
 #include "vex.h"
-#include <stdio.h>
-
 #include "lang/annotation.h"
 #include "lang/primitive.h"
 #include "nio/mem.h"
@@ -83,7 +81,7 @@ u64      FilePtr_length(FilePtr self);
 u64      FilePtr_offset(FilePtr self);
 bool     FilePtr_isEmpty(FilePtr self);
 
-// --- FIndex: key hash → (offset, length) file index -------------------------
+// --- FIndex: key hash >> (offset, length) file index -------------------------
 
 typedef struct FIndexSlot FIndexSlot;
 
@@ -150,13 +148,52 @@ typedef enum FileEventType {
     FILE_EVENT_ALL      = 15
 } FileEventType;
 
+typedef struct FileWatchProps {
+    u32 latencyMs;
+    u32 debounceMs;
+    bool recursive;
+    bool emitDirs;
+    bool ignoreHidden;
+    const char *const *ignorePatterns;
+    bytes ignoreCount;
+    const char *const *includeExtensions;
+    bytes includeCount;
+} FileWatchProps;
+
+typedef struct FileWatchEvent {
+    const char *path;
+    const char *relativePath;
+    FileEventType type;
+    bool isDir;
+    u64 timestampNs;
+    i64 epochSeconds;
+    i64 fileSize;
+} FileWatchEvent;
+
 typedef fn (*FileEventCallback)(const char *path, FileEventType type, any userdata);
+typedef fn (*FileWatchCallback)(const FileWatchEvent *event, any userdata);
 
 ;;CLASSNAME("FileEventWatcher")
 typedef struct FileEventWatcher FileEventWatcher;
 
+FileWatchProps FileWatchProps_defaults();
+
 FileEventWatcher *FileEventWatcher_create(const char *path, FileEventType mask,
                                           FileEventCallback callback, any userdata);
+
+FileEventWatcher *FileEventWatcher_createWithProps(const char *path, FileEventType mask,
+                                                   const FileWatchProps *props,
+                                                   FileWatchCallback callback, any userdata);
+
+bool FileEventWatcher_setProps(FileEventWatcher *watcher, const FileWatchProps *props);
+FileWatchProps FileEventWatcher_getProps(const FileEventWatcher *watcher);
+const char *FileEventWatcher_getPath(const FileEventWatcher *watcher);
+FileEventType FileEventWatcher_getMask(const FileEventWatcher *watcher);
+bool FileEventWatcher_isRunning(const FileEventWatcher *watcher);
+bytes FileEventWatcher_pendingCount(const FileEventWatcher *watcher);
+bool FileEventWatcher_matchesPath(const FileEventWatcher *watcher, const char *path, bool isDir);
+bool FileEventWatcher_pushSynthetic(FileEventWatcher *watcher, const char *path,
+                                    FileEventType type, bool isDir);
 
 bool FileEventWatcher_start(FileEventWatcher *watcher);
 
