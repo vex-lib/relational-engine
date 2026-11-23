@@ -1,8 +1,10 @@
 #ifndef RE_STRUCT_STRUCT_H
 #define RE_STRUCT_STRUCT_H
 
-// struct/struct.h — THE Relational Engine plain-struct directory header.
-// One include for RE's Memory_alloc-backed containers and stride registry.
+/**
+ * struct/struct.h, THE Relational Engine plain-struct directory header.
+ * One include for RE's Memory_alloc-backed containers and stride registry.
+ */
 
 #include "vex.h"
 #include "struct/stride.h"
@@ -18,4 +20,4 @@
 #include "struct/set.h"
 #include "struct/stack.h"
 
-#endif // RE_STRUCT_STRUCT_H
+#endif /** RE_STRUCT_STRUCT_H */

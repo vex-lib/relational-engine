@@ -68,7 +68,7 @@
  */
 
 
-// list.c — List port (Legacy: struct/List.java).
+/** list.c, List port (Legacy: struct/List.java). */
 
 static const bytes DEFAULT_CAPACITY = 1024;
 
@@ -77,37 +77,77 @@ static Collection *asCollection(List *list) {
 }
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+{
+    (*c).typeId = typeId;
+}
 ;;GETTER
-static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+static inline u32 Collection_activeCount(const Collection *c)
+{
+    return (*c).activeCount;
+}
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+static inline fn Collection_setActiveCount(Collection *c, u32 count)
+{
+    (*c).activeCount = count;
+}
 ;;GETTER
-static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+static inline u32 Collection_elementClass(const Collection *c)
+{
+    return (*c).elementClass;
+}
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+static inline fn Collection_setElementClass(Collection *c, u32 cls)
+{
+    (*c).elementClass = cls;
+}
 ;;GETTER
-static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+static inline u32 Collection_strideField(const Collection *c)
+{
+    return (*c).stride;
+}
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+static inline fn Collection_setStride(Collection *c, u32 stride)
+{
+    (*c).stride = stride;
+}
 ;;GETTER
-static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+static inline u32 Collection_capacityField(const Collection *c)
+{
+    return (*c).capacity;
+}
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+static inline fn Collection_setCapacity(Collection *c, u32 cap)
+{
+    (*c).capacity = cap;
+}
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+static inline fn Collection_setHead(Collection *c, u32 head)
+{
+    (*c).head = head;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 ;;GETTER
-static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+static inline u8 *Collection_data(const Collection *c)
+{
+    return (*c).data;
+}
 ;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+static inline fn Collection_setData(Collection *c, u8 *data)
+{
+    (*c).data = data;
+}
 
 static u8 *bufferGrow(Collection *c, bytes needed) {
-    // d64, so growth is amortized O(1). A fixed increment makes "support a
-    // million" quadratic (the Dynamic Scalability & Anti-Hardcoding Law).
     u32 curCap = Collection_capacityField(c);
     bytes newCap = curCap ? curCap : DEFAULT_CAPACITY;
 
@@ -122,8 +162,6 @@ static u8 *bufferGrow(Collection *c, bytes needed) {
     u8 *next = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
     if (!next) {
-        // Loud, counted refusal (the Exhaustion Loudness Law): the element is
-        // not admitted and the caller can query Collection_exhaustionCount.
         Collection_reportExhaustion(c, Bytes);
 
         return nullptr;
@@ -166,8 +204,6 @@ bool List_initStride(List *self, u32 elementClass, bytes stride, bytes capacity)
     Collection_setExhaustionCount(c, 0);
 
     Collection_setExhaustionReported(c, false);
-    // Set before the allocation so a refused buffer still leaves a List_free-able
-    // object: data == nullptr is the empty-buffer state.
     Collection_setData(c, nullptr);
 
     bytes Bytes = cap * stride;
@@ -207,8 +243,6 @@ List *List_3(u32 elementClass, bytes capacity, bytes count) {
 
         return nullptr;
     }
-    // Pre-filled means the slots exist and read as zero; the zeroing is
-    // List_init's, so the count is the only extra step.
     Collection *c = asCollection(list);
 
     Collection_setActiveCount(c, (u32)count);

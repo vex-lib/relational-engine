@@ -20,7 +20,7 @@
  * ============================================================================
  * MODULE: StructExhaustion (struct/exhaustion)
  * ============================================================================
- * PROCEDURAL — no owned class. State lives in the calling owner (a refusal
+ * PROCEDURAL, no owned class. State lives in the calling owner (a refusal
  * count plus a one-report latch, passed by pointer).
  *
  * FUNCTION REGISTRY:
@@ -38,7 +38,7 @@
 
 /** Count a refusal and emit the epoch's single diagnostic. Always false. */
 ;;VALIDATOR
-bool Struct_reportExhaustion(u64 *count, bool *reported, const char *owner,
+bool Struct_reportExhaustion(u64 *count, bool *reported, string owner,
                              bytes requestedBytes, bytes boundBytes) {
     if (count == nullptr || reported == nullptr) {
         THROW("struct exhaustion: null counter (%s, %zu bytes)",
@@ -77,16 +77,18 @@ fn Struct_resetExhaustion(u64 *count, bool *reported) {
        (*reported) = false;
 }
 
-// --- Construction refusals (process-wide; no owner instance exists yet) ---
+/** --- Construction refusals (process-wide; no owner instance exists yet) --- */
 
-// The epoch's construction accounting. Process-wide because a failed
-// construction has no owner instance to carry a counter.
+/**
+ * The epoch's construction accounting. Process-wide because a failed
+ * construction has no owner instance to carry a counter.
+ */
 static u64 s_constructionCount = 0;
 static bool s_constructionReported = false;
 
 /** Count a construction refusal and report the epoch's first one. Always false. */
 ;;VALIDATOR
-bool Struct_reportConstructionExhaustion(const char *owner, bytes requestedBytes) {
+bool Struct_reportConstructionExhaustion(string owner, bytes requestedBytes) {
     s_constructionCount++;
 
     if (!s_constructionReported) {

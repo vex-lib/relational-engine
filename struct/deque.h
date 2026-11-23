@@ -4,9 +4,11 @@
 #include "vex.h"
 #include "struct/collection.h"
 
-// struct/deque.h — the Deque class, ported from struct/Deque.java.
-// d64-ended circular buffer over a stride-based buffer; the head field
-// tracks the front so addFirst/removeFirst wrap around the ring.
+/**
+ * struct/deque.h, the Deque class, ported from struct/Deque.java.
+ * d64-ended circular buffer over a stride-based buffer; the head field
+ * tracks the front so addFirst/removeFirst wrap around the ring.
+ */
 
 typedef struct Deque {
     Collection collection;
@@ -14,7 +16,7 @@ typedef struct Deque {
 
 Deque *Deque_2(u32 element_class, bytes capacity);
 
-// Deque pre-filled to count slots (legacy allocate): active_count = count.
+/** Deque pre-filled to count slots (legacy allocate): active_count = count. */
 Deque *Deque_3(u32 element_class, bytes capacity, bytes count);
 
 fn Deque_free(Deque *deque);
@@ -30,7 +32,7 @@ u8 *Deque_slot(Deque *deque, bytes index);
 
 bool Deque_isEmpty(Deque *deque);
 bytes Deque_size(Deque *deque);
-// Refused-grow count since construction (the Exhaustion Loudness Law).
+/** Refused-grow count since construction (the Exhaustion Loudness Law). */
 ;;TEST
 u64 Deque_exhaustionCount(const Deque *deque);
 bytes Deque_length(Deque *deque);

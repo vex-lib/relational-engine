@@ -66,8 +66,10 @@
  */
 
 
-// deque.c — Deque port (Legacy: struct/Deque.java). Circular buffer: logical
-// index i maps to physical (head + i) % capacity.
+/**
+ * deque.c, Deque port (Legacy: struct/Deque.java). Circular buffer: logical
+ * index i maps to physical (head + i) % capacity.
+ */
 
 static const bytes DEFAULT_CAPACITY = 1024;
 
@@ -76,35 +78,80 @@ static Collection *asCollection(Deque *deque) {
 }
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+{
+    (*c).typeId = typeId;
+}
 ;;GETTER
-static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+static inline u32 Collection_activeCount(const Collection *c)
+{
+    return (*c).activeCount;
+}
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+static inline fn Collection_setActiveCount(Collection *c, u32 count)
+{
+    (*c).activeCount = count;
+}
 ;;GETTER
-static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+static inline u32 Collection_elementClass(const Collection *c)
+{
+    return (*c).elementClass;
+}
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+static inline fn Collection_setElementClass(Collection *c, u32 cls)
+{
+    (*c).elementClass = cls;
+}
 ;;GETTER
-static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+static inline u32 Collection_strideField(const Collection *c)
+{
+    return (*c).stride;
+}
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+static inline fn Collection_setStride(Collection *c, u32 stride)
+{
+    (*c).stride = stride;
+}
 ;;GETTER
-static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+static inline u32 Collection_capacityField(const Collection *c)
+{
+    return (*c).capacity;
+}
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+static inline fn Collection_setCapacity(Collection *c, u32 cap)
+{
+    (*c).capacity = cap;
+}
 ;;GETTER
-static inline u32 Collection_headField(const Collection *c) { return (*c).head; }
+static inline u32 Collection_headField(const Collection *c)
+{
+    return (*c).head;
+}
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+static inline fn Collection_setHead(Collection *c, u32 head)
+{
+    (*c).head = head;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 ;;GETTER
-static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+static inline u8 *Collection_data(const Collection *c)
+{
+    return (*c).data;
+}
 ;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+static inline fn Collection_setData(Collection *c, u8 *data)
+{
+    (*c).data = data;
+}
 
 Deque *Deque_3(u32 elementClass, bytes capacity, bytes count) {
     bytes stride = Stride_get(elementClass);

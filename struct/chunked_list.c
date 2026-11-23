@@ -1,8 +1,10 @@
-// struct/chunked_list.c — never-moved radix-paged list implementation.
-//
-// A growable copy-on-write root, any number of fixed-radix internal levels, and
-// a page-sized leaf. Every hop is shift/mask; a leaf is a contiguous run of
-// rows. The 2-level byte-budget form is the degenerate case (root -> leaf).
+/**
+ * struct/chunked_list.c, never-moved radix-paged list implementation.
+ *
+ * A growable copy-on-write root, any number of fixed-radix internal levels, and
+ * a page-sized leaf. Every hop is shift/mask; a leaf is a contiguous run of
+ * rows. The 2-level byte-budget form is the degenerate case (root  to  leaf).
+ */
 
 #include "vex.h"
 #include "atomic/atomic.h"
@@ -20,7 +22,7 @@
  * ============================================================================
  * Never-moved radix-paged list: rows live in stable leaves reached through a
  * page table (a growable COW root, fixed-radix internal nodes, a page-sized
- * leaf), so a row address handed out once stays valid until free — the sibling
+ * leaf), so a row address handed out once stays valid until free, the sibling
  * struct/List grows one contiguous buffer and therefore moves every element on
  * growth. Radices are powers of two, so every hop is shift/mask with no divide.
  *
@@ -28,7 +30,7 @@
  * readers); internal nodes and leaves are published with an acquire/release
  * handoff and never move; the gate serializes claim-plus-growth-plus-commit with
  * a bounded 100ms try-lock per the Bounded Wait Law. Levels default to 2 (root
- * -> leaf) for the byte-budget constructors; the radix form builds any depth.
+ *  to  leaf) for the byte-budget constructors; the radix form builds any depth.
  * Lives at R2 as a leaf container behavior.
  * ============================================================================
  */
@@ -41,7 +43,7 @@
  * Never-moved radix-paged list: rows live in stable leaves, so a row address
  * handed out once stays valid until free.
  *
- * Concurrency: addSlot and reserve are safe from any number of writers — the
+ * Concurrency: addSlot and reserve are safe from any number of writers, the
  * gate serializes the whole claim-plus-growth-plus-commit step, so every row is
  * handed out exactly once. slot, getChunk, the count getters and packInto are
  * lock-free and safe concurrently with writers: the committed count is stored
@@ -50,7 +52,7 @@
  *
  * Storage: radices[d] is the fan-out of a node at depth d (powers of two), and
  * the leaf radix is radices[levels-1] = rowsPerChunk. shifts[d] is the bit
- * offset of depth d's digit; masks[d] = radices[d]-1 (masks[0] is unused — the
+ * offset of depth d's digit; masks[d] = radices[d]-1 (masks[0] is unused, the
  * root is growable). Lookup is digit = (index >> shifts[d]) & masks[d] with no
  * divide. The root generation is copy-on-write; internal nodes and leaves are
  * atomic pointers published only after initialization.
@@ -135,21 +137,18 @@
  * ============================================================================
  */
 
-// Growth gate bound (the Bounded Wait Law): 100ms is ~6 frames of slack and
-// only expires when another thread is wedged, never on a healthy path.
+/**
+ * Growth gate bound (the Bounded Wait Law): 100ms is ~6 frames of slack and
+ * only expires when another thread is wedged, never on a healthy path.
+ */
 #define VEX_CHUNKED_LOCK_NANOS 100000000ll
 
-// PRIVATE HELPERS
+/** PRIVATE HELPERS (ChunkDir defined in struct/chunked_list.h) */
 
-typedef struct ChunkDir {
-    struct ChunkDir *prev; // previous generation (freed last at teardown)
-    u32 capacity;     // depth-1 slots in THIS generation
-    u32 pad;          // explicit padding so slots[] is 8-byte aligned
-    _Atomic(u8*) slots[]; // depth-1 objects (internal nodes or leaves)
-} ChunkDir;
-
-// Largest power of two rows that fits a byte budget (min 1). The loop test
-// divides instead of shifting so it cannot wrap on large budgets.
+/**
+ * Largest power of two rows that fits a byte budget (min 1). The loop test
+ * divides instead of shifting so it cannot wrap on large budgets.
+ */
 static u32 pow2Rows(bytes stride, u32 chunkBytes) {
     if (stride == 0u) 
         return 1u;
@@ -179,7 +178,7 @@ static u32 shiftOf(u32 rows) {
     return shift;
 }
 
-// Largest power of two <= n (min 1).
+/** Largest power of two <= n (min 1). */
 static u32 pow2Floor(u32 n) {
     if (n <= 1u) 
         return 1u;
@@ -192,7 +191,7 @@ static u32 pow2Floor(u32 n) {
     return p;
 }
 
-// Default radix-form leaf: one page of rows.
+/** Default radix-form leaf: one page of rows. */
 static u32 pageLeafRows(bytes stride) {
     if (stride == 0u) 
         stride = 1u;
@@ -420,14 +419,14 @@ static ChunkDir *directoryOf(const ChunkedList *self) {
     return (ChunkDir*) atomic_load_explicit(ChunkedList_directoryPtr(self), memory_order_acquire);
 }
 
-// Shift/mask digit at a depth. Depth 0 (the root) is unmasked: it is growable.
+/** Shift/mask digit at a depth. Depth 0 (the root) is unmasked: it is growable. */
 static inline u32 digitOf(const ChunkedList *self, u32 index, u32 depth) {
     u32 v = index >> ChunkedList_shifts(self)[depth];
 
     return depth == 0u ? v : (v & ChunkedList_masks(self)[depth]);
 }
 
-// Lock-free leaf resolve by row index (no offset): null when not published yet.
+/** Lock-free leaf resolve by row index (no offset): null when not published yet. */
 static u8 *leafAtRow(const ChunkedList *self, u32 index) {
     ChunkDir *dir = directoryOf(self);
 
@@ -460,9 +459,11 @@ static u8 *leafAtRow(const ChunkedList *self, u32 index) {
     return node;
 }
 
-// Lock-free stable row resolve: null when the row is not published yet.
-// Callers bound index by the committed count first; the committed store lands
-// only after the leaf publish, so index < committed implies non-null here.
+/**
+ * Lock-free stable row resolve: null when the row is not published yet.
+ * Callers bound index by the committed count first; the committed store lands
+ * only after the leaf publish, so index < committed implies non-null here.
+ */
 static u8 *rowAt(const ChunkedList *self, u32 index) {
     u8 *leaf = leafAtRow(self, index);
 
@@ -476,9 +477,11 @@ static u8 *rowAt(const ChunkedList *self, u32 index) {
     return leaf + (bytes)(index & ChunkedList_rowMask(self)) * stride;
 }
 
-// Byte offset of a leaf's tail link: the row Bytes rounded UP to 8 Bytes so the
-// link is naturally aligned. The link is written once (when the next leaf is
-// created) and read with acquire/release.
+/**
+ * Byte offset of a leaf's tail link: the row Bytes rounded UP to 8 Bytes so the
+ * link is naturally aligned. The link is written once (when the next leaf is
+ * created) and read with acquire/release.
+ */
 static bytes leafLinkOffset(const ChunkedList *self) {
     const Collection *coll = ChunkedList_collection(self);
 
@@ -487,8 +490,10 @@ static bytes leafLinkOffset(const ChunkedList *self) {
     return (rowsBytes + (bytes)(VEX_CHUNKED_LINK_BYTES - 1u)) & ~(bytes)(VEX_CHUNKED_LINK_BYTES - 1u);
 }
 
-// Allocate + zero one node at `depth`: an internal pointer array, or a leaf of
-// rows at the deepest depth (plus the tail link).
+/**
+ * Allocate + zero one node at `depth`: an internal pointer array, or a leaf of
+ * rows at the deepest depth (plus the tail link).
+ */
 static u8 *nodeAlloc(const ChunkedList *self, u32 depth) {
     u32 radix = ChunkedList_radices(self)[depth];
 
@@ -517,9 +522,11 @@ static u8 *nodeAlloc(const ChunkedList *self, u32 depth) {
     return node;
 }
 
-// Copy-on-write root doubling: publish a bigger generation, keep the old one
-// valid forever (the arraycopy of the cold path — node pointers only). Gate
-// held by the caller: exactly one grower, so chunkCount only moves here.
+/**
+ * Copy-on-write root doubling: publish a bigger generation, keep the old one
+ * valid forever (the arraycopy of the cold path, node pointers only). Gate
+ * held by the caller: exactly one grower, so chunkCount only moves here.
+ */
 static bool dirGrow(ChunkedList *self) {
     ChunkDir *old = directoryOf(self);
 
@@ -535,7 +542,6 @@ static bool dirGrow(ChunkedList *self) {
     ChunkDir *next = (ChunkDir*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), Bytes);
 
     if (!next) {
-        // Loud, counted refusal through the embedded Collection mirror.
         Collection_reportExhaustion(ChunkedList_collectionMut(self), Bytes);
 
         return false;
@@ -563,7 +569,7 @@ static bool dirGrow(ChunkedList *self) {
     return true;
 }
 
-// Grow the root until depth-1 slot `slot` exists. Gate held.
+/** Grow the root until depth-1 slot `slot` exists. Gate held. */
 static bool ensureRootSlotLocked(ChunkedList *self, u32 slot) {
     ChunkDir *dir = directoryOf(self);
 
@@ -580,8 +586,10 @@ static bool ensureRootSlotLocked(ChunkedList *self, u32 slot) {
     return true;
 }
 
-// Create + publish one leaf, walking (and creating) its internal path. Gate
-// held by the caller. Rows are zeroed before publish (acquire/release handoff).
+/**
+ * Create + publish one leaf, walking (and creating) its internal path. Gate
+ * held by the caller. Rows are zeroed before publish (acquire/release handoff).
+ */
 static bool chunkAddLocked(ChunkedList *self) {
     u32 leafIndex = atomic_load(ChunkedList_chunkCountMut(self));
 
@@ -640,8 +648,6 @@ static bool chunkAddLocked(ChunkedList *self) {
         slot = &children[digit];
     }
 
-    // Extend the chunk -> chunk chain: the previous leaf's tail link points at
-    // the new leaf (published release, after the new leaf is fully zeroed).
     if (newLeaf && leafIndex > 0u) {
         u8 *prev = leafAtRow(self, (leafIndex - 1u) << rowShift);
 
@@ -663,7 +669,7 @@ static bool chunkAddLocked(ChunkedList *self) {
     return true;
 }
 
-// Growth gate body: publish leaves until `needChunks` exist. Gate held.
+/** Growth gate body: publish leaves until `needChunks` exist. Gate held. */
 static bool ensureChunksLocked(ChunkedList *self, u32 needChunks) {
     while (atomic_load(ChunkedList_chunkCountMut(self)) < needChunks) 
         if (!chunkAddLocked(self)) 
@@ -671,7 +677,7 @@ static bool ensureChunksLocked(ChunkedList *self, u32 needChunks) {
     return true;
 }
 
-// Growth gate: bounded 100ms try-lock, drop-degrade false on contention or OOM.
+/** Growth gate: bounded 100ms try-lock, drop-degrade false on contention or OOM. */
 static bool ensureChunks(ChunkedList *self, u32 needChunks) {
     if (needChunks <= atomic_load(ChunkedList_chunkCountMut(self))) 
         return true;
@@ -686,7 +692,7 @@ static bool ensureChunks(ChunkedList *self, u32 needChunks) {
     return ok;
 }
 
-// Recompute the shift/mask tables from radices (geometry change, gate held).
+/** Recompute the shift/mask tables from radices (geometry change, gate held). */
 static fn recomputeGeometry(ChunkedList *self) {
     u32 levels = ChunkedList_levels(self);
 
@@ -715,8 +721,10 @@ static fn recomputeGeometry(ChunkedList *self) {
     }
 }
 
-// Shared builder: allocate the struct + geometry tables, zero the counters.
-// `chunkBytes` 0 derives the leaf byte size from rows*stride.
+/**
+ * Shared builder: allocate the struct + geometry tables, zero the counters.
+ * `chunkBytes` 0 derives the leaf byte size from rows*stride.
+ */
 static ChunkedList *buildPaged(u32 elementClass, bytes stride, const u32 *radixIn, u32 levels, u32 chunkBytes) {
     if (levels < 2u) 
         levels = 2u;
@@ -818,7 +826,7 @@ static ChunkedList *buildPaged(u32 elementClass, bytes stride, const u32 *radixI
     return self;
 }
 
-// The 2-level byte-budget form (the historical shape).
+/** The 2-level byte-budget form (the historical shape). */
 ChunkedList *ChunkedList_3(u32 elementClass, u32 stride, u32 chunkBytes) {
     if (stride == 0u) 
         stride = Stride_get(elementClass);
@@ -839,7 +847,7 @@ ChunkedList *ChunkedList_3(u32 elementClass, u32 stride, u32 chunkBytes) {
     return buildPaged(elementClass, stride, radixIn, 2u, chunkBytes);
 }
 
-// Recursive teardown: free a depth-`depth` object and everything under it.
+/** Recursive teardown: free a depth-`depth` object and everything under it. */
 static fn freeSubtree(u8 *node, const ChunkedList *self, u32 depth) {
     if (!node) 
         return;
@@ -860,7 +868,7 @@ static fn freeSubtree(u8 *node, const ChunkedList *self, u32 depth) {
     Memory_free(node);
 }
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 
 ChunkedList *ChunkedList_1(u32 elementClass) {
     return ChunkedList_3(elementClass, Stride_get(elementClass), VEX_CHUNKED_BYTES_DEFAULT);
@@ -889,8 +897,6 @@ ChunkedList *ChunkedList_paged(u32 elementClass, u32 stride, const i32 *radices,
     bool preset = count >= 1u && radices[0] < 0;
 
     if (preset) {
-        // A *_LAYER_DEFAULT sentinel selects the shape; explicit numbers after
-        // it override the corresponding level (index 1 upward).
         if (radices[0] == CHUNKED_LIST_THREE_LAYER_DEFAULT) 
             levels = 3u;
         else 
@@ -939,7 +945,7 @@ ChunkedList *ChunkedList_paged(u32 elementClass, u32 stride, const i32 *radices,
     return self;
 }
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 
 fn ChunkedList_free(ChunkedList *self) {
     if (!self) 
@@ -1113,7 +1119,7 @@ fn ChunkedList_forEachChunk(const ChunkedList *self, ChunkedListChunkFn fn, any 
     }
 }
 
-// SETTERS
+/** SETTERS */
 
 fn ChunkedList_setChunkBytes(ChunkedList *self, u32 chunkBytes) {
     if (!self) 
@@ -1140,7 +1146,7 @@ fn ChunkedList_setChunkBytes(ChunkedList *self, u32 chunkBytes) {
     SpinLock_unlock(ChunkedList_lockMut(self));
 }
 
-// GETTERS
+/** GETTERS */
 
 u32 ChunkedList_size(const ChunkedList *self) {
     if (!self) 

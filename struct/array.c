@@ -61,30 +61,63 @@
  */
 
 
-// array.c — Array port (Legacy: struct/Array.java).
+/** array.c, Array port (Legacy: struct/Array.java). */
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+{
+    (*c).typeId = typeId;
+}
 ;;GETTER
-static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+static inline u32 Collection_activeCount(const Collection *c)
+{
+    return (*c).activeCount;
+}
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+static inline fn Collection_setActiveCount(Collection *c, u32 count)
+{
+    (*c).activeCount = count;
+}
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+static inline fn Collection_setElementClass(Collection *c, u32 cls)
+{
+    (*c).elementClass = cls;
+}
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+static inline fn Collection_setStride(Collection *c, u32 stride)
+{
+    (*c).stride = stride;
+}
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+static inline fn Collection_setCapacity(Collection *c, u32 cap)
+{
+    (*c).capacity = cap;
+}
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+static inline fn Collection_setHead(Collection *c, u32 head)
+{
+    (*c).head = head;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 ;;GETTER
-static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+static inline u8 *Collection_data(const Collection *c)
+{
+    return (*c).data;
+}
 ;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+static inline fn Collection_setData(Collection *c, u8 *data)
+{
+    (*c).data = data;
+}
 
 static Collection *asCollection(Array *array) {
     return (Collection*) array;

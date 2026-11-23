@@ -12,7 +12,7 @@
  * DEFINITION: Collection
  * ============================================================================
  * The Collection metadata struct, ported from struct/Collection.java: a
- * header describing a typed element buffer — type id, active count, element
+ * header describing a typed element buffer, type id, active count, element
  * class, stride, capacity, circular head index, and the data pointer.
  * Provides stride-aware slot read/write (bounded and unsafe variants) plus
  * size/length/capacity/head/data introspection. Queue and Deque embed this
@@ -67,24 +67,48 @@
  */
 
 
-// collection.c — Collection port (Legacy: struct/Collection.java).
+/** collection.c, Collection port (Legacy: struct/Collection.java). */
 
 ;;GETTER
-static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+static inline u32 Collection_activeCount(const Collection *c)
+{
+    return (*c).activeCount;
+}
 ;;GETTER
-static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+static inline u32 Collection_elementClass(const Collection *c)
+{
+    return (*c).elementClass;
+}
 ;;GETTER
-static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+static inline u32 Collection_strideField(const Collection *c)
+{
+    return (*c).stride;
+}
 ;;GETTER
-static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+static inline u32 Collection_capacityField(const Collection *c)
+{
+    return (*c).capacity;
+}
 ;;GETTER
-static inline u64 *Collection_exhaustionCountMut(Collection *c) { return &(*c).exhaustionCount; }
+static inline u64 *Collection_exhaustionCountMut(Collection *c)
+{
+    return &(*c).exhaustionCount;
+}
 ;;GETTER
-static inline bool *Collection_exhaustionReportedMut(Collection *c) { return &(*c).exhaustionReported; }
+static inline bool *Collection_exhaustionReportedMut(Collection *c)
+{
+    return &(*c).exhaustionReported;
+}
 ;;GETTER
-static inline u32 Collection_headField(const Collection *c) { return (*c).head; }
+static inline u32 Collection_headField(const Collection *c)
+{
+    return (*c).head;
+}
 ;;GETTER
-static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+static inline u8 *Collection_data(const Collection *c)
+{
+    return (*c).data;
+}
 
 static u64 readSlotAt(const u8 *data, bytes stride) {
     switch (stride) {
@@ -155,7 +179,7 @@ u32 Collection_capacity(Collection *c) {
     return Collection_capacityField(c);
 }
 
-// --- Exhaustion observability (the Exhaustion Loudness Law) ---
+/** --- Exhaustion observability (the Exhaustion Loudness Law) --- */
 
 /** Count a refused grow and emit the epoch's single diagnostic. Always false. */
 ;;VALIDATOR
@@ -165,7 +189,6 @@ bool Collection_reportExhaustion(Collection *c, bytes requestedBytes) {
 
         return false;
     }
-    // One implementation for the whole ecosystem: the shared owner-agnostic seam.
     return Struct_reportExhaustion(Collection_exhaustionCountMut(c),
                                    Collection_exhaustionReportedMut(c),
                                    "collection", requestedBytes,
@@ -201,16 +224,15 @@ u8 *Collection_dataBuffer(Collection *c) {
     return Collection_data(c);
 }
 
-// The BOUNDED read/write pair: an out-of-range index is refused with a safe
-// default AND reported on stderr (the Failure Observability Law) — never a
-// silent out-of-bounds dereference. index * stride is checked for overflow
-// (the Overflow Guard Law) so a hostile index cannot wrap the pointer.
+/**
+ * The BOUNDED read/write pair: an out-of-range index is refused with a safe
+ * default AND reported on stderr (the Failure Observability Law), never a
+ * silent out-of-bounds dereference. index * stride is checked for overflow
+ * (the Overflow Guard Law) so a hostile index cannot wrap the pointer.
+ */
 u64 Collection_readSlot(Collection *c, bytes index) {
     if (!c) 
         return 0;
-    // Bound by CAPACITY (the physical memory bound), not activeCount: a
-    // circular container (Queue/Deque) reads a PHYSICAL slot (head) that may
-    // exceed the live count. Logical bounds are the callers' contract.
     u32 cap = Collection_capacityField(c);
     if (index >= cap) {
         THROW("collection readSlot: index %zu out of capacity (%u)",
@@ -233,9 +255,6 @@ u64 Collection_readSlot(Collection *c, bytes index) {
 fn Collection_writeSlot(Collection *c, bytes index, u64 value) {
     if (!c) 
         return;
-    // Bound by CAPACITY, not activeCount: an append (List_add) writes the slot
-    // at index == activeCount, a legal PHYSICAL slot. activeCount is the
-    // caller's contract; capacity is the memory bound.
     u32 cap = Collection_capacityField(c);
     if (index >= cap) {
         THROW("collection writeSlot: index %zu out of capacity (%u)",
@@ -255,9 +274,11 @@ fn Collection_writeSlot(Collection *c, bytes index, u64 value) {
     writeSlotAt(Collection_data(c) + offset, stride, value);
 }
 
-// Deliberately unchecked (trust-the-handle): NO bounds check on index — the
-// caller has validated it. Null-guarded so a hostile handle degrades instead of
-// crashing (the Cold-Strict, Hot-Minimal Validation Law).
+/**
+ * Deliberately unchecked (trust-the-handle): NO bounds check on index, the
+ * caller has validated it. Null-guarded so a hostile handle degrades instead of
+ * crashing (the Cold-Strict, Hot-Minimal Validation Law).
+ */
 u64 Collection_readSlotUnsafe(Collection *c, bytes index) {
     if (!c) 
         return 0;

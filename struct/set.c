@@ -56,11 +56,11 @@
  */
 
 
-// set.c — Set port (Legacy: struct/Set.java).
+/** set.c, Set port (Legacy: struct/Set.java). */
 
 static const bytes SLOT_SIZE = 24;
 static const bytes DEFAULT_CAPACITY = 16;
-static const bytes LOAD_DIVISOR = 4; // 0.75 load factor
+static const bytes LOAD_DIVISOR = 4; /** 0.75 load factor */
 static const u64 STATE_EMPTY = 0;
 static const u64 STATE_OCCUPIED = 1;
 static const u64 STATE_DELETED = 2;
@@ -70,31 +70,70 @@ static Collection *asCollection(Set *set) {
 }
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+{
+    (*c).typeId = typeId;
+}
 ;;GETTER
-static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+static inline u32 Collection_activeCount(const Collection *c)
+{
+    return (*c).activeCount;
+}
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+static inline fn Collection_setActiveCount(Collection *c, u32 count)
+{
+    (*c).activeCount = count;
+}
 ;;GETTER
-static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+static inline u32 Collection_elementClass(const Collection *c)
+{
+    return (*c).elementClass;
+}
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+static inline fn Collection_setElementClass(Collection *c, u32 cls)
+{
+    (*c).elementClass = cls;
+}
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+static inline fn Collection_setStride(Collection *c, u32 stride)
+{
+    (*c).stride = stride;
+}
 ;;GETTER
-static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+static inline u32 Collection_capacityField(const Collection *c)
+{
+    return (*c).capacity;
+}
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+static inline fn Collection_setCapacity(Collection *c, u32 cap)
+{
+    (*c).capacity = cap;
+}
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+static inline fn Collection_setHead(Collection *c, u32 head)
+{
+    (*c).head = head;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 ;;GETTER
-static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+static inline u8 *Collection_data(const Collection *c)
+{
+    return (*c).data;
+}
 ;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+static inline fn Collection_setData(Collection *c, u8 *data)
+{
+    (*c).data = data;
+}
 
 static i32 isReferenceClass(u32 classId) {
     return classId == ID_STRING || classId >= ID_LIST;

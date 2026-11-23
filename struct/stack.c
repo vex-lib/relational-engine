@@ -62,38 +62,80 @@
  */
 
 
-// stack.c — Stack port (Legacy: struct/Stack.java).
+/** stack.c, Stack port (Legacy: struct/Stack.java). */
 
 static const bytes DEFAULT_CAPACITY = 1024;
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId) { (*c).typeId = typeId; }
+static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+{
+    (*c).typeId = typeId;
+}
 ;;GETTER
-static inline u32 Collection_activeCount(const Collection *c) { return (*c).activeCount; }
+static inline u32 Collection_activeCount(const Collection *c)
+{
+    return (*c).activeCount;
+}
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count) { (*c).activeCount = count; }
+static inline fn Collection_setActiveCount(Collection *c, u32 count)
+{
+    (*c).activeCount = count;
+}
 ;;GETTER
-static inline u32 Collection_elementClass(const Collection *c) { return (*c).elementClass; }
+static inline u32 Collection_elementClass(const Collection *c)
+{
+    return (*c).elementClass;
+}
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls) { (*c).elementClass = cls; }
+static inline fn Collection_setElementClass(Collection *c, u32 cls)
+{
+    (*c).elementClass = cls;
+}
 ;;GETTER
-static inline u32 Collection_strideField(const Collection *c) { return (*c).stride; }
+static inline u32 Collection_strideField(const Collection *c)
+{
+    return (*c).stride;
+}
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride) { (*c).stride = stride; }
+static inline fn Collection_setStride(Collection *c, u32 stride)
+{
+    (*c).stride = stride;
+}
 ;;GETTER
-static inline u32 Collection_capacityField(const Collection *c) { return (*c).capacity; }
+static inline u32 Collection_capacityField(const Collection *c)
+{
+    return (*c).capacity;
+}
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap) { (*c).capacity = cap; }
+static inline fn Collection_setCapacity(Collection *c, u32 cap)
+{
+    (*c).capacity = cap;
+}
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head) { (*c).head = head; }
+static inline fn Collection_setHead(Collection *c, u32 head)
+{
+    (*c).head = head;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count) { (*c).exhaustionCount = count; }
+static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
+}
 ;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep) { (*c).exhaustionReported = rep; }
+static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 ;;GETTER
-static inline u8 *Collection_data(const Collection *c) { return (*c).data; }
+static inline u8 *Collection_data(const Collection *c)
+{
+    return (*c).data;
+}
 ;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data) { (*c).data = data; }
+static inline fn Collection_setData(Collection *c, u8 *data)
+{
+    (*c).data = data;
+}
 
 static Collection *asCollection(Stack *stack) {
     return (Collection*) stack;
@@ -167,8 +209,6 @@ fn Stack_free(Stack *stack) {
 }
 
 fn Stack_push(Stack *stack, u64 valueOrPointer) {
-    // Family-consistent fn entry point, but not silent: a refused element is
-    // reported by Stack_pushTry (THROW + a named TryCode).
     (discard) Stack_pushTry(stack, valueOrPointer);
 }
 
@@ -185,10 +225,6 @@ TryValue Stack_pushTry(Stack *stack, u64 valueOrPointer) {
     u32 stride = Collection_strideField(c);
 
     if (activeCount >= cap) {
-        // d64, like the sibling containers (Deque/Queue/List). Growing by a
-        // fixed step allocates a fresh buffer on every growth, and freed bump
-        // storage is reclaimed only wholesale -- so a large push run exhausts
-        // the arena i64 before the buffer fits (the No Hardcoding Law).
         bytes newCap = cap ? (bytes)cap * 2 : DEFAULT_CAPACITY;
 
         if (newCap > UINT32_MAX) {
@@ -204,8 +240,6 @@ TryValue Stack_pushTry(Stack *stack, u64 valueOrPointer) {
         u8 *next = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
 
         if (!next) {
-            // Shared loud, counted refusal (the Exhaustion Loudness Law); the
-            // Try carries the machine-readable reason.
             (discard) Collection_reportExhaustion(c, Bytes);
 
             return TryValue_error(TRY_NO_MEMORY);

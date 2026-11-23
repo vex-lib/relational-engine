@@ -4,8 +4,10 @@
 #include "vex.h"
 #include "struct/collection.h"
 
-// struct/queue.h — the Queue class, ported from struct/Queue.java.
-// FIFO circular buffer; push appends at the tail, pop removes from the head.
+/**
+ * struct/queue.h, the Queue class, ported from struct/Queue.java.
+ * FIFO circular buffer; push appends at the tail, pop removes from the head.
+ */
 
 typedef struct Queue {
     Collection collection;
@@ -13,7 +15,7 @@ typedef struct Queue {
 
 Queue *Queue_2(u32 element_class, bytes capacity);
 
-// Queue pre-filled to count slots (legacy allocate): active_count = count.
+/** Queue pre-filled to count slots (legacy allocate): active_count = count. */
 Queue *Queue_3(u32 element_class, bytes capacity, bytes count);
 
 fn Queue_free(Queue *queue);
@@ -25,7 +27,7 @@ u8 *Queue_slot(Queue *queue, bytes index);
 
 bool Queue_isEmpty(Queue *queue);
 bytes Queue_size(Queue *queue);
-// Refused-grow count since construction (the Exhaustion Loudness Law).
+/** Refused-grow count since construction (the Exhaustion Loudness Law). */
 ;;TEST
 u64 Queue_exhaustionCount(const Queue *queue);
 bytes Queue_length(Queue *queue);

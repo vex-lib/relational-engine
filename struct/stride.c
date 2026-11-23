@@ -38,11 +38,6 @@
 
 #define MAX_CUSTOM_STRIDES 512u
 
-typedef struct CustomStrideEntry {
-    u64 id;
-    bytes stride;
-} CustomStrideEntry;
-
 static SpinLock g_stride_lock = SPIN_LOCK_INIT;
 static CustomStrideEntry g_custom_strides[MAX_CUSTOM_STRIDES];
 static u32 g_custom_count = 0u;

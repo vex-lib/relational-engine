@@ -1,15 +1,17 @@
-// ring.c — MPMC ring buffer (thread/RingBuffer.java port).
-//
-// A fixed-capacity FIFO with power-of-two capacity so the slot index is a
-// cheap mask instead of a modulo. One spinlock guards the whole structure
-// (the legacy used the same idea: "spinlock-coordinated"). head/tail are
-// atomic bytes counters; the lock serializes the actual push/pop so the
-// reader never sees torn data.
-//
-// Full/empty are detected by head==tail (empty) vs. tail-head==capacity (full),
-// which is why capacity is *at least* as large as any burst you push.
-// Lesson 18 replaces the spinlock with per-thread slots later; this is the
-// correct, simple version that works today.
+/**
+ * ring.c, MPMC ring buffer (thread/RingBuffer.java port).
+ *
+ * A fixed-capacity FIFO with power-of-two capacity so the slot index is a
+ * cheap mask instead of a modulo. One spinlock guards the whole structure
+ * (the legacy used the same idea: "spinlock-coordinated"). head/tail are
+ * atomic bytes counters; the lock serializes the actual push/pop so the
+ * reader never sees torn data.
+ *
+ * Full/empty are detected by head==tail (empty) vs. tail-head==capacity (full),
+ * which is why capacity is *at least* as large as any burst you push.
+ * Lesson 18 replaces the spinlock with per-thread slots later; this is the
+ * correct, simple version that works today.
+ */
 
 #include "vex.h"
 #include "atomic/atomic.h"
@@ -27,7 +29,7 @@
  * cheap mask instead of a modulo. One spinlock serializes the actual copy
  * in/out while head/tail are monotonic atomic counters, so readers never see
  * torn data and full/empty are exact (head==tail empty, tail-head==capacity
- * full). The slots arena is calloc'd once at construction and freed at shutdown —
+ * full). The slots arena is calloc'd once at construction and freed at shutdown,
  * push/pop allocate nothing on the hot path. Capacity is a hard contract:
  * any burst larger than the ring is rejected, never silently dropped.
  * ============================================================================
@@ -66,8 +68,10 @@
  */
 
 
-// Round up to the next power of two (clamp: 1..2^64). Classic bit trick —
-// same nextPowerOfTwo the Java version had.
+/**
+ * Round up to the next power of two (clamp: 1..2^64). Classic bit trick,
+ * same nextPowerOfTwo the Java version had.
+ */
 static bytes nextPow2(bytes value) {
     if (value <= 0) 
        return 1;
@@ -89,7 +93,7 @@ static bytes nextPow2(bytes value) {
     return value + 1;
 }
 
-// Constructs the ring and allocates zeroed storage with rounded-up capacity.
+/** Constructs the ring and allocates zeroed storage with rounded-up capacity. */
 RingBuffer RingBuffer_0() {
     RingBuffer ring;
 
@@ -110,7 +114,6 @@ RingBuffer RingBuffer_2(bytes elem_size, bytes capacity) {
     if (elem_size == 0) 
        return ring;
 
-    // Round the request up to a power of two; slot = idx & mask.
     bytes cap = nextPow2(capacity);
 
     bytes total = cap * elem_size;
@@ -136,11 +139,20 @@ RingBuffer RingBuffer_2(bytes elem_size, bytes capacity) {
 }
 
 ;;GETTER
-static inline u8 *RingBuffer_slots(const RingBuffer *ring) { return (*ring).slots; }
+static inline u8 *RingBuffer_slots(const RingBuffer *ring)
+{
+    return (*ring).slots;
+}
 ;;SETTER
-static inline fn RingBuffer_setSlots(RingBuffer *ring, u8 *slots) { (*ring).slots = slots; }
+static inline fn RingBuffer_setSlots(RingBuffer *ring, u8 *slots)
+{
+    (*ring).slots = slots;
+}
 ;;GETTER
-static inline SpinLock *RingBuffer_lockMut(RingBuffer *ring) { return &(*ring).lock; }
+static inline SpinLock *RingBuffer_lockMut(RingBuffer *ring)
+{
+    return &(*ring).lock;
+}
 ;;GETTER
 static inline bytes RingBuffer_tailLoad(const RingBuffer *ring) {
     return atomic_load_explicit(&(*ring).tail, memory_order_relaxed);
@@ -158,13 +170,22 @@ static inline fn RingBuffer_storeHead(RingBuffer *ring, bytes v) {
     atomic_store_explicit(&(*ring).head, v, memory_order_release);
 }
 ;;GETTER
-static inline bytes RingBuffer_capacity(const RingBuffer *ring) { return (*ring).capacity; }
+static inline bytes RingBuffer_capacity(const RingBuffer *ring)
+{
+    return (*ring).capacity;
+}
 ;;GETTER
-static inline bytes RingBuffer_mask(const RingBuffer *ring) { return (*ring).mask; }
+static inline bytes RingBuffer_mask(const RingBuffer *ring)
+{
+    return (*ring).mask;
+}
 ;;GETTER
-static inline bytes RingBuffer_elemSize(const RingBuffer *ring) { return (*ring).elem_size; }
+static inline bytes RingBuffer_elemSize(const RingBuffer *ring)
+{
+    return (*ring).elem_size;
+}
 
-// Frees ring storage and clears its storage pointer.
+/** Frees ring storage and clears its storage pointer. */
 fn RingBuffer_shutdown(RingBuffer *ring) {
     if (ring && RingBuffer_slots(ring)) {
         Memory_free(RingBuffer_slots(ring));
@@ -173,7 +194,7 @@ fn RingBuffer_shutdown(RingBuffer *ring) {
     }
 }
 
-// Pushes one item under the ring lock; returns false for invalid input or a full ring.
+/** Pushes one item under the ring lock; returns false for invalid input or a full ring. */
 bool RingBuffer_push(RingBuffer *ring, const_any item) {
     if (!ring || !item) 
        return false;
@@ -188,7 +209,7 @@ bool RingBuffer_push(RingBuffer *ring, const_any item) {
     if (tail - head >= RingBuffer_capacity(ring)) {
         SpinLock_unlock(lock);
 
-        return false; // full
+        return false;
     }
 
     bytes slot = tail & RingBuffer_mask(ring);
@@ -203,7 +224,7 @@ bool RingBuffer_push(RingBuffer *ring, const_any item) {
     return true;
 }
 
-// Removes the oldest item under the ring lock; returns false for invalid input or empty ring.
+/** Removes the oldest item under the ring lock; returns false for invalid input or empty ring. */
 bool RingBuffer_pop(RingBuffer *ring, any out) {
     if (!ring || !out) 
        return false;
@@ -218,7 +239,7 @@ bool RingBuffer_pop(RingBuffer *ring, any out) {
     if (head == tail) {
         SpinLock_unlock(lock);
 
-        return false; // empty
+        return false;
     }
 
     bytes slot = head & RingBuffer_mask(ring);
