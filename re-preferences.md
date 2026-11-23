@@ -1,10 +1,10 @@
-# relational-engine — Repo-Local Living Preferences
+# relational-engine, Repo-Local Living Preferences
 
 ## Constitution Link
 
 gist.md (`../../../metadata/gists/preferences/gist.md`) is the compressed law list; all universal laws bind this repository. Read one on demand: `./tools/prefs law "<title>"`. Universal laws are inherited, never restated.
 
-Tier: lifetime (substrate). Owns: `nio/mem.c`, `nio/arena.c`, and `nio/transient.c` (the allocator implementation), `primitive/` (`Buffer`, `CharSequence`, `vex-string`), filesystem IO/NIO, native C memory/storage, the relational hashing primitives (`hash/`), the base spinlock (`atomic/`), and the opaque thread-index/tag registry (`thread/`). Borrows: Vexspoke CPU-only contracts (higher synchronization, crypto, constructor/annotation seams) — never duplicate storage. Thread role policy is Vexspoke's (`thread/`), never re's. VexHome layout policy is Vexspoke's (`io/`), not re's. Rust storage, its C ABI and the storage/mapping/reservation laws are rangoon's (`rust/`), not re's.
+Tier: lifetime (substrate). Owns: `nio/mem.c`, `nio/pool.c`, `nio/arena.c`, and `nio/transient.c` (the 3-tier Pool -> Arena -> any allocator implementation), `primitive/` (`Buffer`, `CharSequence`, `varchar`, `vex-string`), filesystem IO/NIO, native C memory/storage, the relational hashing primitives (`hash/`), the base spinlock (`atomic/`), and the opaque thread-index/tag registry (`thread/`). Borrows: Vexspoke CPU-only contracts (higher synchronization, crypto, constructor/annotation seams), never duplicate storage. Thread role policy is Vexspoke's (`thread/`), never re's. VexHome layout policy is Vexspoke's (`io/`), not re's. Rust storage, its C ABI and the storage/mapping/reservation laws are rangoon's (`rust/`), not re's.
 
 ## Exclusive Laws
 
@@ -20,7 +20,7 @@ Tier: lifetime (substrate). Owns: `nio/mem.c`, `nio/arena.c`, and `nio/transient
 
 ### Storage & Memory Substrate Law
 
-* `nio/mem.c` is the only libc backing seam; `nio/arena.c` and `nio/transient.c` own the arena and scratch mechanics. Every other repository allocates through `Memory_alloc`/`MemoryArena_alloc`/`Transient_alloc`.
+* `nio/mem.c` is the only libc backing seam; `nio/pool.c` owns the growable OS page pool, `nio/arena.c` owns per-lib arenas, and `nio/transient.c` owns scratch mechanics. Every other repository allocates through `Memory_alloc`/`MemoryArena_alloc`/`Transient_alloc`.
 * libc `malloc`/`free`/`calloc`/`realloc`/`strdup` outside `re/nio/mem.c` is a defect.
 * Engine `io`/`nio` own the production native C Memory/MemoryArena/Transient and file/log/transport ABI (32-byte headers, legacy project type IDs, C allocation semantics preserved).
 * Default builds consume the engine; Rust typed pools are rangoon's distinct API, not a silent allocator substitution.
@@ -33,11 +33,11 @@ Tier: lifetime (substrate). Owns: `nio/mem.c`, `nio/arena.c`, and `nio/transient
 
 ## Repo-Local Extensions
 
-* None — no managed exceptions to universal laws.
+* None, no managed exceptions to universal laws.
 
 ## Readiness Cross-Reference
 
 * Feature readiness: relational-engine readiness gist.
 * Open blockers: ecosystem blockers gist.
-* Proof lawbook: `tests/test-preferences.md` — `./tools/prefs test "<title>"`.
-* Evidence ledger: `metadata/gists/test-checklist.md` — `python3 tools/test_checklist.py check`.
+* Proof lawbook: `tests/test-preferences.md`, `./tools/prefs test "<title>"`.
+* Evidence ledger: `metadata/gists/test-checklist.md`, `python3 tools/test_checklist.py check`.

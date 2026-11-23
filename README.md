@@ -15,11 +15,11 @@ Remote: [vex-lib/relational-engine](https://github.com/vex-lib/relational-engine
 
 ## Features
 
-- **Per-library arenas (`re/nio/mem.h`)**:
-  - Explicit non-null `Memory_alloc(type, arena, bytes)` returning a raw `any` pointer (rejects `nullptr`; never falls back to a global arena).
-  - 32-byte allocation header and 32-byte payload floor.
-  - 7 fixed slab classes for allocations `<= 4 KiB`; coalescing free-list with tail retraction for allocations `> 4 KiB`.
-  - `Transient` frame scratch allocator for short-lived per-frame or per-pass work.
+- **3-tier relational memory (`re/nio/mem.h`)**:
+  - **Tier 1, `MemoryPool` (`nio/pool.c`)**: Growable OS virtual-memory super-chunks (`64 MiB` default, growing until OS OOM) handing out architecture-native pages (`16 KiB` on Apple Silicon, `4 KiB` elsewhere) and reclaiming freed physical pages via `madvise` / `MEM_RESET`.
+  - **Tier 2, `MemoryArena` (`nio/arena.c`)**: Lightweight per-library logical owners drawn from `MemoryPool` (`maxPages == 0` for unbounded growth, or a hard page budget), with 7 slab classes (`64 B..4096 B`) and contiguous multi-page spans (`> 4 KiB`) that return empty pages immediately to the pool.
+  - **Tier 3, `any` VarHandles (`nio/mem.c`)**: Explicit non-null `Memory_alloc(type, arena, bytes)` with a frozen 32-byte allocation header and 32-byte payload floor (rejects `nullptr`; never falls back to a global arena).
+  - `Transient` frame scratch allocator (`nio/transient.c`) for short-lived per-frame or per-pass work.
   - Dedicated generational handle / slot-table API (index + generation resolving to arena-backed storage).
 - **Native IO (`re/nio/`)**: `File`, `Log`, `FileEventWatcher`, and macOS clipboard access.
 - **Type algebra (`re/type/`)**: Runtime type descriptors, sizing, and structural metadata.
@@ -42,8 +42,8 @@ python3 -B test/native_run.py --owner re_test --suite mem_exhaustion --mode thre
 
 ## Documentation
 
-- [`docs/relational-engine-primer.md`](docs/relational-engine-primer.md) — Architecture overview and usage guide.
-- [`docs/native-memory-proof.md`](docs/native-memory-proof.md) — Allocator invariants, slab layout, and proofs.
+- [`docs/relational-engine-primer.md`](docs/relational-engine-primer.md), Architecture overview and usage guide.
+- [`docs/native-memory-proof.md`](docs/native-memory-proof.md), Allocator invariants, slab layout, and proofs.
 
 ## Future
 

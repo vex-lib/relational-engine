@@ -1,6 +1,4 @@
-//
-// Created by Vex on 11/10/26.
-//
+/** Created by Vex on 11/10/26. */
 
 #ifndef VEXGRAPH_ECOSYSTEM_RE_H
 #define VEXGRAPH_ECOSYSTEM_RE_H
@@ -19,4 +17,4 @@
 #include "thread/thread.h"
 #include "type/re_type.h"
 
-#endif //VEXGRAPH_ECOSYSTEM_RE_H
+#endif /** VEXGRAPH_ECOSYSTEM_RE_H */
