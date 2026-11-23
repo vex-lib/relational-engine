@@ -1,11 +1,11 @@
-# Relational Engine — the C boundary, plainly
+# Relational Engine, the C boundary, plainly
 
 This is a reading document, not a spec. It explains what `re` owns after the Rust
 move, how the native allocator and its C ABI fit together, and where the Rust half
 now lives. It is written so you can follow the C side without reading every file,
 and so you can disagree with the architecture in an informed way.
 
-If something here contradicts the source, the source wins — this document is a
+If something here contradicts the source, the source wins, this document is a
 map, not the territory. The Rust half has its own primer:
 `../../../rust/docs/rangoon-primer.md`.
 
@@ -37,7 +37,7 @@ lock and the process thread table.
 
 | Directory | Owns |
 | :--- | :--- |
-| `nio/` | `Memory`, `MemoryArena`, `Transient` — the allocator implementation |
+| `nio/` | `MemoryPool` (`pool.c`), `MemoryArena` (`arena.c`), `Memory` (`mem.c`), `Transient` (`transient.c`), the 3-tier allocator implementation |
 | `io/` | `File`, `FileEvent`, `FileWriter`, `HotFile`, `Log`, `LogParser` |
 | `clipboard/` | the macOS clipboard adapter and its stub |
 | `type/` | the 64-bit type-id algebra and this project's class registry |
@@ -57,7 +57,7 @@ Every `Memory_*` payload sits behind four 64-bit words:
 [ typeId ][ hash ][ length ][ pointer ]   then the payload bytes
 ```
 
-- `typeId` is the triple-sugar self-describe word: form, project, modifier,
+- `typeId` is the self-describing type word: form, project, modifier,
   wrapper one, wrapper two, the **BE6C** sugar and the class number. A pointer
   therefore names its own project and class without a registry lookup.
 - `hash` is an FNV-1a veto over `(typeId, length, pointer)`, with the low bit
@@ -72,57 +72,61 @@ O(1) reads with no locking. The header is frozen at four words: no growth room
 lives in-band.
 
 Two independent checks fail closed: the BE6C sugar inside the id, and the hash
-over the stated fields. Provenance beyond that is the arena-range gate, never a
-magic cookie. Blocks are **immovable** — `pointer` records an address, so a live
-block is never relocated.
+over the stated fields. Provenance beyond that is the pool chunk lookup, never
+a magic cookie. Blocks are **immovable**, `pointer` records an address, so a
+live block is never relocated.
 
 Payloads are 32-byte aligned on every supported platform (the Universal Alignment
-Law). The engine builds that floor itself by over-allocating one unit and rounding
-the base forward; it does not take alignment from `aligned_alloc` or a platform
-attribute.
+Law).
 
 The header's `hash` is a **veto, not an identity**. It is a pure function of
 `(typeId, length, pointer)`, so a block reused at the same address with the same
 type and length produces the same hash. It catches corruption; it cannot tell an
 incarnation from its successor. Reuse detection is the generation, and the
-generation lives with the slot that issued the handle — the header is per block,
+generation lives with the slot that issued the handle, the header is per block,
 and the generation is per slot.
 
-## 4. Three arenas, three lifetimes
+## 4. Pool, arenas, VarHandles, and transient scratch
 
-- **Default (master) arena** — process-lifetime objects. `Memory_init` carves it
-  once; `Memory_alloc` / `Memory_free` are the hot path; `Memory_freeAll` resets
-  the whole arena last.
-- **Secondary arenas** — isolated ownership domains. `MemoryArena_create` and
-  `MemoryArena_destroy` bracket them; a block is freed back to its own arena.
-- **Transient arena** — frame and scratch memory. `Transient_alloc` is the bump
-  path; `Transient_reset` resets at the frame boundary; `Transient_contains`
-  answers which lifetime a pointer belongs to.
+- **Tier 1: `MemoryPool` (`nio/pool.c`)**, process-wide OS virtual-memory
+  super-chunks (`64 MiB` default chunks, growing indefinitely until OS OOM)
+  handing out architecture-native pages (`16 KiB` on Apple Silicon, `4 KiB`
+  elsewhere) and advising the OS to reclaim physical RAM when pages return.
+- **Tier 2: `MemoryArena` (`nio/arena.c`)**, lightweight per-library ownership
+  domains drawn from `MemoryPool`. `MemoryArena()` grows unbounded
+  until OS OOM; a non-zero page cap enforces a hard budget. Starts at zero
+  pages and returns empty slab pages and multi-page spans back to the pool.
+- **Tier 3: `any` VarHandles (`nio/mem.c`)**, `Memory_alloc(typeId, arena, bytes)`
+  / `Memory_free` / `Memory_realloc` with 32-byte headers and 32-byte payload
+  alignment.
+- **Transient scratch (`nio/transient.c`)**, per-frame bump scratch.
+  `Transient_alloc` is the bump path; `Transient_reset` resets at the frame
+  boundary; `Transient_contains` answers which lifetime a pointer belongs to.
 
-Slab blocks recycle individually in O(1). Bump blocks invalidate on free but
-reclaim capacity only on `freeAll`. A refused allocation returns `nullptr` and
-reports once per epoch; the count is queryable through
-`Memory_exhaustionCount`, `MemoryArena_exhaustionCount` and
+Slab blocks (`64 B..4096 B`) recycle individually in O(1); multi-page spans
+(`> 4096 B`) return their pages directly to `MemoryPool` on free. A refused
+allocation returns `nullptr` and reports once per epoch; the count is queryable
+through `Memory_exhaustionCount`, `MemoryArena_exhaustionCount` and
 `Transient_exhaustionCount`. There is no untracked heap fallback.
 
-## 5. The allocator is the only libc seam
+## 5. Strict three-tier allocation without raw libc wrappers
 
-`nio/mem.c` is the single place libc allocation appears. `nio/arena.c` and
-`nio/transient.c` own the arena and scratch mechanics and call the private
-`Memory_systemAlloc` / `Memory_systemCalloc` / `Memory_systemRealloc` /
-`Memory_systemFree` wrappers declared in `nio/mem.h`.
+`nio/pool.c` owns the growable OS page pool (`mmap` / `VirtualAlloc`),
+`nio/arena.c` owns per-library arenas, `nio/transient.c` owns scratch
+mechanics, and `nio/mem.c` owns the public `Memory_*` VarHandle operations.
+There are no `Memory_system*` or `Memory_raw*` backdoors.
 
-Every other repository allocates through `Memory_alloc`, `MemoryArena_alloc` or
+Every repository allocates and frees strictly through `Memory_alloc` /
+`Memory_free`, `MemoryArena_alloc` / `MemoryArena_free`, or
 `Transient_alloc`. `malloc`, `calloc`, `realloc`, `free`, `strdup` and friends
-outside the owner are defects, and `tools/python/alloc_gate.py` is the executable
-audit.
+are forbidden, and `tools/python/alloc_gate.py` is the executable audit.
 
 ## 6. Native IO
 
-- `io/file/` — `File`, its event surface, `FileWriter`, and `HotFile`. HotFile is
+- `io/file/`, `File`, its event surface, `FileWriter`, and `HotFile`. HotFile is
   a draft no-op: its lifecycle calls prove the shape, not live reload.
-- `io/log/` — `Log` and `LogParser`.
-- `clipboard/` — a macOS adapter plus a stub for targets without one.
+- `io/log/`, `Log` and `LogParser`.
+- `clipboard/`, a macOS adapter plus a stub for targets without one.
 
 These are the production native C file seams. Buffered readers/writers and
 FFF-style gathering/indexing are planned work in `io/`, not implemented durable
@@ -224,7 +228,7 @@ Honest places to push, so the architecture can be argued with:
    comment. A generated header could reduce declaration drift; ownership and
    lifetime contracts would still need review and C-client tests.
 2. **One header, one truth.** The 32-byte block header lives with the allocator;
-   the type algebra lives in `type/`. They are related but separate — worth
+   the type algebra lives in `type/`. They are related but separate, worth
    deciding whether the header should carry more self-description.
 3. **The older substrate.** `substrate/` and rangoon's `VariableRegistry` both
    describe name-to-value storage. Decide whether the C predecessor is retired or
@@ -235,7 +239,7 @@ Honest places to push, so the architecture can be argued with:
 
 ## 14. Scope and Limitations
 
-**Scope:** R0 memory and storage — allocation, native file/cache/log IO, the
+**Scope:** R0 memory and storage, allocation, native file/cache/log IO, the
 stable C ABI, the shared type-id algebra, the base lock and the thread table. It
 is a backend, not a host or a driver.
 
@@ -257,13 +261,13 @@ is a backend, not a host or a driver.
 
 ## 15. Glossary
 
-- **R0** — the host/lifetime tier: `lifetime` plus this storage substrate.
-- **block header** — the 32 bytes before every payload.
-- **arena** — a region with one lifetime and one reset point.
-- **transient** — the per-frame scratch arena.
-- **type algebra** — the shared 64-bit id encoding and its readers.
-- **BE6C** — the author's stylized Cyrillic "векс" signature inside every id.
-- **seam** — the C/Rust boundary and its rules.
+- **R0**, the host/lifetime tier: `lifetime` plus this storage substrate.
+- **block header**, the 32 bytes before every payload.
+- **arena**, a region with one lifetime and one reset point.
+- **transient**, the per-frame scratch arena.
+- **type algebra**, the shared 64-bit id encoding and its readers.
+- **BE6C**, the author's stylized Cyrillic "векс" signature inside every id.
+- **seam**, the C/Rust boundary and its rules.
 
 ---
 
