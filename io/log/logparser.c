@@ -1,6 +1,6 @@
 #include "vex.h"
 #include "io/log/log.h"
-// Production R2 I/O owner: Relational Engine; existing LogParser ABI preserved.
+/** Production R2 I/O owner: Relational Engine; existing LogParser ABI preserved. */
 
 #include <stdio.h>
 #include <string.h>
@@ -28,7 +28,7 @@
  * ============================================================================
  * the LogParser class, ported from io/LogParser.java.
  *
- * STRUCT FIELDS: none — procedural (operates on binary log files on disk (read-only))
+ * STRUCT FIELDS: none, procedural (operates on binary log files on disk (read-only))
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -44,7 +44,7 @@
  */
 
 
-// logparser.c — LogParser port (Legacy: io/LogParser.java).
+/** logparser.c, LogParser port (Legacy: io/LogParser.java). */
 
 static const u8 LOGPARSER_MAGIC[7] = { 0x41, 0x4E, 0x54, 0x49, 0x4C, 0x4F, 0x47 };
 
@@ -73,7 +73,7 @@ static bool is_log_header(const u8 *h) {
 }
 
 /** Open a path and determine whether its leading bytes form a supported log header. */
-bool LogParser_isLogFile(const char *path) {
+bool LogParser_isLogFile(string path) {
     File *f = File_open(path, FILE_MODE_READ);
 
     if (!f) 
@@ -91,7 +91,7 @@ bool LogParser_isLogFile(const char *path) {
 }
 
 /** Return the number of complete records in a valid log, or -1 when its header cannot be read. */
-i64 LogParser_count(const char *path) {
+i64 LogParser_count(string path) {
     File *f = File_open(path, FILE_MODE_READ);
 
     if (!f) 
@@ -120,7 +120,7 @@ i64 LogParser_count(const char *path) {
 }
 
 /** Stream complete decoded records to the callback and return the number delivered. */
-i64 LogParser_parse(const char *path, LogRecordFn handler, any userdata) {
+i64 LogParser_parse(string path, LogRecordFn handler, any userdata) {
     if (!handler) 
         return -1;
 
@@ -160,8 +160,8 @@ i64 LogParser_parse(const char *path, LogRecordFn handler, any userdata) {
 }
 
 /** Format a record's relative timestamp, event name, and five values into the caller buffer. */
-i32 LogParser_formatRecord(char *out, bytes out_cap, i32 kind, i64 ts,
-                           i64 base_ts, const char *name,
+i32 LogParser_formatRecord(utf8 *out, bytes out_cap, i32 kind, i64 ts,
+                           i64 base_ts, string name,
                            i64 v0, i64 v1, i64 v2,
                            i64 v3, i64 v4) {
     d64 ms = base_ts <= 0 ? 0.0 : (d64)(ts - base_ts) / 1000000.0;
@@ -187,7 +187,7 @@ i32 LogParser_formatRecord(char *out, bytes out_cap, i32 kind, i64 ts,
 }
 
 /** Return the registered event name or a static kind#N fallback string. */
-const char *LogParser_kindName(i32 kind) {
+string LogParser_kindName(i32 kind) {
     switch (kind) {
         case 1:  return "produce";
         case 2:  return "present";
@@ -203,7 +203,7 @@ const char *LogParser_kindName(i32 kind) {
         case 32: return "touchMove";
         case 33: return "touchCancel";
         default: {
-            static char fallback[32];
+            static utf8 fallback[32];
             snprintf(fallback, sizeof(fallback), "kind#%d", kind);
             return fallback;
         }

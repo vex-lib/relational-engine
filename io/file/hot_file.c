@@ -1,6 +1,6 @@
 #include "vex.h"
 #include "io/file/file.h"
-// Production R2 I/O owner: Relational Engine; existing HotFile ABI preserved.
+/** Production R2 I/O owner: Relational Engine; existing HotFile ABI preserved. */
 #include "lang/annotation.h"
 
 ;;DEFINITION
@@ -12,7 +12,7 @@
  * watcher that detects source/config file changes and triggers lock-safe
  * reloads. Exists because hotcwap's loader needs to know when a module's
  * source changed without polling the filesystem on the frame path. memory:
- * currently a ;;DRAFT seam — init/shutdown/pumpEvents are stubs awaiting the
+ * currently a ;;DRAFT seam, init/shutdown/pumpEvents are stubs awaiting the
  * macOS FSEvents background thread. Lifetime: process-scoped; pumpEvents is
  * called by the R1 host.
  * ============================================================================
@@ -25,7 +25,7 @@
  * ============================================================================
  * OS-level file monitoring and hot-reloading architecture
  *
- * STRUCT FIELDS: none — procedural (operates on OS file-watch handles (pump-based))
+ * STRUCT FIELDS: none, procedural (operates on OS file-watch handles (pump-based))
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------

@@ -16,8 +16,9 @@
 #include <dispatch/dispatch.h>
 #endif
 
-;;DEFINITION
 #define TYPE_FILE_EVENT_WATCHER Type_make(PROJ_RELATIONAL_ENGINE, FORM_SINGLETON, 2u)
+
+;;DEFINITION
 /**
  * ============================================================================
  * DEFINITION: FileEventWatcher
@@ -41,18 +42,9 @@
  * ============================================================================
  */
 
-typedef struct QueuedEvent {
-    char *path;
-    FileEventType type;
-    bool isDir;
-    u64 timestampNs;
-    i64 epochSeconds;
-    i64 fileSize;
-} QueuedEvent;
-
 struct FileEventWatcher {
     MemoryArena *arena;
-    char *path;
+    utf8 *path;
     bytes pathLen;
     FileEventType mask;
     FileEventCallback legacyCallback;
@@ -64,9 +56,9 @@ struct FileEventWatcher {
     bool recursive;
     bool emitDirs;
     bool ignoreHidden;
-    char **ignorePatterns;
+    utf8 **ignorePatterns;
     bytes ignoreCount;
-    char **includeExtensions;
+    utf8 **includeExtensions;
     bytes includeCount;
 
     pthread_mutex_t mutex;
@@ -83,116 +75,272 @@ struct FileEventWatcher {
 };
 
 ;;GETTER
-static inline MemoryArena *FileEventWatcher_arena(const FileEventWatcher *w) { return (*w).arena; }
+static inline MemoryArena *FileEventWatcher_arena(const FileEventWatcher *w)
+{
+    return (*w).arena;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setArena(FileEventWatcher *w, MemoryArena *a) { (*w).arena = a; }
+static inline fn FileEventWatcher_setArena(FileEventWatcher *w, MemoryArena *a)
+{
+    (*w).arena = a;
+}
 ;;GETTER
-static inline char *FileEventWatcher_pathRaw(const FileEventWatcher *w) { return (*w).path; }
+static inline utf8 *FileEventWatcher_pathRaw(const FileEventWatcher *w)
+{
+    return (*w).path;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setPath(FileEventWatcher *w, char *p) { (*w).path = p; }
+static inline fn FileEventWatcher_setPath(FileEventWatcher *w, utf8 *p)
+{
+    (*w).path = p;
+}
 ;;GETTER
-static inline bytes FileEventWatcher_pathLen(const FileEventWatcher *w) { return (*w).pathLen; }
+static inline bytes FileEventWatcher_pathLen(const FileEventWatcher *w)
+{
+    return (*w).pathLen;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setPathLen(FileEventWatcher *w, bytes n) { (*w).pathLen = n; }
+static inline fn FileEventWatcher_setPathLen(FileEventWatcher *w, bytes n)
+{
+    (*w).pathLen = n;
+}
 ;;GETTER
-static inline FileEventType FileEventWatcher_maskRaw(const FileEventWatcher *w) { return (*w).mask; }
+static inline FileEventType FileEventWatcher_maskRaw(const FileEventWatcher *w)
+{
+    return (*w).mask;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setMask(FileEventWatcher *w, FileEventType m) { (*w).mask = m; }
+static inline fn FileEventWatcher_setMask(FileEventWatcher *w, FileEventType m)
+{
+    (*w).mask = m;
+}
 ;;GETTER
-static inline FileEventCallback FileEventWatcher_legacyCb(const FileEventWatcher *w) { return (*w).legacyCallback; }
+static inline FileEventCallback FileEventWatcher_legacyCb(const FileEventWatcher *w)
+{
+    return (*w).legacyCallback;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setLegacyCb(FileEventWatcher *w, FileEventCallback cb) { (*w).legacyCallback = cb; }
+static inline fn FileEventWatcher_setLegacyCb(FileEventWatcher *w, FileEventCallback cb)
+{
+    (*w).legacyCallback = cb;
+}
 ;;GETTER
-static inline FileWatchCallback FileEventWatcher_watchCb(const FileEventWatcher *w) { return (*w).watchCallback; }
+static inline FileWatchCallback FileEventWatcher_watchCb(const FileEventWatcher *w)
+{
+    return (*w).watchCallback;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setWatchCb(FileEventWatcher *w, FileWatchCallback cb) { (*w).watchCallback = cb; }
+static inline fn FileEventWatcher_setWatchCb(FileEventWatcher *w, FileWatchCallback cb)
+{
+    (*w).watchCallback = cb;
+}
 ;;GETTER
-static inline any FileEventWatcher_userdata(const FileEventWatcher *w) { return (*w).userdata; }
+static inline any FileEventWatcher_userdata(const FileEventWatcher *w)
+{
+    return (*w).userdata;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setUserdata(FileEventWatcher *w, any ud) { (*w).userdata = ud; }
+static inline fn FileEventWatcher_setUserdata(FileEventWatcher *w, any ud)
+{
+    (*w).userdata = ud;
+}
 ;;GETTER
-static inline u32 FileEventWatcher_latencyMs(const FileEventWatcher *w) { return (*w).latencyMs; }
+static inline u32 FileEventWatcher_latencyMs(const FileEventWatcher *w)
+{
+    return (*w).latencyMs;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setLatencyMs(FileEventWatcher *w, u32 v) { (*w).latencyMs = v; }
+static inline fn FileEventWatcher_setLatencyMs(FileEventWatcher *w, u32 v)
+{
+    (*w).latencyMs = v;
+}
 ;;GETTER
-static inline u32 FileEventWatcher_debounceMs(const FileEventWatcher *w) { return (*w).debounceMs; }
+static inline u32 FileEventWatcher_debounceMs(const FileEventWatcher *w)
+{
+    return (*w).debounceMs;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setDebounceMs(FileEventWatcher *w, u32 v) { (*w).debounceMs = v; }
+static inline fn FileEventWatcher_setDebounceMs(FileEventWatcher *w, u32 v)
+{
+    (*w).debounceMs = v;
+}
 ;;GETTER
-static inline bool FileEventWatcher_recursive(const FileEventWatcher *w) { return (*w).recursive; }
+static inline bool FileEventWatcher_recursive(const FileEventWatcher *w)
+{
+    return (*w).recursive;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setRecursive(FileEventWatcher *w, bool v) { (*w).recursive = v; }
+static inline fn FileEventWatcher_setRecursive(FileEventWatcher *w, bool v)
+{
+    (*w).recursive = v;
+}
 ;;GETTER
-static inline bool FileEventWatcher_emitDirs(const FileEventWatcher *w) { return (*w).emitDirs; }
+static inline bool FileEventWatcher_emitDirs(const FileEventWatcher *w)
+{
+    return (*w).emitDirs;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setEmitDirs(FileEventWatcher *w, bool v) { (*w).emitDirs = v; }
+static inline fn FileEventWatcher_setEmitDirs(FileEventWatcher *w, bool v)
+{
+    (*w).emitDirs = v;
+}
 ;;GETTER
-static inline bool FileEventWatcher_ignoreHidden(const FileEventWatcher *w) { return (*w).ignoreHidden; }
+static inline bool FileEventWatcher_ignoreHidden(const FileEventWatcher *w)
+{
+    return (*w).ignoreHidden;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setIgnoreHidden(FileEventWatcher *w, bool v) { (*w).ignoreHidden = v; }
+static inline fn FileEventWatcher_setIgnoreHidden(FileEventWatcher *w, bool v)
+{
+    (*w).ignoreHidden = v;
+}
 ;;GETTER
-static inline char **FileEventWatcher_ignorePatterns(const FileEventWatcher *w) { return (*w).ignorePatterns; }
+static inline utf8 **FileEventWatcher_ignorePatterns(const FileEventWatcher *w)
+{
+    return (*w).ignorePatterns;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setIgnorePatterns(FileEventWatcher *w, char **p) { (*w).ignorePatterns = p; }
+static inline fn FileEventWatcher_setIgnorePatterns(FileEventWatcher *w, utf8 **p)
+{
+    (*w).ignorePatterns = p;
+}
 ;;GETTER
-static inline bytes FileEventWatcher_ignoreCount(const FileEventWatcher *w) { return (*w).ignoreCount; }
+static inline bytes FileEventWatcher_ignoreCount(const FileEventWatcher *w)
+{
+    return (*w).ignoreCount;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setIgnoreCount(FileEventWatcher *w, bytes n) { (*w).ignoreCount = n; }
+static inline fn FileEventWatcher_setIgnoreCount(FileEventWatcher *w, bytes n)
+{
+    (*w).ignoreCount = n;
+}
 ;;GETTER
-static inline char **FileEventWatcher_includeExts(const FileEventWatcher *w) { return (*w).includeExtensions; }
+static inline utf8 **FileEventWatcher_includeExts(const FileEventWatcher *w)
+{
+    return (*w).includeExtensions;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setIncludeExts(FileEventWatcher *w, char **p) { (*w).includeExtensions = p; }
+static inline fn FileEventWatcher_setIncludeExts(FileEventWatcher *w, utf8 **p)
+{
+    (*w).includeExtensions = p;
+}
 ;;GETTER
-static inline bytes FileEventWatcher_includeCount(const FileEventWatcher *w) { return (*w).includeCount; }
+static inline bytes FileEventWatcher_includeCount(const FileEventWatcher *w)
+{
+    return (*w).includeCount;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setIncludeCount(FileEventWatcher *w, bytes n) { (*w).includeCount = n; }
+static inline fn FileEventWatcher_setIncludeCount(FileEventWatcher *w, bytes n)
+{
+    (*w).includeCount = n;
+}
 ;;GETTER
-static inline pthread_mutex_t *FileEventWatcher_mutexMut(FileEventWatcher *w) { return &(*w).mutex; }
+static inline pthread_mutex_t *FileEventWatcher_mutexMut(FileEventWatcher *w)
+{
+    return &(*w).mutex;
+}
 ;;GETTER
-static inline QueuedEvent *FileEventWatcher_queue(const FileEventWatcher *w) { return (*w).queue; }
+static inline QueuedEvent *FileEventWatcher_queue(const FileEventWatcher *w)
+{
+    return (*w).queue;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setQueue(FileEventWatcher *w, QueuedEvent *q) { (*w).queue = q; }
+static inline fn FileEventWatcher_setQueue(FileEventWatcher *w, QueuedEvent *q)
+{
+    (*w).queue = q;
+}
 ;;GETTER
-static inline bytes FileEventWatcher_queueCount(const FileEventWatcher *w) { return (*w).queueCount; }
+static inline bytes FileEventWatcher_queueCount(const FileEventWatcher *w)
+{
+    return (*w).queueCount;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setQueueCount(FileEventWatcher *w, bytes c) { (*w).queueCount = c; }
+static inline fn FileEventWatcher_setQueueCount(FileEventWatcher *w, bytes c)
+{
+    (*w).queueCount = c;
+}
 ;;GETTER
-static inline bytes FileEventWatcher_queueCapacity(const FileEventWatcher *w) { return (*w).queueCapacity; }
+static inline bytes FileEventWatcher_queueCapacity(const FileEventWatcher *w)
+{
+    return (*w).queueCapacity;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setQueueCapacity(FileEventWatcher *w, bytes c) { (*w).queueCapacity = c; }
+static inline fn FileEventWatcher_setQueueCapacity(FileEventWatcher *w, bytes c)
+{
+    (*w).queueCapacity = c;
+}
 ;;GETTER
-static inline bool FileEventWatcher_runningRaw(const FileEventWatcher *w) { return (*w).running; }
+static inline bool FileEventWatcher_runningRaw(const FileEventWatcher *w)
+{
+    return (*w).running;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setRunning(FileEventWatcher *w, bool r) { (*w).running = r; }
+static inline fn FileEventWatcher_setRunning(FileEventWatcher *w, bool r)
+{
+    (*w).running = r;
+}
 #if defined(VEX_PLATFORM_APPLE)
 ;;GETTER
-static inline FSEventStreamRef FileEventWatcher_stream(const FileEventWatcher *w) { return (*w).stream; }
+static inline FSEventStreamRef FileEventWatcher_stream(const FileEventWatcher *w)
+{
+    return (*w).stream;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setStream(FileEventWatcher *w, FSEventStreamRef s) { (*w).stream = s; }
+static inline fn FileEventWatcher_setStream(FileEventWatcher *w, FSEventStreamRef s)
+{
+    (*w).stream = s;
+}
 ;;GETTER
-static inline dispatch_queue_t FileEventWatcher_dispatchQueue(const FileEventWatcher *w) { return (*w).dispatchQueue; }
+static inline dispatch_queue_t FileEventWatcher_dispatchQueue(const FileEventWatcher *w)
+{
+    return (*w).dispatchQueue;
+}
 ;;SETTER
-static inline fn FileEventWatcher_setDispatchQueue(FileEventWatcher *w, dispatch_queue_t q) { (*w).dispatchQueue = q; }
+static inline fn FileEventWatcher_setDispatchQueue(FileEventWatcher *w, dispatch_queue_t q)
+{
+    (*w).dispatchQueue = q;
+}
 #endif
 
 ;;GETTER
-static inline u32 Props_latencyMs(const FileWatchProps *p) { return (*p).latencyMs; }
+static inline u32 Props_latencyMs(const FileWatchProps *p)
+{
+    return (*p).latencyMs;
+}
 ;;GETTER
-static inline u32 Props_debounceMs(const FileWatchProps *p) { return (*p).debounceMs; }
+static inline u32 Props_debounceMs(const FileWatchProps *p)
+{
+    return (*p).debounceMs;
+}
 ;;GETTER
-static inline bool Props_recursive(const FileWatchProps *p) { return (*p).recursive; }
+static inline bool Props_recursive(const FileWatchProps *p)
+{
+    return (*p).recursive;
+}
 ;;GETTER
-static inline bool Props_emitDirs(const FileWatchProps *p) { return (*p).emitDirs; }
+static inline bool Props_emitDirs(const FileWatchProps *p)
+{
+    return (*p).emitDirs;
+}
 ;;GETTER
-static inline bool Props_ignoreHidden(const FileWatchProps *p) { return (*p).ignoreHidden; }
+static inline bool Props_ignoreHidden(const FileWatchProps *p)
+{
+    return (*p).ignoreHidden;
+}
 ;;GETTER
-static inline const char *const *Props_ignorePatterns(const FileWatchProps *p) { return (*p).ignorePatterns; }
+static inline string const *Props_ignorePatterns(const FileWatchProps *p) { return (*p).ignorePatterns; }
 ;;GETTER
-static inline bytes Props_ignoreCount(const FileWatchProps *p) { return (*p).ignoreCount; }
+static inline bytes Props_ignoreCount(const FileWatchProps *p)
+{
+    return (*p).ignoreCount;
+}
 ;;GETTER
-static inline const char *const *Props_includeExts(const FileWatchProps *p) { return (*p).includeExtensions; }
+static inline string const *Props_includeExts(const FileWatchProps *p) { return (*p).includeExtensions; }
 ;;GETTER
-static inline bytes Props_includeCount(const FileWatchProps *p) { return (*p).includeCount; }
+static inline bytes Props_includeCount(const FileWatchProps *p)
+{
+    return (*p).includeCount;
+}
 
 /** Reads monotonic nanoseconds for event timestamps and debounce windows. */
 static u64 watchNowNs() {
@@ -202,7 +350,7 @@ static u64 watchNowNs() {
 }
 
 /** Reads current file byte size via stat, or -1 if absent or unreadable. */
-static i64 watchFileSize(const char *path) {
+static i64 watchFileSize(string path) {
     if (!path)
         return -1;
     struct stat st;
@@ -212,7 +360,7 @@ static i64 watchFileSize(const char *path) {
 }
 
 /** Compares two NUL-terminated strings for exact byte equality. */
-static bool watchStrEq(const char *a, const char *b) {
+static bool watchStrEq(string a, string b) {
     if (!a || !b)
         return false;
     bytes la = strlen(a);
@@ -223,7 +371,7 @@ static bool watchStrEq(const char *a, const char *b) {
 }
 
 /** Returns true if str begins with the first prefixLen bytes of prefix. */
-static bool watchStartsWith(const char *str, const char *prefix, bytes prefixLen) {
+static bool watchStartsWith(string str, string prefix, bytes prefixLen) {
     if (!str || !prefix)
         return false;
     if (strlen(str) < prefixLen)
@@ -232,17 +380,17 @@ static bool watchStartsWith(const char *str, const char *prefix, bytes prefixLen
 }
 
 /** Scans str for the first occurrence of target byte, or returns nullptr. */
-static const char *watchFindChar(const char *str, char target) {
+static string watchFindChar(string str, utf8 target) {
     if (!str)
         return nullptr;
-    for (const char *p = str; *p != '\0'; p++)
+    for (string p = str; *p != '\0'; p++)
         if (*p == target)
             return p;
     return nullptr;
 }
 
 /** Returns true if needle occurs as a contiguous substring inside haystack. */
-static bool watchContains(const char *haystack, const char *needle) {
+static bool watchContains(string haystack, string needle) {
     if (!haystack || !needle || !needle[0])
         return false;
     bytes hlen = strlen(haystack);
@@ -256,11 +404,11 @@ static bool watchContains(const char *haystack, const char *needle) {
 }
 
 /** Allocates an owned copy of a NUL-terminated string inside the watcher's arena. */
-static char *watchDupStr(MemoryArena *arena, const char *src) {
+static utf8 *watchDupStr(MemoryArena *arena, string src) {
     if (!arena || !src)
         return nullptr;
     bytes len = strlen(src);
-    char *copy = (char*) MemoryArena_alloc(arena, TYPE_FILE_EVENT_WATCHER, len + 1u);
+    utf8 *copy = (utf8*) MemoryArena_alloc(arena, TYPE_FILE_EVENT_WATCHER, len + 1u);
     if (!copy)
         return nullptr;
     memcpy(copy, src, len + 1u);
@@ -268,7 +416,7 @@ static char *watchDupStr(MemoryArena *arena, const char *src) {
 }
 
 /** Releases an owned string list allocated inside the watcher's arena. */
-static fn watchFreeStrList(MemoryArena *arena, char **list, bytes count) {
+static fn watchFreeStrList(MemoryArena *arena, utf8 **list, bytes count) {
     if (!arena || !list)
         return;
     for (bytes i = 0; i < count; i++)
@@ -277,13 +425,13 @@ static fn watchFreeStrList(MemoryArena *arena, char **list, bytes count) {
 }
 
 /** Deep-copies a caller string list into the watcher's arena; returns false on OOM. */
-static bool watchCopyStrList(MemoryArena *arena, const char *const *src, bytes count,
-                             char ***outList, bytes *outCount) {
+static bool watchCopyStrList(MemoryArena *arena, string const *src, bytes count,
+                             utf8 ***outList, bytes *outCount) {
     *outList = nullptr;
     *outCount = 0;
     if (!src || count == 0)
         return true;
-    char **list = (char**) MemoryArena_alloc(arena, TYPE_FILE_EVENT_WATCHER, count * sizeof(char*));
+    utf8 **list = (utf8**) MemoryArena_alloc(arena, TYPE_FILE_EVENT_WATCHER, count * sizeof(utf8*));
     if (!list)
         return false;
     bytes kept = 0;
@@ -307,26 +455,26 @@ static bool watchCopyStrList(MemoryArena *arena, const char *const *src, bytes c
 }
 
 /** Returns the relative slice of path under the watched root, or path itself if outside. */
-static const char *watchRelativePath(const FileEventWatcher *watcher, const char *path) {
-    const char *root = FileEventWatcher_pathRaw(watcher);
+static string watchRelativePath(const FileEventWatcher *watcher, string path) {
+    string root = FileEventWatcher_pathRaw(watcher);
     bytes rootLen = FileEventWatcher_pathLen(watcher);
     if (!root || rootLen == 0 || !path)
         return path ? path : "";
     if (!watchStartsWith(path, root, rootLen))
         return path;
-    const char *rest = path + rootLen;
+    string rest = path + rootLen;
     while (*rest == '/')
         rest++;
     return *rest ? rest : ".";
 }
 
 /** Returns true if any path component in rel begins with a dot. */
-static bool watchHasHiddenSegment(const char *rel) {
-    const char *p = rel;
+static bool watchHasHiddenSegment(string rel) {
+    string p = rel;
     while (*p) {
         if (*p == '.' && !(p[1] == '\0' || p[1] == '/'))
             return true;
-        const char *slash = watchFindChar(p, '/');
+        string slash = watchFindChar(p, '/');
         if (!slash)
             break;
         p = slash + 1;
@@ -335,7 +483,7 @@ static bool watchHasHiddenSegment(const char *rel) {
 }
 
 /** Returns true if str ends with suffix. */
-static bool watchEndsWith(const char *str, const char *suffix) {
+static bool watchEndsWith(string str, string suffix) {
     bytes slen = strlen(str);
     bytes plen = strlen(suffix);
     if (plen > slen)
@@ -344,7 +492,7 @@ static bool watchEndsWith(const char *str, const char *suffix) {
 }
 
 /** Returns true if pattern matches a segment, suffix, or substring of rel. */
-static bool watchPatternMatches(const char *rel, const char *pattern) {
+static bool watchPatternMatches(string rel, string pattern) {
     if (!rel || !pattern || !pattern[0])
         return false;
     if (pattern[0] == '*' && pattern[1] != '\0')
@@ -353,22 +501,22 @@ static bool watchPatternMatches(const char *rel, const char *pattern) {
 }
 
 /** Evaluates watch properties against a candidate path and directory flag. */
-static bool watchMatchesLocked(const FileEventWatcher *watcher, const char *path, bool isDir) {
+static bool watchMatchesLocked(const FileEventWatcher *watcher, string path, bool isDir) {
     if (!watcher || !path || !path[0])
         return false;
     if (isDir && !FileEventWatcher_emitDirs(watcher))
         return false;
-    const char *rel = watchRelativePath(watcher, path);
+    string rel = watchRelativePath(watcher, path);
     if (!FileEventWatcher_recursive(watcher) && watchFindChar(rel, '/') != nullptr)
         return false;
     if (FileEventWatcher_ignoreHidden(watcher) && watchHasHiddenSegment(rel))
         return false;
-    char **ignores = FileEventWatcher_ignorePatterns(watcher);
+    utf8 **ignores = FileEventWatcher_ignorePatterns(watcher);
     bytes ignoreCount = FileEventWatcher_ignoreCount(watcher);
     for (bytes i = 0; i < ignoreCount; i++)
         if (watchPatternMatches(rel, ignores[i]))
             return false;
-    char **includes = FileEventWatcher_includeExts(watcher);
+    utf8 **includes = FileEventWatcher_includeExts(watcher);
     bytes includeCount = FileEventWatcher_includeCount(watcher);
     if (includeCount > 0 && !isDir) {
         bool matched = false;
@@ -384,7 +532,7 @@ static bool watchMatchesLocked(const FileEventWatcher *watcher, const char *path
 }
 
 /** Enqueues or coalesces a filtered file event under the watcher mutex. */
-static bool watchEnqueue(FileEventWatcher *watcher, const char *path, FileEventType type, bool isDir) {
+static bool watchEnqueue(FileEventWatcher *watcher, string path, FileEventType type, bool isDir) {
     if (!watcher || !path)
         return false;
     if (!(type & FileEventWatcher_maskRaw(watcher)))
@@ -437,7 +585,7 @@ static bool watchEnqueue(FileEventWatcher *watcher, const char *path, FileEventT
         FileEventWatcher_setQueueCapacity(watcher, newCap);
     }
 
-    char *copy = watchDupStr(arena, path);
+    utf8 *copy = watchDupStr(arena, path);
     if (!copy) {
         pthread_mutex_unlock(mtx);
         return false;
@@ -464,7 +612,7 @@ static fn fsCallback(ConstFSEventStreamRef streamRef, any clientCallBackInfo,
     (discard) streamRef;
     (discard) eventIds;
     FileEventWatcher *watcher = (FileEventWatcher*) clientCallBackInfo;
-    char **paths = (char**) eventPaths;
+    utf8 **paths = (utf8**) eventPaths;
 
     for (bytes i = 0; i < numEvents; i++) {
         FileEventType type = FILE_EVENT_NONE;
@@ -511,12 +659,12 @@ static bool watchApplyProps(FileEventWatcher *watcher, const FileWatchProps *pro
         latency = 5000u;
 
     MemoryArena *arena = FileEventWatcher_arena(watcher);
-    char **newIgnores = nullptr;
+    utf8 **newIgnores = nullptr;
     bytes newIgnoreCount = 0;
     if (!watchCopyStrList(arena, Props_ignorePatterns(&eff), Props_ignoreCount(&eff), &newIgnores, &newIgnoreCount))
         return false;
 
-    char **newIncludes = nullptr;
+    utf8 **newIncludes = nullptr;
     bytes newIncludeCount = 0;
     if (!watchCopyStrList(arena, Props_includeExts(&eff), Props_includeCount(&eff), &newIncludes, &newIncludeCount)) {
         watchFreeStrList(arena, newIgnores, newIgnoreCount);
@@ -541,7 +689,7 @@ static bool watchApplyProps(FileEventWatcher *watcher, const FileWatchProps *pro
 }
 
 /** Constructor allocating a FileEventWatcher and its isolated arena. */
-static FileEventWatcher *FileEventWatcher_init(const char *path, FileEventType mask,
+static FileEventWatcher *FileEventWatcher_init(string path, FileEventType mask,
                                                const FileWatchProps *props,
                                                FileEventCallback legacyCb,
                                                FileWatchCallback watchCb,
@@ -554,14 +702,14 @@ static FileEventWatcher *FileEventWatcher_init(const char *path, FileEventType m
         return nullptr;
     memset(watcher, 0, sizeof(FileEventWatcher));
 
-    MemoryArena *arena = MemoryArena_create(0);
+    MemoryArena *arena = MemoryArena(0);
     if (!arena) {
         Memory_free(watcher);
         return nullptr;
     }
     FileEventWatcher_setArena(watcher, arena);
 
-    char *wpath = watchDupStr(arena, path);
+    utf8 *wpath = watchDupStr(arena, path);
     if (!wpath) {
         MemoryArena_destroy(arena);
         Memory_free(watcher);
@@ -589,19 +737,37 @@ static FileEventWatcher *FileEventWatcher_init(const char *path, FileEventType m
     return watcher;
 }
 
-/** Creates a legacy path+type file watcher with default watch properties. */
-FileEventWatcher *FileEventWatcher_create(const char *path, FileEventType mask,
-                                          FileEventCallback callback, any userdata) {
+;;CONSTRUCTOR
+/**
+ * Creates a legacy path+type file watcher with default watch properties.
+ * @param path     root directory path to watch
+ * @param mask     FileEventType event bitmask
+ * @param callback legacy event callback invoked on pump
+ * @param userdata caller context pointer forwarded to callback
+ * @return newly allocated FileEventWatcher, or nullptr on failure
+ */
+FileEventWatcher *FileEventWatcher_4(string path, FileEventType mask,
+                                     FileEventCallback callback, any userdata) {
     FileWatchProps defaults = FileWatchProps_defaults();
     defaults.emitDirs = true;
     defaults.ignoreHidden = false;
     return FileEventWatcher_init(path, mask, &defaults, callback, nullptr, userdata);
 }
 
-/** Creates a rich-metadata file watcher configured with explicit FileWatchProps. */
-FileEventWatcher *FileEventWatcher_createWithProps(const char *path, FileEventType mask,
-                                                   const FileWatchProps *props,
-                                                   FileWatchCallback callback, any userdata) {
+;;CONSTRUCTOR
+/**
+ * Creates a rich-metadata file watcher configured with explicit FileWatchProps.
+ * @param path     root path to watch
+ * @param mask     event type mask
+ * @param props    explicit watch configuration
+ * @param callback rich event callback invoked on pump
+ * @param userdata caller context pointer forwarded to callback
+ * @return newly allocated FileEventWatcher, or nullptr on failure
+ */
+FileEventWatcher *FileEventWatcher_5(string path, FileEventType mask,
+                                     const FileWatchProps *props,
+                                     FileWatchCallback callback, any userdata)
+{
     return FileEventWatcher_init(path, mask, props, nullptr, callback, userdata);
 }
 
@@ -623,15 +789,15 @@ FileWatchProps FileEventWatcher_getProps(const FileEventWatcher *watcher) {
     out.recursive = FileEventWatcher_recursive(watcher);
     out.emitDirs = FileEventWatcher_emitDirs(watcher);
     out.ignoreHidden = FileEventWatcher_ignoreHidden(watcher);
-    out.ignorePatterns = (const char *const *) FileEventWatcher_ignorePatterns(watcher);
+    out.ignorePatterns = (string const *) FileEventWatcher_ignorePatterns(watcher);
     out.ignoreCount = FileEventWatcher_ignoreCount(watcher);
-    out.includeExtensions = (const char *const *) FileEventWatcher_includeExts(watcher);
+    out.includeExtensions = (string const *) FileEventWatcher_includeExts(watcher);
     out.includeCount = FileEventWatcher_includeCount(watcher);
     return out;
 }
 
 /** Returns the normalized watched root path, or nullptr if watcher is null. */
-const char *FileEventWatcher_getPath(const FileEventWatcher *watcher) {
+string FileEventWatcher_getPath(const FileEventWatcher *watcher) {
     return watcher ? FileEventWatcher_pathRaw(watcher) : nullptr;
 }
 
@@ -657,7 +823,7 @@ bytes FileEventWatcher_pendingCount(const FileEventWatcher *watcher) {
 }
 
 /** Tests whether a candidate path passes the watcher's active filter properties. */
-bool FileEventWatcher_matchesPath(const FileEventWatcher *watcher, const char *path, bool isDir) {
+bool FileEventWatcher_matchesPath(const FileEventWatcher *watcher, string path, bool isDir) {
     if (!watcher)
         return false;
     pthread_mutex_t *mtx = FileEventWatcher_mutexMut((FileEventWatcher*) watcher);
@@ -668,7 +834,7 @@ bool FileEventWatcher_matchesPath(const FileEventWatcher *watcher, const char *p
 }
 
 /** Enqueues a synthetic event through the same filter, debounce, and metadata pipeline. */
-bool FileEventWatcher_pushSynthetic(FileEventWatcher *watcher, const char *path,
+bool FileEventWatcher_pushSynthetic(FileEventWatcher *watcher, string path,
                                     FileEventType type, bool isDir) {
     return watchEnqueue(watcher, path, type, isDir);
 }

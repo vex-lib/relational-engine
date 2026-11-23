@@ -1,10 +1,14 @@
 #include "vex.h"
 #include "io/file/file.h"
-// Production R2 I/O owner: Relational Engine; existing File ABI preserved.
+/** Production R2 I/O owner: Relational Engine; existing File ABI preserved. */
 
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#if defined(VEX_PLATFORM_WINDOWS)
+#include <direct.h>
+#endif
 
 #include "nio/mem.h"
 #include "type/re_type.h"
@@ -34,7 +38,7 @@
  * STRUCT FIELDS (Mirroring io/file/file.h):
  * ----------------------------------------------------------------------------
  *   File {
- *     char name[FILE_PATH_MAX]; // field/entry name
+ *     utf8 name[FILE_PATH_MAX]; // field/entry name
  *     FILE *handle; // OS file handle
  *     i64 size; // file cursor/size state
  *     i64 position; // file cursor/size state
@@ -67,10 +71,10 @@
  */
 
 
-// file.c — File port (Legacy: io/File.java). stdio-backed file handle.
+/** file.c, File port (Legacy: io/File.java). stdio-backed file handle. */
 
 /** Translate File mode flags to stdio fopen modes, preserving existing bytes unless truncation is requested. */
-static FILE *map_open(const char *path, u32 mode) {
+static FILE *map_open(string path, u32 mode) {
     bool read = (mode & FILE_MODE_READ) != 0;
 
     bool write = (mode & (FILE_MODE_WRITE | FILE_MODE_APPEND)) != 0;
@@ -103,7 +107,7 @@ static FILE *map_open(const char *path, u32 mode) {
 }
 
 ;;GETTER
-static char *File_nameMut(File *f) {
+static utf8 *File_nameMut(File *f) {
     return (*f).name;
 }
 
@@ -127,16 +131,22 @@ static fn File_setMode(File *f, u32 mode) {
     (*f).mode = mode;
 }
 
-/** Open a path using the requested mode flags and create its File in the engine arena. */
-File *File_open(const char *path, u32 mode) {
+;;CONSTRUCTOR
+/**
+ * Opens a path using the requested mode flags and allocates its File in the engine arena.
+ * @param path filesystem path to open
+ * @param mode FILE_MODE_* bitmask
+ * @return newly allocated File handle, or nullptr on failure
+ */
+File *File_open(string path, u32 mode) {
     if (!path) 
         return nullptr;
 
     if ((mode & FILE_MODE_CREATE) != 0) {
-        const char *slash = strrchr(path, '/');
+        string slash = strrchr(path, '/');
 
         if (slash && slash != path) {
-            char parent[FILE_PATH_MAX];
+            utf8 parent[FILE_PATH_MAX];
 
             bytes len = (bytes)(slash - path);
 
@@ -163,7 +173,7 @@ File *File_open(const char *path, u32 mode) {
         return nullptr;
     }
 
-    char *nameBuf = File_nameMut(f);
+    utf8 *nameBuf = File_nameMut(f);
 
     strncpy(nameBuf, path, FILE_PATH_MAX - 1);
 
@@ -197,7 +207,12 @@ File *File_open(const char *path, u32 mode) {
     return f;
 }
 
-/** Close the OS handle and release the arena-owned File object. */
+;;DECONSTRUCT
+/**
+ * Closes the OS handle and releases the arena-owned File object.
+ * @param f File instance to close
+ * @return true when f was non-null and closed
+ */
 bool File_close(File *f) {
     if (!f) 
         return false;
@@ -313,7 +328,7 @@ FILE *File_handle(const File *f) {
 
 /** Return the File object's stored path. */
 ;;GETTER
-const char *File_name(const File *f) {
+string File_name(const File *f) {
     return (*f).name;
 }
 
@@ -341,7 +356,7 @@ bool File_eof(const File *f) {
 }
 
 /** Return whether stat succeeds for the supplied filesystem path. */
-bool File_exists(const char *path) {
+bool File_exists(string path) {
     if (!path) 
         return false;
 
@@ -351,7 +366,7 @@ bool File_exists(const char *path) {
 }
 
 /** Return whether the path exists and identifies a directory. */
-bool File_isDirectory(const char *path) {
+bool File_isDirectory(string path) {
     if (!path) 
         return false;
 
@@ -363,48 +378,75 @@ bool File_isDirectory(const char *path) {
     return S_ISDIR(st.st_mode);
 }
 
-/** Create each missing path component with mode 0755, accepting existing directories. */
-bool File_mkdirs(const char *path) {
-    if (!path) 
+/**
+ * Creates a single directory path component using the active platform API.
+ * @param path NUL-terminated directory path to create
+ * @return zero on success or non-zero on failure with errno set
+ */
+static i32 makeDirectory(string path)
+{
+#if defined(VEX_PLATFORM_WINDOWS)
+    return _mkdir(path);
+#else
+    return mkdir(path, 0755);
+#endif
+}
+
+/**
+ * Create each missing path component with mode 0755, accepting existing directories.
+ * @param path NUL-terminated directory path to create recursively
+ * @return true when the target directory exists after the call
+ */
+bool File_mkdirs(string path)
+{
+    if(!path)
         return false;
 
-    if (File_exists(path)) 
+    if(File_exists(path))
         return true;
 
-    char buf[FILE_PATH_MAX];
+    utf8 buf[FILE_PATH_MAX];
 
     bytes len = strlen(path);
 
-    if (len >= FILE_PATH_MAX) 
+    if(len >= FILE_PATH_MAX)
         return false;
 
     memcpy(buf, path, len + 1);
 
-    for (char *p = buf + 1; *p; p++) {
-        if (*p == '/') {
+    for(utf8 *p = buf + 1; *p; p++) {
+        bool isSep = (*p == '/');
+#if defined(VEX_PLATFORM_WINDOWS)
+        if(*p == '\\')
+            isSep = true;
+#endif
+        if(isSep) {
+            utf8 saved = *p;
             *p = '\0';
 
-            if (mkdir(buf, 0755) != 0 && errno != EEXIST) 
+            if(makeDirectory(buf) != 0 && errno != EEXIST)
                 return false;
 
-            *p = '/';
+            *p = saved;
         }
     }
 
-    return mkdir(buf, 0755) == 0 || errno == EEXIST;
+    return makeDirectory(buf) == 0 || errno == EEXIST;
 }
 
 /** Remove a filesystem path using the C remove operation. */
-bool File_delete(const char *path) {
+bool File_delete(string path) {
     if (!path) 
         return false;
 
     return remove(path) == 0;
 }
 
-// ============================================================================
-// FilePtr — non-owning view into file bytes
-// ============================================================================
+/**
+ * ============================================================================
+ * FilePtr, non-owning view into file bytes
+ * ============================================================================
+ */
 
 ;;DEFINITION
 /**
@@ -414,7 +456,7 @@ bool File_delete(const char *path) {
  * Non-owning view into file bytes: base pointer + offset + length. Borrows
  * its base from a mapped region owned elsewhere (FixedMappedFile,
  * GrowableMappedFile, or any mmap'd backing). Zero steady-state allocation;
- * passed and returned by value. Never freed by the borrower — the region's
+ * passed and returned by value. Never freed by the borrower, the region's
  * owner releases it.
  * ============================================================================
  */
@@ -440,10 +482,10 @@ bool File_delete(const char *path) {
  *   - FilePtr_from(any base, u64 offset, u64 length)
  *
  * Accessors:
- *   - FilePtr_data(FilePtr self) -> u8 *
- *   - FilePtr_length(FilePtr self) -> u64
- *   - FilePtr_offset(FilePtr self) -> u64
- *   - FilePtr_isEmpty(FilePtr self) -> bool
+ *   - FilePtr_data(FilePtr self)  to  u8 *
+ *   - FilePtr_length(FilePtr self)  to  u64
+ *   - FilePtr_offset(FilePtr self)  to  u64
+ *   - FilePtr_isEmpty(FilePtr self)  to  bool
  * ============================================================================
  */
 
@@ -478,9 +520,11 @@ bool FilePtr_isEmpty(FilePtr self) {
     return self.length == 0 || self.base == nullptr;
 }
 
-// ============================================================================
-// FIndex — key hash → (offset, length) file index
-// ============================================================================
+/**
+ * ============================================================================
+ * FIndex, key hash → (offset, length) file index
+ * ============================================================================
+ */
 
 ;;DEFINITION
 /**
@@ -523,16 +567,16 @@ bool FilePtr_isEmpty(FilePtr self) {
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Constructors:
- *   - FIndex_create(initialCapacity)
- *   - FIndex_createArena(initialCapacity, arena)
+ *   - FIndex(initialCapacity)
+ *   - FIndex(initialCapacity, arena)
  *
  * Core Functions:
  *   - FIndex_shutdown(FIndex *)
- *   - FIndex_find(FIndex *, u64, u64 *, u64 *) -> bool
- *   - FIndex_insert(FIndex *, u64, u64, u64) -> bool
+ *   - FIndex_find(FIndex *, u64, u64 *, u64 *)  to  bool
+ *   - FIndex_insert(FIndex *, u64, u64, u64)  to  bool
  *   - FIndex_remove(FIndex *, u64)
- *   - FIndex_count(const FIndex *) -> u64
- *   - FIndex_live(const FIndex *) -> bool
+ *   - FIndex_count(const FIndex *)  to  u64
+ *   - FIndex_live(const FIndex *)  to  bool
  * ============================================================================
  */
 
@@ -666,7 +710,12 @@ static any findexAlloc(FIndex *self, bytes bytesCount) {
     return Memory_alloc(TYPE_FINDEX_SINGLETON, Re_arena(), bytesCount);
 }
 
-/** Release a table through the same owner that allocated it. */
+;;DECONSTRUCT
+/**
+ * Releases a slot table through the same arena owner that allocated it.
+ * @param self owning FIndex instance
+ * @param ptr  slot array pointer to release
+ */
 static fn findexRelease(FIndex *self, any ptr) {
     if (!ptr) 
         return;
@@ -776,12 +825,27 @@ static bool findexGrow(FIndex *self, bytes minCapacity) {
     return true;
 }
 
-FIndex FIndex_create(bytes initialCapacity) {
-    return FIndex_createArena(initialCapacity, nullptr);
+;;CONSTRUCTOR
+/**
+ * Constructs an FIndex backed by the default Relational Engine arena.
+ * @param initialCapacity minimum initial slot count (0 creates an empty index)
+ * @return initialized FIndex value
+ */
+FIndex FIndex_1(bytes initialCapacity) {
+    return FIndex_2(initialCapacity, nullptr);
 }
 
-FIndex FIndex_createArena(bytes initialCapacity, MemoryArena *arena) {
-    FIndex self = { .slots = nullptr, .capacity = 0, .count = 0, .used = 0, .arena = arena };
+;;CONSTRUCTOR
+/**
+ * Constructs an FIndex backed by the specified arena (or Re_arena() when nullptr).
+ * @param initialCapacity minimum initial slot count (0 creates an empty index)
+ * @param arena           backing MemoryArena, or nullptr for Re_arena()
+ * @return initialized FIndex value
+ */
+FIndex FIndex_2(bytes initialCapacity, MemoryArena *arena) {
+    FIndex self;
+    memset(&self, 0, sizeof(self));
+    self.arena = arena;
 
     if (initialCapacity == 0) 
         return self;

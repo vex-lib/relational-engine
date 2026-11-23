@@ -1,6 +1,6 @@
 #include "vex.h"
 #include "io/log/log.h"
-// Production R2 I/O owner: Relational Engine; existing Log ABI preserved.
+/** Production R2 I/O owner: Relational Engine; existing Log ABI preserved. */
 
 #include <stdlib.h>
 #include <string.h>
@@ -38,7 +38,7 @@
  *     bytes slot_mask; // capacity mask for indexing
  *     bytes slot_size; // slot/ring sizing state
  *     FileWriter writer; // file sink writer
- *     pthread_t thread; // background thread handle
+ *     thread thread; // background thread handle
  *     bool thread_started; // background thread handle
  *     atomic_bool running; // run-state flag
  *     bool enabled; // built with a real sink
@@ -47,7 +47,7 @@
  *     _Atomic u64 dropped; // dropped record counter
  *     u64 written; // writer thread only
  *     u64 flush_point; // writer thread only
- *     char path[FILE_PATH_MAX]; // backing file path
+ *     utf8 path[FILE_PATH_MAX]; // backing file path
  *   }
  *
  * FUNCTION REGISTRY:
@@ -74,64 +74,156 @@
  */
 
 
-// log.c — Log port (Legacy: io/Log.java). MPSC event ring + writer daemon.
+/** log.c, Log port (Legacy: io/Log.java). MPSC event ring + writer daemon. */
 
 ;;GETTER
-static inline FileWriter *Log_writerMut(Log *log) { return &(*log).writer; }
+static inline FileWriter *Log_writerMut(Log *log)
+{
+    return &(*log).writer;
+}
 ;;GETTER
-static inline u8 *Log_arena(const Log *log) { return (*log).arena; }
+static inline u8 *Log_arena(const Log *log)
+{
+    return (*log).arena;
+}
 ;;SETTER
-static inline fn Log_setArena(Log *log, u8 *arena) { (*log).arena = arena; }
+static inline fn Log_setArena(Log *log, u8 *arena)
+{
+    (*log).arena = arena;
+}
 ;;GETTER
-static inline bytes Log_slotCount(const Log *log) { return (*log).slot_count; }
+static inline bytes Log_slotCount(const Log *log)
+{
+    return (*log).slot_count;
+}
 ;;SETTER
-static inline fn Log_setSlotCount(Log *log, bytes count) { (*log).slot_count = count; }
+static inline fn Log_setSlotCount(Log *log, bytes count)
+{
+    (*log).slot_count = count;
+}
 ;;GETTER
-static inline bytes Log_slotMask(const Log *log) { return (*log).slot_mask; }
+static inline bytes Log_slotMask(const Log *log)
+{
+    return (*log).slot_mask;
+}
 ;;SETTER
-static inline fn Log_setSlotMask(Log *log, bytes mask) { (*log).slot_mask = mask; }
+static inline fn Log_setSlotMask(Log *log, bytes mask)
+{
+    (*log).slot_mask = mask;
+}
 ;;GETTER
-static inline bytes Log_slotSize(const Log *log) { return (*log).slot_size; }
+static inline bytes Log_slotSize(const Log *log)
+{
+    return (*log).slot_size;
+}
 ;;SETTER
-static inline fn Log_setSlotSize(Log *log, bytes size) { (*log).slot_size = size; }
+static inline fn Log_setSlotSize(Log *log, bytes size)
+{
+    (*log).slot_size = size;
+}
 ;;GETTER
-static inline char *Log_pathMut(Log *log) { return (*log).path; }
+static inline utf8 *Log_pathMut(Log *log)
+{
+    return (*log).path;
+}
 ;;GETTER
-static inline bool Log_enabled(const Log *log) { return (*log).enabled; }
+static inline bool Log_enabled(const Log *log)
+{
+    return (*log).enabled;
+}
 ;;SETTER
-static inline fn Log_setEnabled(Log *log, bool enabled) { (*log).enabled = enabled; }
+static inline fn Log_setEnabled(Log *log, bool enabled)
+{
+    (*log).enabled = enabled;
+}
 ;;GETTER
-static inline bool Log_active(const Log *log) { return (*log).active; }
+static inline bool Log_active(const Log *log)
+{
+    return (*log).active;
+}
 ;;SETTER
-static inline fn Log_setActiveField(Log *log, bool active) { (*log).active = active; }
+static inline fn Log_setActiveField(Log *log, bool active)
+{
+    (*log).active = active;
+}
 ;;GETTER
-static inline bool Log_loadRunning(const Log *log) { return atomic_load_explicit(&(*log).running, memory_order_acquire); }
+static inline bool Log_loadRunning(const Log *log)
+{
+    return atomic_load_explicit(&(*log).running, memory_order_acquire);
+}
 ;;GETTER
-static inline fn Log_initRunning(Log *log, bool val) { atomic_init(&(*log).running, val); }
+static inline fn Log_initRunning(Log *log, bool val)
+{
+    atomic_init(&(*log).running, val);
+}
 ;;GETTER
-static inline fn Log_storeRunning(Log *log, bool val) { atomic_store(&(*log).running, val); }
+static inline fn Log_storeRunning(Log *log, bool val)
+{
+    atomic_store(&(*log).running, val);
+}
 ;;GETTER
-static inline fn Log_initAppended(Log *log, u64 val) { atomic_init(&(*log).appended, val); }
+static inline fn Log_initAppended(Log *log, u64 val)
+{
+    atomic_init(&(*log).appended, val);
+}
 ;;GETTER
-static inline fn Log_fetchAddAppended(Log *log) { atomic_fetch_add_explicit(&(*log).appended, 1, memory_order_relaxed); }
+static inline fn Log_fetchAddAppended(Log *log)
+{
+    atomic_fetch_add_explicit(&(*log).appended, 1, memory_order_relaxed);
+}
 ;;GETTER
-static inline fn Log_initDropped(Log *log, u64 val) { atomic_init(&(*log).dropped, val); }
+static inline fn Log_initDropped(Log *log, u64 val)
+{
+    atomic_init(&(*log).dropped, val);
+}
 ;;GETTER
-static inline fn Log_fetchAddDropped(Log *log) { atomic_fetch_add_explicit(&(*log).dropped, 1, memory_order_relaxed); }
+static inline fn Log_fetchAddDropped(Log *log)
+{
+    atomic_fetch_add_explicit(&(*log).dropped, 1, memory_order_relaxed);
+}
 ;;SETTER
-static inline fn Log_setWritten(Log *log, u64 val) { (*log).written = val; }
+static inline fn Log_setWritten(Log *log, u64 val)
+{
+    (*log).written = val;
+}
 ;;GETTER
-static inline u64 Log_flushPoint(const Log *log) { return (*log).flush_point; }
+static inline u64 Log_flushPoint(const Log *log)
+{
+    return (*log).flush_point;
+}
 ;;SETTER
-static inline fn Log_setFlushPoint(Log *log, u64 val) { (*log).flush_point = val; }
-;;GETTER
-static inline pthread_t *Log_threadMut(Log *log) { return &(*log).thread; }
-;;GETTER
-static inline pthread_t Log_thread(const Log *log) { return (*log).thread; }
-;;GETTER
-static inline bool Log_threadStarted(const Log *log) { return (*log).thread_started; }
+static inline fn Log_setFlushPoint(Log *log, u64 val)
+{
+    (*log).flush_point = val;
+}
+#if defined(VEX_PLATFORM_WINDOWS)
 ;;SETTER
-static inline fn Log_setThreadStarted(Log *log, bool val) { (*log).thread_started = val; }
+static inline fn Log_setThread(Log *log, thread worker)
+{
+    (*log).worker = worker;
+}
+#else
+;;GETTER
+static inline thread *Log_threadMut(Log *log)
+{
+    return &(*log).worker;
+}
+#endif
+;;GETTER
+static inline thread Log_thread(const Log *log)
+{
+    return (*log).worker;
+}
+;;GETTER
+static inline bool Log_threadStarted(const Log *log)
+{
+    return (*log).thread_started;
+}
+;;SETTER
+static inline fn Log_setThreadStarted(Log *log, bool val)
+{
+    (*log).thread_started = val;
+}
 
 static const u8 LOG_MAGIC[7] = { 0x41, 0x4E, 0x54, 0x49, 0x4C, 0x4F, 0x47 };
 
@@ -141,7 +233,7 @@ static i64 monotonic_nanos() {
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
 
-    return (i64)ts.tv_sec * 1000000000L + (i64)ts.tv_nsec;
+    return (i64) ts.tv_sec * 1000000000LL + (i64) ts.tv_nsec;
 }
 
 /** Encode a 32-bit value in big-endian byte order at the requested offset. */
@@ -315,7 +407,7 @@ static any writer_main(any arg) {
 }
 
 /** Initialize the bounded record ring, file sink, counters, and writer thread. */
-bool Log_init(Log *log, const char *path, bytes slot_count) {
+bool Log_init(Log *log, string path, bytes slot_count) {
     if (!log || !path) 
         return false;
 
@@ -332,7 +424,7 @@ bool Log_init(Log *log, const char *path, bytes slot_count) {
 
     Log_setSlotSize(log, LOG_SLOT_SIZE);
 
-    char *lpath = Log_pathMut(log);
+    utf8 *lpath = Log_pathMut(log);
     strncpy(lpath, path, FILE_PATH_MAX - 1);
 
     lpath[FILE_PATH_MAX - 1] = '\0';
@@ -369,7 +461,16 @@ bool Log_init(Log *log, const char *path, bytes slot_count) {
 
     Log_setFlushPoint(log, 0);
 
-    if (pthread_create(Log_threadMut(log), nullptr, writer_main, log) != 0) {
+    i32 threadRc = 0;
+#if defined(VEX_PLATFORM_WINDOWS)
+    pthread_t winTid = 0;
+    threadRc = pthread_create(&winTid, nullptr, writer_main, log);
+    if(threadRc == 0)
+        Log_setThread(log, (thread) (bytes) winTid);
+#else
+    threadRc = pthread_create(Log_threadMut(log), nullptr, writer_main, log);
+#endif
+    if(threadRc != 0) {
         Log_storeRunning(log, false);
 
         Memory_free(arena);
@@ -388,7 +489,12 @@ bool Log_init(Log *log, const char *path, bytes slot_count) {
     return true;
 }
 
-/** Stop and join the writer, drain remaining records, and release its ring and file sink. */
+;;DECONSTRUCT
+/**
+ * Stops and joins the writer thread, drains remaining records, and releases
+ * the ring arena and file sink.
+ * @param log log instance to shut down
+ */
 fn Log_shutdown(Log *log) {
     if (!log) 
         return;
@@ -396,7 +502,11 @@ fn Log_shutdown(Log *log) {
     Log_storeRunning(log, false);
 
     if (Log_threadStarted(log)) {
+#if defined(VEX_PLATFORM_WINDOWS)
+        pthread_join((pthread_t) (bytes) Log_thread(log), nullptr);
+#else
         pthread_join(Log_thread(log), nullptr);
+#endif
 
         Log_setThreadStarted(log, false);
     }
@@ -432,7 +542,7 @@ fn Log_setActive(Log *log, bool on) {
 }
 
 /** Return the path stored at initialization. */
-const char *Log_path(const Log *log) {
+string Log_path(const Log *log) {
     return (*log).path;
 }
 

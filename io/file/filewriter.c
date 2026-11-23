@@ -1,6 +1,6 @@
 #include "vex.h"
 #include "io/file/file.h"
-// Production R2 I/O owner: Relational Engine; existing FileWriter ABI preserved.
+/** Production R2 I/O owner: Relational Engine; existing FileWriter ABI preserved. */
 
 #include <string.h>
 
@@ -33,7 +33,7 @@
  *     FILE *out; // instance state
  *     bool open; // instance state
  *     u64 bytes_written; // writer-side flushed count
- *     char buffer[FILEWRITER_BUFFER_SIZE]; // staging buffer
+ *     utf8 buffer[FILEWRITER_BUFFER_SIZE]; // staging buffer
  *   }
  *
  * FUNCTION REGISTRY:
@@ -48,25 +48,46 @@
  */
 
 
-// filewriter.c — FileWriter port (Legacy: io/FileWriter.java).
+/** filewriter.c, FileWriter port (Legacy: io/FileWriter.java). */
 
 ;;GETTER
-static inline bool FileWriter_openField(const FileWriter *w) { return (*w).open; }
+static inline bool FileWriter_openField(const FileWriter *w)
+{
+    return (*w).open;
+}
 ;;SETTER
-static inline fn FileWriter_setOpen(FileWriter *w, bool open) { (*w).open = open; }
+static inline fn FileWriter_setOpen(FileWriter *w, bool open)
+{
+    (*w).open = open;
+}
 ;;GETTER
-static inline FILE *FileWriter_out(const FileWriter *w) { return (*w).out; }
+static inline FILE *FileWriter_out(const FileWriter *w)
+{
+    return (*w).out;
+}
 ;;SETTER
-static inline fn FileWriter_setOut(FileWriter *w, FILE *out) { (*w).out = out; }
+static inline fn FileWriter_setOut(FileWriter *w, FILE *out)
+{
+    (*w).out = out;
+}
 ;;GETTER
-static inline char *FileWriter_bufferMut(FileWriter *w) { return (*w).buffer; }
+static inline utf8 *FileWriter_bufferMut(FileWriter *w)
+{
+    return (*w).buffer;
+}
 ;;GETTER
-static inline u64 FileWriter_bytesWrittenField(const FileWriter *w) { return (*w).bytes_written; }
+static inline u64 FileWriter_bytesWrittenField(const FileWriter *w)
+{
+    return (*w).bytes_written;
+}
 ;;SETTER
-static inline fn FileWriter_setBytesWritten(FileWriter *w, u64 bw) { (*w).bytes_written = bw; }
+static inline fn FileWriter_setBytesWritten(FileWriter *w, u64 bw)
+{
+    (*w).bytes_written = bw;
+}
 
 /** Open a binary output path, creating missing parent directories and enabling full buffering. */
-bool FileWriter_open(FileWriter *w, const char *path) {
+bool FileWriter_open(FileWriter *w, string path) {
     if (!w || !path) 
         return false;
 
@@ -74,12 +95,12 @@ bool FileWriter_open(FileWriter *w, const char *path) {
 
     FileWriter_setBytesWritten(w, 0);
 
-    const char *slash = strrchr(path, '/');
+    string slash = strrchr(path, '/');
 
     if (slash && slash != path) {
         bytes len = (bytes)(slash - path);
 
-        char parent[FILE_PATH_MAX];
+        utf8 parent[FILE_PATH_MAX];
 
         if (len >= FILE_PATH_MAX) 
             return false;

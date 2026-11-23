@@ -4,7 +4,7 @@
 #include "vex.h"
 #include "io/log/log.h"
 
-const Log incl_log; // include log
+const Log incl_log; /** include log */
 
 
 #endif
