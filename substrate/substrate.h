@@ -1,7 +1,7 @@
 #ifndef SUBSTRATE_SUBSTRATE_H
 #define SUBSTRATE_SUBSTRATE_H
 
-// substrate/substrate.h — the relational substrate directory door.
+/** substrate/substrate.h, the relational substrate directory door. */
 
 #include "vex.h"
 #include "substrate/relational/cell.h"

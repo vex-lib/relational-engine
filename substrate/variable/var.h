@@ -6,20 +6,22 @@
 #include "substrate/variable/variable_slot.h"
 #include "type/re_type.h"
 
-// substrate/variable/var.h — an arena-owned reactive binding.
-//
-// The caller asks for `var *v = var("name", &arena);` and gets a stable pointer
-// inside that arena. The name is the 32-byte VariableSlot atom; the value is a
-// thin opaque pointer. `var` owns the reactive glue: subscribers are called
-// with (self, value, context) when var_set publishes. The row lives or dies
-// with the arena.
-//
-// INTENTIONAL(vex): `var` is lowercase on purpose — vocabulary, not a
-// CapitalCase class, consistent with the floor's `string` spelling.
-//
-// This is deliberately NOT a Cell/VariableSlot merge: VariableSlot owns the
-// name grammar, Cell owns the uniform value slot, var owns the glue between
-// them. Cold path only — the rendezvous, never per-frame.
+/**
+ * substrate/variable/var.h, an arena-owned reactive binding.
+ *
+ * The caller asks for `var *v = var("name", &arena);` and gets a stable pointer
+ * inside that arena. The name is the 32-byte VariableSlot atom; the value is a
+ * thin opaque pointer. `var` owns the reactive glue: subscribers are called
+ * with (self, value, context) when var_set publishes. The row lives or dies
+ * with the arena.
+ *
+ * `var` is lowercase on purpose, vocabulary, not a CapitalCase class,
+ * consistent with the floor's `string` spelling.
+ *
+ * This is deliberately NOT a Cell/VariableSlot merge: VariableSlot owns the
+ * name grammar, Cell owns the uniform value slot, var owns the glue between
+ * them. Cold path only, the rendezvous, never per-frame.
+ */
 
 #define TYPE_VAR_SINGLETON Type_make(PROJ_RELATIONAL_ENGINE, FORM_SINGLETON, 12u)
 #define VAR_MAX_OBSERVERS 8u
@@ -28,6 +30,7 @@ typedef struct var var;
 
 typedef fn (*VarObserver)(var *self, pointer value, any context);
 
+;;INTENTION("var is lowercase on purpose as floor vocabulary consistent with string, not a CapitalCase class")
 ;;CLASSNAME("var")
 struct var {
     VariableSlot slot;
@@ -38,7 +41,7 @@ struct var {
     bytes observerCount;
 };
 
-var *var_2(const char *name, MemoryArena *arena);
+var *var_2(string name, MemoryArena *arena);
 #define var(...) var_2(__VA_ARGS__)
 
 bool var_set(var *self, pointer value);
@@ -46,12 +49,12 @@ bool var_subscribe(var *self, VarObserver observer, any context);
 fn var_unsubscribe(var *self, VarObserver observer, any context);
 fn var_unsubscribeAll(var *self);
 
-const char *var_name(const var *self);
+string var_name(const var *self);
 pointer var_value(const var *self);
 bytes var_observerCount(const var *self);
 MemoryArena *var_arena(const var *self);
 
-fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated);
-fn var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated);
+fn var_toString(const var *self, utf8 *dest, bytes cap, bool *outTruncated);
+fn var_toStringStruct(const var *self, utf8 *dest, bytes cap, bool *outTruncated);
 
 #endif

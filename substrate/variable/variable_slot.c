@@ -1,8 +1,10 @@
-// substrate/variable/variable_slot.c — the 32-byte name box.
-//
-// Fold + validate the name once (cold, quiet), store it zero-padded, keep the
-// value pointer opaque. No allocation on the read path; the arity constructors
-// are the only allocators.
+/**
+ * substrate/variable/variable_slot.c, the 32-byte name box.
+ *
+ * Fold + validate the name once (cold, quiet), store it zero-padded, keep the
+ * value pointer opaque. No allocation on the read path; the arity constructors
+ * are the only allocators.
+ */
 
 #include "vex.h"
 #include "substrate/variable/variable_slot.h"
@@ -31,8 +33,8 @@
  * arena-allocated through the arity constructors (TYPE_VARIABLE_SLOT). The
  * inline form is the steady-state shape; the arena form is the convenience.
  *
- * Path temperature: cold. A name box is read by the reflective walk — name and
- * dotted-path resolution — which is a cold rendezvous, never a per-frame path
+ * Path temperature: cold. A name box is read by the reflective walk, name and
+ * dotted-path resolution, which is a cold rendezvous, never a per-frame path
  * (the Cold-Only Reflection Law). Validation is exhaustive at the cold seam
  * (the Cold-Strict, Hot-Minimal Validation Law): a bad name is rejected, never
  * silently truncated.
@@ -49,13 +51,13 @@
  * STRUCT FIELDS (Mirroring substrate/variable/variable_slot.h):
  * ----------------------------------------------------------------------------
  *   VariableSlot {
- *     char name[24];      // folded name, NUL-terminated, zero-padded
+ *     utf8 name[24];      // folded name, NUL-terminated, zero-padded
  *     pointer pointer;  // the value cell address (the destination)
  *   }
  *
  * PRIVATE HELPERS (kept file-local, pure logic, no behavior of their own):
  * ----------------------------------------------------------------------------
- *   (none — the fold/validate helpers are static functions below, not records)
+ *   (none, the fold/validate helpers are static functions below, not records)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -68,7 +70,7 @@
  *
  * Public Core Functions: (.h)
  *   - VariableSlot_foldName(name, out)         : fold + validate the charset
- *   - VariableSlot_bucketOf(c)                 : first-char bucket 0..38
+ *   - VariableSlot_bucketOf(c)                 : first-utf8 bucket 0..38
  *
  * Private Core Functions: (.c static)
  *   - storeName(self, folded)                  : zero-pad copy into the slot
@@ -89,14 +91,16 @@
  * ============================================================================
  */
 
-// Fold a name to lowercase and validate the segment grammar. A name is one or
-// more '.'-separated segments, each 1..23 characters of [a-z0-9_$-]; the whole
-// name is 1..23 characters (dots included). Case folds to lowercase. The dot is
-// the search splitter — stored between segments, never a segment of its own,
-// and never the first character (the hash bucket reads the first character).
-// Empty segments (leading, trailing, or f64d dots) are rejected. Writes
-// NUL-terminated folded Bytes into out, which must hold VARIABLE_SLOT_NAME_BYTES.
-bool VariableSlot_foldName(const char *name, char *out) {
+/**
+ * Fold a name to lowercase and validate the segment grammar. A name is one or
+ * more '.'-separated segments, each 1..23 characters of [a-z0-9_$-]; the whole
+ * name is 1..23 characters (dots included). Case folds to lowercase. The dot is
+ * the search splitter, stored between segments, never a segment of its own,
+ * and never the first character (the hash bucket reads the first character).
+ * Empty segments (leading, trailing, or f64d dots) are rejected. Writes
+ * NUL-terminated folded Bytes into out, which must hold VARIABLE_SLOT_NAME_BYTES.
+ */
+bool VariableSlot_foldName(string name, utf8 *out) {
     if (name == nullptr || name[0] == '\0') 
         return false;
 
@@ -104,8 +108,8 @@ bool VariableSlot_foldName(const char *name, char *out) {
 
     bytes segLen = 0u;
 
-    for (const char *p = name; ; p++) {
-        char c = *p;
+    for (string p = name; ; p++) {
+        utf8 c = *p;
 
         if (c == '\0' || c == '.') {
             if (segLen == 0u) 
@@ -137,13 +141,13 @@ bool VariableSlot_foldName(const char *name, char *out) {
         if (len >= VARIABLE_SLOT_NAME_MAX) 
             return false;
 
-        out[len++] = (char) ((u >= 'A' && u <= 'Z') ? (u + 32) : u);
+        out[len++] = (utf8) ((u >= 'A' && u <= 'Z') ? (u + 32) : u);
 
         segLen++;
     }
 }
 
-i32 VariableSlot_bucketOf(char c) {
+i32 VariableSlot_bucketOf(utf8 c) {
     if (c >= 'a' && c <= 'z') 
         return c - 'a';
 
@@ -163,29 +167,40 @@ i32 VariableSlot_bucketOf(char c) {
 }
 
 ;;GETTER
-static inline char *VariableSlot_nameMut(VariableSlot *self) { return (*self).name; }
+static inline utf8 *VariableSlot_nameMut(VariableSlot *self)
+{
+    return (*self).name;
+}
 ;;GETTER
-static inline const char *VariableSlot_name(const VariableSlot *self) { return (*self).name; }
+static inline string VariableSlot_name(const VariableSlot *self)
+{
+    return (*self).name;
+}
 ;;GETTER
-static inline pointer VariableSlot_pointer(const VariableSlot *self) { return (*self).pointer; }
+static inline pointer VariableSlot_pointer(const VariableSlot *self)
+{
+    return (*self).pointer;
+}
 
-// Store a validated folded name into the slot, zero-padding the tail so the
-// 24-byte buffer has no stale Bytes.
-static fn storeName(VariableSlot *self, const char *folded) {
-    char *dest = VariableSlot_nameMut(self);
+/**
+ * Store a validated folded name into the slot, zero-padding the tail so the
+ * 24-byte buffer has no stale Bytes.
+ */
+static fn storeName(VariableSlot *self, string folded) {
+    utf8 *dest = VariableSlot_nameMut(self);
 
     memset(dest, 0, VARIABLE_SLOT_NAME_BYTES);
 
     memcpy(dest, folded, strlen(folded) + 1);
 }
 
-// CONSTRUCTORS (PUBLIC & PRIVATE)
+/** CONSTRUCTORS (PUBLIC & PRIVATE) */
 
-bool VariableSlot_init(VariableSlot *self, const char *name, pointer pointer) {
+bool VariableSlot_init(VariableSlot *self, string name, pointer pointer) {
     if (self == nullptr) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return false;
@@ -208,11 +223,11 @@ VariableSlot *VariableSlot_0() {
     return self;
 }
 
-VariableSlot *VariableSlot_1(const char *name) {
+VariableSlot *VariableSlot_1(string name) {
     return VariableSlot_2(name, 0);
 }
 
-VariableSlot *VariableSlot_2(const char *name, pointer pointer) {
+VariableSlot *VariableSlot_2(string name, pointer pointer) {
     VariableSlot *self = VariableSlot_0();
 
     if (self == nullptr) 
@@ -227,18 +242,42 @@ VariableSlot *VariableSlot_2(const char *name, pointer pointer) {
     return self;
 }
 
+;;CONSTRUCTOR
+variable *variable_0()
+{
+    return VariableSlot_0();
+}
+
+;;CONSTRUCTOR
+variable *variable_1(string name)
+{
+    return VariableSlot_1(name);
+}
+
+;;CONSTRUCTOR
+variable *variable_2(string name, pointer pointer)
+{
+    return VariableSlot_2(name, pointer);
+}
+
+;;DECONSTRUCT
+fn variable_free(variable *self)
+{
+    VariableSlot_free(self);
+}
+
 fn VariableSlot_free(VariableSlot *self) {
     if (self != nullptr) 
         Memory_free(self);
 }
 
-// SETTERS (PUBLIC & PRIVATE)
+/** SETTERS (PUBLIC & PRIVATE) */
 
-bool VariableSlot_setName(VariableSlot *self, const char *name) {
+bool VariableSlot_setName(VariableSlot *self, string name) {
     if (self == nullptr) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return false;
@@ -255,9 +294,9 @@ fn VariableSlot_setPointer(VariableSlot *self, pointer pointer) {
     (*self).pointer = pointer;
 }
 
-// GETTERS (PUBLIC & PRIVATE)
+/** GETTERS (PUBLIC & PRIVATE) */
 
-const char *VariableSlot_getName(const VariableSlot *self) {
+string VariableSlot_getName(const VariableSlot *self) {
     return self ? VariableSlot_name(self) : nullptr;
 }
 
@@ -275,16 +314,16 @@ bool VariableSlot_isEmpty(const VariableSlot *self) {
     return VariableSlot_name(self)[0] == '\0';
 }
 
-bool VariableSlot_nameEquals(const VariableSlot *self, const char *name) {
+bool VariableSlot_nameEquals(const VariableSlot *self, string name) {
     if (self == nullptr) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return false;
 
-    const char *sname = VariableSlot_name(self);
+    string sname = VariableSlot_name(self);
     for (bytes i = 0; i < VARIABLE_SLOT_NAME_BYTES; i++) {
         if (sname[i] != folded[i]) 
             return false;
@@ -296,10 +335,10 @@ bool VariableSlot_nameEquals(const VariableSlot *self, const char *name) {
     return true;
 }
 
-// STRING PROJECTIONS (the toString Law)
+/** STRING PROJECTIONS (the toString Law) */
 
-// The name charset cannot contain '"' or '\', so a quoted name needs no escape.
-fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated) {
+/** The name charset cannot contain '"' or '\', so a quoted name needs no escape. */
+fn VariableSlot_toString(const VariableSlot *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated != nullptr) 
         *outTruncated = false;
 
@@ -312,7 +351,7 @@ fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *
         return;
     }
 
-    const char *name = VariableSlot_name(self);
+    string name = VariableSlot_name(self);
 
     if (name[0] == '\0') 
         name = "?";
@@ -325,7 +364,7 @@ fn VariableSlot_toString(const VariableSlot *self, char *dest, bytes cap, bool *
     }
 }
 
-fn VariableSlot_toStringStruct(const VariableSlot *self, char *dest, bytes cap, bool *outTruncated) {
+fn VariableSlot_toStringStruct(const VariableSlot *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated != nullptr) 
         *outTruncated = false;
 

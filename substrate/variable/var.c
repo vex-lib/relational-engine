@@ -42,35 +42,77 @@
  */
 
 ;;GETTER
-static inline VariableSlot *Var_slotMut(var *self) { return &(*self).slot; }
+static inline VariableSlot *Var_slotMut(var *self)
+{
+    return &(*self).slot;
+}
 ;;GETTER
-static inline const VariableSlot *Var_slot(const var *self) { return &(*self).slot; }
+static inline const VariableSlot *Var_slot(const var *self)
+{
+    return &(*self).slot;
+}
 ;;SETTER
-static inline fn Var_setArena(var *self, MemoryArena *arena) { (*self).arena = arena; }
+static inline fn Var_setArena(var *self, MemoryArena *arena)
+{
+    (*self).arena = arena;
+}
 ;;SETTER
-static inline fn Var_setValue(var *self, pointer value) { (*self).value = value; }
+static inline fn Var_setValue(var *self, pointer value)
+{
+    (*self).value = value;
+}
 ;;GETTER
-static inline VarObserver Var_observerAt(const var *self, bytes i) { return (*self).observers[i]; }
+static inline VarObserver Var_observerAt(const var *self, bytes i)
+{
+    return (*self).observers[i];
+}
 ;;SETTER
-static inline fn Var_setObserverAt(var *self, bytes i, VarObserver obs) { (*self).observers[i] = obs; }
+static inline fn Var_setObserverAt(var *self, bytes i, VarObserver obs)
+{
+    (*self).observers[i] = obs;
+}
 ;;GETTER
-static inline any Var_observerContextAt(const var *self, bytes i) { return (*self).observerContext[i]; }
+static inline any Var_observerContextAt(const var *self, bytes i)
+{
+    return (*self).observerContext[i];
+}
 ;;SETTER
-static inline fn Var_setObserverContextAt(var *self, bytes i, any ctx) { (*self).observerContext[i] = ctx; }
+static inline fn Var_setObserverContextAt(var *self, bytes i, any ctx)
+{
+    (*self).observerContext[i] = ctx;
+}
 ;;GETTER
-static inline VarObserver *Var_observersMut(var *self) { return (*self).observers; }
+static inline VarObserver *Var_observersMut(var *self)
+{
+    return (*self).observers;
+}
 ;;GETTER
-static inline any *Var_observerContextMut(var *self) { return (*self).observerContext; }
+static inline any *Var_observerContextMut(var *self)
+{
+    return (*self).observerContext;
+}
 ;;SETTER
-static inline fn Var_setObserverCount(var *self, bytes count) { (*self).observerCount = count; }
+static inline fn Var_setObserverCount(var *self, bytes count)
+{
+    (*self).observerCount = count;
+}
 ;;GETTER
-static inline pointer Var_valueRaw(const var *self) { return (*self).value; }
+static inline pointer Var_valueRaw(const var *self)
+{
+    return (*self).value;
+}
 ;;GETTER
-static inline bytes Var_observerCountRaw(const var *self) { return (*self).observerCount; }
+static inline bytes Var_observerCountRaw(const var *self)
+{
+    return (*self).observerCount;
+}
 ;;GETTER
-static inline MemoryArena *Var_arenaRaw(const var *self) { return (*self).arena; }
+static inline MemoryArena *Var_arenaRaw(const var *self)
+{
+    return (*self).arena;
+}
 
-var *var_2(const char *name, MemoryArena *arena) {
+var *var_2(string name, MemoryArena *arena) {
     if (!name || !arena) 
         return nullptr;
 
@@ -167,7 +209,7 @@ fn var_unsubscribeAll(var *self) {
     Var_setObserverCount(self, 0u);
 }
 
-const char *var_name(const var *self) {
+string var_name(const var *self) {
     return self ? VariableSlot_getName(Var_slot(self)) : nullptr;
 }
 
@@ -183,7 +225,7 @@ MemoryArena *var_arena(const var *self) {
     return self ? Var_arenaRaw(self) : nullptr;
 }
 
-fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
+fn var_toString(const var *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -206,7 +248,7 @@ fn var_toString(const var *self, char *dest, bytes cap, bool *outTruncated) {
     }
 }
 
-fn var_toStringStruct(const var *self, char *dest, bytes cap, bool *outTruncated) {
+fn var_toStringStruct(const var *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 

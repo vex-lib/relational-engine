@@ -1,7 +1,9 @@
-// substrate/relational/shelf.c — the global shelf: a node pool with u32 graph edges.
-//
-// Nodes are never-moved ChunkedList rows; edges are u32 indices; each node
-// references one separately-allocated identity Cell. Cold path only.
+/**
+ * substrate/relational/shelf.c, the global shelf: a node pool with u32 graph edges.
+ *
+ * Nodes are never-moved ChunkedList rows; edges are u32 indices; each node
+ * references one separately-allocated identity Cell. Cold path only.
+ */
 
 #include "vex.h"
 #include "substrate/relational/shelf.h"
@@ -56,7 +58,7 @@
  *
  * PRIVATE HELPERS (kept file-local, pure logic, no behavior of their own):
  * ----------------------------------------------------------------------------
- *   (none — nodeAt is a static function below, not a record)
+ *   (none, nodeAt is a static function below, not a record)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -92,31 +94,67 @@
  */
 
 ;;GETTER
-static inline bool Shelf_active(const Shelf *shelf) { return (*shelf).active; }
+static inline bool Shelf_active(const Shelf *shelf)
+{
+    return (*shelf).active;
+}
 ;;SETTER
-static inline fn Shelf_setActive(Shelf *shelf, bool active) { (*shelf).active = active; }
+static inline fn Shelf_setActive(Shelf *shelf, bool active)
+{
+    (*shelf).active = active;
+}
 ;;SETTER
-static inline fn Shelf_setCount(Shelf *shelf, u32 count) { (*shelf).count = count; }
+static inline fn Shelf_setCount(Shelf *shelf, u32 count)
+{
+    (*shelf).count = count;
+}
 ;;GETTER
-static inline u32 Shelf_head(const Shelf *shelf) { return (*shelf).head; }
+static inline u32 Shelf_head(const Shelf *shelf)
+{
+    return (*shelf).head;
+}
 ;;SETTER
-static inline fn Shelf_setHeadField(Shelf *shelf, u32 head) { (*shelf).head = head; }
+static inline fn Shelf_setHeadField(Shelf *shelf, u32 head)
+{
+    (*shelf).head = head;
+}
 ;;GETTER
-static inline ChunkedList *Shelf_nodes(const Shelf *shelf) { return (*shelf).nodes; }
+static inline ChunkedList *Shelf_nodes(const Shelf *shelf)
+{
+    return (*shelf).nodes;
+}
 ;;SETTER
-static inline fn Shelf_setNodes(Shelf *shelf, ChunkedList *nodes) { (*shelf).nodes = nodes; }
+static inline fn Shelf_setNodes(Shelf *shelf, ChunkedList *nodes)
+{
+    (*shelf).nodes = nodes;
+}
 ;;GETTER
-static inline pointer ShelfNode_cell(const ShelfNode *row) { return (*row).cell; }
+static inline pointer ShelfNode_cell(const ShelfNode *row)
+{
+    return (*row).cell;
+}
 ;;SETTER
-static inline fn ShelfNode_setCell(ShelfNode *row, pointer cell) { (*row).cell = cell; }
+static inline fn ShelfNode_setCell(ShelfNode *row, pointer cell)
+{
+    (*row).cell = cell;
+}
 ;;GETTER
-static inline u32 ShelfNode_next(const ShelfNode *row) { return (*row).next; }
+static inline u32 ShelfNode_next(const ShelfNode *row)
+{
+    return (*row).next;
+}
 ;;SETTER
-static inline fn ShelfNode_setNext(ShelfNode *row, u32 next) { (*row).next = next; }
+static inline fn ShelfNode_setNext(ShelfNode *row, u32 next)
+{
+    (*row).next = next;
+}
 ;;SETTER
-static inline fn ShelfNode_setPad(ShelfNode *row, u32 pad) { (*row).pad = pad; }
+static inline fn ShelfNode_setPad(ShelfNode *row, u32 pad)
+{
+    (*row).pad = pad;
+}
 
-// Bounds-checked node resolve: null on a null shelf or an out-of-range index.
+/** Bounds-checked node resolve: null on a null shelf or an out-of-range index. */
 static ShelfNode *nodeAt(const Shelf *shelf, u32 index) {
     if (!shelf || index >= Shelf_count(shelf)) 
         return nullptr;
@@ -124,7 +162,7 @@ static ShelfNode *nodeAt(const Shelf *shelf, u32 index) {
     return (ShelfNode*) ChunkedList_slot(Shelf_nodes(shelf), index);
 }
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 
 bool Shelf_init(Shelf *shelf) {
     if (!shelf) 
@@ -198,7 +236,7 @@ fn Shelf_free(Shelf *shelf) {
     Memory_free(shelf);
 }
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 
 u32 Shelf_addNode(Shelf *shelf, pointer cell) {
     if (!shelf || !Shelf_active(shelf)) 
@@ -270,7 +308,7 @@ bool Shelf_link(Shelf *shelf, u32 from, u32 to) {
     return Shelf_setNext(shelf, from, to);
 }
 
-// SETTERS
+/** SETTERS */
 
 bool Shelf_setHead(Shelf *shelf, u32 index) {
     if (!shelf) 
@@ -284,7 +322,7 @@ bool Shelf_setHead(Shelf *shelf, u32 index) {
     return true;
 }
 
-// GETTERS
+/** GETTERS */
 
 u32 Shelf_getHead(const Shelf *shelf) {
     if (!shelf) 
@@ -304,9 +342,9 @@ bool Shelf_isEmpty(const Shelf *shelf) {
     return Shelf_count(shelf) == 0u;
 }
 
-// STRING PROJECTIONS (the toString Law)
+/** STRING PROJECTIONS (the toString Law) */
 
-fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated) {
+fn Shelf_toString(const Shelf *shelf, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -327,7 +365,7 @@ fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated)
     }
 }
 
-fn Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated) {
+fn Shelf_toStringStruct(const Shelf *shelf, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 

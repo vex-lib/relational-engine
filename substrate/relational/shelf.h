@@ -5,33 +5,47 @@
 #include "lang/constructor.h"
 #include "struct/chunked_list.h"
 
-// substrate/relational/shelf.h — the global shelf: a node pool with u32 graph edges.
-//
-// The shelf is the Relational Engine's "linked list inside an arraylist": nodes
-// live in a never-moved ChunkedList (so a node's address is stable for life),
-// and the graph edges are 32-bit INDICES into that list — data-oriented and
-// relocatable, not invisible pointer chases. Each node references one identity
-// Cell, allocated separately so it carries its own 32-byte header; the shelf is
-// the indexable pool the reflective walk traverses.
-//
-// COLD PATH ONLY (the Cold-Only Reflection Law): the shelf is the rendezvous
-// walked by search/debug/script/hot-swap, never a per-frame structure. See the
-// `;;INTENTION` marker on the walk in the resolver.
+/**
+ * substrate/relational/shelf.h, the global shelf: a node pool with u32 graph edges.
+ *
+ * The shelf is the Relational Engine's "linked list inside an arraylist": nodes
+ * live in a never-moved ChunkedList (so a node's address is stable for life),
+ * and the graph edges are 32-bit INDICES into that list, data-oriented and
+ * relocatable, not invisible pointer chases. Each node references one identity
+ * Cell, allocated separately so it carries its own 32-byte header; the shelf is
+ * the indexable pool the reflective walk traverses.
+ *
+ * COLD PATH ONLY (the Cold-Only Reflection Law): the shelf is the rendezvous
+ * walked by search/debug/script/hot-swap, never a per-frame structure. See the
+ * `;;INTENTION` marker on the walk in the resolver.
+ */
 
 #define SHELF_INDEX_NONE UINT32_MAX
 
-// SLOT RECORD (owned by Shelf, behaviorless): one shelf node.
+/**
+ * SLOT RECORD (owned by Shelf, behaviorless): one shelf node.
+ *
+ * pointer cell - the identity cell this node references (0 when bare)
+ * u32 next     - graph edge: u32 index of the next node (SHELF_INDEX_NONE = end)
+ * u32 pad      - explicit padding (keeps the row 16 Bytes)
+ */
 typedef struct ShelfNode {
-    pointer cell; // the identity cell this node references (0 when bare)
-    u32 next;  // graph edge: u32 index of the next node (SHELF_INDEX_NONE = end)
-    u32 pad;   // explicit padding (keeps the row 16 Bytes)
+    pointer cell;
+    u32 next;
+    u32 pad;
 } ShelfNode;
 
+/**
+ * bool active        - runtime-active flag
+ * u32 count          - live nodes (== row count)
+ * u32 head           - first node index (SHELF_INDEX_NONE when empty)
+ * ChunkedList *nodes - never-moved ShelfNode rows (u32 edges)
+ */
 typedef struct Shelf {
-    bool active;        // runtime-active flag
-    u32 count;     // live nodes (== row count)
-    u32 head;      // first node index (SHELF_INDEX_NONE when empty)
-    ChunkedList *nodes; // never-moved ShelfNode rows (u32 edges)
+    bool active;
+    u32 count;
+    u32 head;
+    ChunkedList *nodes;
 } Shelf;
 
 bool Shelf_init(Shelf *shelf);
@@ -55,7 +69,7 @@ u32 Shelf_getHead(const Shelf *shelf);
 u32 Shelf_count(const Shelf *shelf);
 bool Shelf_isEmpty(const Shelf *shelf);
 
-fn Shelf_toString(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated);
-fn Shelf_toStringStruct(const Shelf *shelf, char *dest, bytes cap, bool *outTruncated);
+fn Shelf_toString(const Shelf *shelf, utf8 *dest, bytes cap, bool *outTruncated);
+fn Shelf_toStringStruct(const Shelf *shelf, utf8 *dest, bytes cap, bool *outTruncated);
 
 #endif

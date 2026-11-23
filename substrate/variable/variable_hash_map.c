@@ -1,8 +1,10 @@
-// substrate/variable/variable_hash_map.c — the relational name => pointer hash map.
-//
-// Two-level index (bucket = first folded char, slot = Murmur3(FNV1a(tail)) &
-// 1023); each occupied slot is a lazily-minted ChunkedList of VariableSlot rows.
-// Bands are minted lazily too. Cold path only.
+/**
+ * substrate/variable/variable_hash_map.c, the relational name => pointer hash map.
+ *
+ * Two-level index (bucket = first folded utf8, slot = Murmur3(FNV1a(tail)) &
+ * 1023); each occupied slot is a lazily-minted ChunkedList of VariableSlot rows.
+ * Bands are minted lazily too. Cold path only.
+ */
 
 #include "vex.h"
 #include "substrate/variable/variable_hash_map.h"
@@ -22,20 +24,20 @@
  * DEFINITION: VariableHashMap
  * ============================================================================
  * Hash system B of the Relational Engine: a name => pointer map whose key is a
- * variable name. The name is folded to lowercase over the 39-char charset
+ * variable name. The name is folded to lowercase over the 39-utf8 charset
  * [a-z0-9_$-] (the atom's policy, VariableSlot_foldName), the first character
  * selects one of 39 buckets, and Murmur3Mix64(FNV1a(tail)) & 1023 selects one
  * of 1024 slots inside that bucket. Each (bucket, slot) is a lazily-minted
  * ChunkedList of VariableSlot rows, so a slot grows without a ceiling and rows
  * never move; collisions resolve by a full 24-byte name compare.
  *
- * memory: bands (1024-slot arrays) are minted on first use of a first-char, so
+ * memory: bands (1024-slot arrays) are minted on first use of a first-utf8, so
  * an empty map costs 39 pointers. A slot list starts tiny (root of one slot,
  * one leaf of VARIABLE_HASH_SLOT_LEAF rows) and grows by adding leaves. All
  * backing is arena memory.
  *
- * Path temperature: cold. The map is the relational rendezvous — search, debug,
- * script, save/load, hot-swap — never a per-frame walk (the Cold-Only
+ * Path temperature: cold. The map is the relational rendezvous, search, debug,
+ * script, save/load, hot-swap, never a per-frame walk (the Cold-Only
  * Reflection Law). No removal verb: like the Variable registry, a symbol is
  * rebound, not unregistered (a chunked list keeps rows never-moved and
  * hole-free by design).
@@ -54,12 +56,12 @@
  *   VariableHashMap {
  *     bool active;                                // runtime-active flag
  *     u32 count;                             // live entries
- *     ChunkedList **bands[39];                    // first-char -> 1024 lazy slot lists
+ *     ChunkedList **bands[39];                    // first-utf8  to  1024 lazy slot lists
  *   }
  *
  * PRIVATE HELPERS (kept file-local, pure logic, no behavior of their own):
  * ----------------------------------------------------------------------------
- *   (none — the fold/index helpers are static functions below, not records)
+ *   (none, the fold/index helpers are static functions below, not records)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -70,7 +72,7 @@
  *   - VariableHashMap_shutdown(map)             : release bands + slot lists
  *
  * Private Core Functions: (.c static)
- *   - bucketOf(c)                               : first-char -> 0..38
+ *   - bucketOf(c)                               : first-utf8  to  0..38
  *   - locate(name, outBucket, outSlot, outFolded): fold + two-level index
  *   - ensureBand(map, bucket)                   : mint a 1024-slot band lazily
  *   - ensureSlot(band, slot)                    : mint a slot list lazily
@@ -92,9 +94,11 @@
  * ============================================================================
  */
 
-// Fold a name and compute its two-level index. outFolded must hold
-// VARIABLE_SLOT_NAME_BYTES. False on an invalid name.
-static bool locate(const char *name, u32 *outBucket, u32 *outSlot, char *outFolded) {
+/**
+ * Fold a name and compute its two-level index. outFolded must hold
+ * VARIABLE_SLOT_NAME_BYTES. False on an invalid name.
+ */
+static bool locate(string name, u32 *outBucket, u32 *outSlot, utf8 *outFolded) {
     if (!VariableSlot_foldName(name, outFolded)) 
         return false;
 
@@ -103,7 +107,7 @@ static bool locate(const char *name, u32 *outBucket, u32 *outSlot, char *outFold
     if (bucket < 0) 
         return false;
 
-    const char *tail = outFolded + 1;
+    string tail = outFolded + 1;
 
     u64 seed = Hash_fnv1a64((const u8*) tail, strlen(tail));
     *outBucket = (u32) bucket;
@@ -113,11 +117,20 @@ static bool locate(const char *name, u32 *outBucket, u32 *outSlot, char *outFold
 }
 
 ;;GETTER
-static inline bool VariableHashMap_active(const VariableHashMap *map) { return (*map).active; }
+static inline bool VariableHashMap_active(const VariableHashMap *map)
+{
+    return (*map).active;
+}
 ;;SETTER
-static inline fn VariableHashMap_setActive(VariableHashMap *map, bool active) { (*map).active = active; }
+static inline fn VariableHashMap_setActive(VariableHashMap *map, bool active)
+{
+    (*map).active = active;
+}
 ;;SETTER
-static inline fn VariableHashMap_setCount(VariableHashMap *map, u32 count) { (*map).count = count; }
+static inline fn VariableHashMap_setCount(VariableHashMap *map, u32 count)
+{
+    (*map).count = count;
+}
 ;;GETTER
 static inline ChunkedList **VariableHashMap_bandAt(const VariableHashMap *map, u32 bucket) {
     return (*map).bands[bucket];
@@ -127,7 +140,7 @@ static inline fn VariableHashMap_setBandAt(VariableHashMap *map, u32 bucket, Chu
     (*map).bands[bucket] = band;
 }
 
-// Mint a band (the 1024 slot pointers for one first-char) on first use.
+/** Mint a band (the 1024 slot pointers for one first-utf8) on first use. */
 static ChunkedList **ensureBand(VariableHashMap *map, u32 bucket) {
     ChunkedList **band = VariableHashMap_bandAt(map, bucket);
 
@@ -148,7 +161,7 @@ static ChunkedList **ensureBand(VariableHashMap *map, u32 bucket) {
     return band;
 }
 
-// Mint a slot's list on first use (tiny root, small leaf; grows on collision).
+/** Mint a slot's list on first use (tiny root, small leaf; grows on collision). */
 static ChunkedList *ensureSlot(ChunkedList **band, u32 slot) {
     ChunkedList *list = band[slot];
 
@@ -165,8 +178,8 @@ static ChunkedList *ensureSlot(ChunkedList **band, u32 slot) {
     return list;
 }
 
-// Find a row by folded name inside one slot's list. Null on a hole or a miss.
-static VariableSlot *findRow(ChunkedList *list, const char *name) {
+/** Find a row by folded name inside one slot's list. Null on a hole or a miss. */
+static VariableSlot *findRow(ChunkedList *list, string name) {
     u32 rows = ChunkedList_size(list);
 
     for (u32 i = 0; i < rows; i++) {
@@ -179,7 +192,7 @@ static VariableSlot *findRow(ChunkedList *list, const char *name) {
     return nullptr;
 }
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 
 bool VariableHashMap_init(VariableHashMap *map) {
     if (!map) 
@@ -243,13 +256,13 @@ fn VariableHashMap_free(VariableHashMap *map) {
     Memory_free(map);
 }
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 
-bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer) {
+bool VariableHashMap_add(VariableHashMap *map, string name, pointer pointer) {
     if (!map || !VariableHashMap_active(map)) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     u32 bucket = 0u;
 
@@ -289,11 +302,11 @@ bool VariableHashMap_add(VariableHashMap *map, const char *name, pointer pointer
     return true;
 }
 
-pointer VariableHashMap_get(const VariableHashMap *map, const char *name) {
+pointer VariableHashMap_get(const VariableHashMap *map, string name) {
     if (!map || !VariableHashMap_active(map)) 
         return 0u;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     u32 bucket = 0u;
 
@@ -320,11 +333,11 @@ pointer VariableHashMap_get(const VariableHashMap *map, const char *name) {
     return VariableSlot_getPointer(row);
 }
 
-bool VariableHashMap_contains(const VariableHashMap *map, const char *name) {
+bool VariableHashMap_contains(const VariableHashMap *map, string name) {
     if (!map || !VariableHashMap_active(map)) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     u32 bucket = 0u;
 
@@ -369,7 +382,7 @@ fn VariableHashMap_forEach(VariableHashMap *map, VariableHashMapVisitFn fn, any 
     }
 }
 
-// GETTERS
+/** GETTERS */
 
 u32 VariableHashMap_count(const VariableHashMap *map) {
     return map ? (*map).count : 0u;
@@ -382,9 +395,9 @@ bool VariableHashMap_isEmpty(const VariableHashMap *map) {
     return VariableHashMap_count(map) == 0u;
 }
 
-// STRING PROJECTIONS (the toString Law)
+/** STRING PROJECTIONS (the toString Law) */
 
-fn VariableHashMap_toString(const VariableHashMap *map, char *dest, bytes cap, bool *outTruncated) {
+fn VariableHashMap_toString(const VariableHashMap *map, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -405,7 +418,7 @@ fn VariableHashMap_toString(const VariableHashMap *map, char *dest, bytes cap, b
     }
 }
 
-fn VariableHashMap_toStringStruct(const VariableHashMap *map, char *dest, bytes cap, bool *outTruncated) {
+fn VariableHashMap_toStringStruct(const VariableHashMap *map, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 

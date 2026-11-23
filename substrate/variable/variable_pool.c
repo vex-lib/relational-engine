@@ -14,7 +14,7 @@
  * ============================================================================
  * Process-wide interned string pool: each distinct name is stated once in a
  * fixed 32-byte slot ([ptr][str1][str2][str3]) and shared by pointer, never
- * copied — name identity is inherently global, so two arenas interning the
+ * copied, name identity is inherently global, so two arenas interning the
  * same name must share rather than duplicate. The static table is arena-
  * backed: zero-initialized statics fail closed pre-init (magic gate), and
  * teardown composes with the owning arena. Lookup runs binary search over a
@@ -28,7 +28,7 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * MODULE: StringPoolService (substrate/variable/variable_pool.c — static intern table)
+ * MODULE: StringPoolService (substrate/variable/variable_pool.c, static intern table)
  * ============================================================================
  * Process-wide interned string pool: names stated once in fixed 32-byte
  * slots ([ptr][str1][str2][str3]), shared by pointer, never copied. Static
@@ -44,7 +44,7 @@
  * ----------------------------------------------------------------------------
  *   StringSlot {
  *     u64 self;  // intrusive validity: must equal own address
- *     char name[24];  // NUL-terminated, zero-padded, exact Bytes
+ *     utf8 name[24];  // NUL-terminated, zero-padded, exact Bytes
  *   }
  *
  * PRIVATE HELPERS (kept file-local pure-data only, each with full fields):
@@ -61,7 +61,7 @@
  * SLOT RECORD (owned by this service, behaviorless, see variable_pool.h):
  * ----------------------------------------------------------------------------
  *   StringSlot self;    // u64 + intrusive validity, equals own address
- *   StringSlot name;    // char[24] + NUL-terminated Bytes, zero-padded
+ *   StringSlot name;    // utf8[24] + NUL-terminated Bytes, zero-padded
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Constructors:
@@ -82,22 +82,15 @@
 
 #define STRING_POOL_MAGIC 0x504F4F4Cu
 
-typedef struct StringPoolState {
-    u32 magic;     // STRING_POOL_MAGIC when live (fail-closed gate)
-    MemoryArena *arena; // backing arena (borrowed; teardown frees all)
-    StringSlot *slots;  // slot array (append-only; may move on grow)
-    u32 *order;    // sorted slot indices
-    u32 count;     // live slots
-    u32 capacity;  // allocated slots
-} StringPoolState;
-
 static StringPoolState s_pool;
 static SpinLock s_lock = SPIN_LOCK_INIT;
 
-// Binary search over the sorted index (Java Arrays.binarySearch courtesy:
-// found -> slot index; absent -> -(insertion point) - 1). Compares full
-// zero-padded 24-byte names through one indirection per probe. Lock held.
-static i32 search_order(const char key[24]) {
+/**
+ * Binary search over the sorted index (Java Arrays.binarySearch courtesy:
+ * found  to  slot index; absent  to  -(insertion point) - 1). Compares full
+ * zero-padded 24-byte names through one indirection per probe. Lock held.
+ */
+static i32 search_order(const utf8 key[24]) {
     u32 *order = s_pool.order;
 
     StringSlot *slots = s_pool.slots;
@@ -124,8 +117,10 @@ static i32 search_order(const char key[24]) {
     return -lo - 1;
 }
 
-// f64s the slot + index arrays (cold path only, lock held). Copies slots
-// verbatim then rewrites every self link — absolute addresses change on move.
+/**
+ * f64s the slot + index arrays (cold path only, lock held). Copies slots
+ * verbatim then rewrites every self link, absolute addresses change on move.
+ */
 static bool grow() {
     u32 cap = s_pool.capacity * 2;
 
@@ -233,8 +228,8 @@ fn StringPool_shutdown() {
     SpinLock_unlock(&s_lock);
 }
 
-;;INTENTION("23-char names: fixed 32B slots (24B name + 8B self) keep the pool indexable with O(1) validity checks; longer names rejected cold — class/widget/probe names are short by convention and silent truncation would corrupt identity")
-i32 StringPool_intern(const char *str) {
+;;INTENTION("23-utf8 names: fixed 32B slots (24B name + 8B self) keep the pool indexable with O(1) validity checks; longer names rejected cold, class/widget/probe names are short by convention and silent truncation would corrupt identity")
+i32 StringPool_intern(string str) {
     if (!str || str[0] == '\0') 
         return -1;
 
@@ -243,7 +238,7 @@ i32 StringPool_intern(const char *str) {
     if (len > STRING_POOL_NAME_MAX) 
         return -1;
 
-    char key[24];
+    utf8 key[24];
 
     memset(key, 0, sizeof(key));
 
@@ -304,7 +299,7 @@ i32 StringPool_intern(const char *str) {
     return (i32) idx;
 }
 
-i32 StringPool_find(const char *str) {
+i32 StringPool_find(string str) {
     if (!str || str[0] == '\0') 
         return -1;
 
@@ -313,7 +308,7 @@ i32 StringPool_find(const char *str) {
     if (len > STRING_POOL_NAME_MAX) 
         return -1;
 
-    char key[24];
+    utf8 key[24];
 
     memset(key, 0, sizeof(key));
 
@@ -347,7 +342,7 @@ const StringSlot *StringPool_slot(u32 index) {
     return out;
 }
 
-const char *StringPool_name(u32 index) {
+string StringPool_name(u32 index) {
     const StringSlot *slot = StringPool_slot(index);
 
     return slot ? (*slot).name : nullptr;
@@ -364,7 +359,10 @@ u32 StringPool_count() {
 }
 
 ;;GETTER
-static inline u64 StringSlot_self(const StringSlot *slot) { return (*slot).self; }
+static inline u64 StringSlot_self(const StringSlot *slot)
+{
+    return (*slot).self;
+}
 
 bool StringPool_isSlot(const_any ptr) {
     if (!ptr) 

@@ -1,8 +1,10 @@
-// relational/cell.c — the 32-byte identity cell.
-//
-// Allocate an arena block whose 32-byte MemoryHeader is the identity; the
-// payload is one Cell (value + pad). No behavior beyond the header reads and the
-// value slot.
+/**
+ * relational/cell.c, the 32-byte identity cell.
+ *
+ * Allocate an arena block whose 32-byte MemoryHeader is the identity; the
+ * payload is one Cell (value + pad). No behavior beyond the header reads and the
+ * value slot.
+ */
 
 #include "vex.h"
 #include "substrate/relational/cell.h"
@@ -21,14 +23,14 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
  * DEFINITION: Cell
  * ============================================================================
  * The reflection engine's identity atom: one 48-byte arena block made of the
- * standard 32-byte MemoryHeader (id, hash, length, pointer — the identity) plus
+ * standard 32-byte MemoryHeader (id, hash, length, pointer, the identity) plus
  * a 16-byte payload (a value/pointer slot and padding). A cell is therefore
  * self-describing: Cell_check(cell, typeId) answers its kind straight from the
  * header, with no side table and no extra Bytes.
  *
  * Lifetime: arena-allocated (TYPE from the caller's typeId) and released with
  * Cell_free, or wholesale at arena teardown. The identity typeId is the
- * caller's — a cell is a shape, not a fixed class.
+ * caller's, a cell is a shape, not a fixed class.
  *
  * Path temperature: cold. Cells are read by the reflective rendezvous, never on
  * a frame (the Cold-Only Reflection Law). All getters are null-safe.
@@ -42,7 +44,7 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
  * ============================================================================
  * the identity cell (32-byte MemoryHeader identity + a 16-byte value slot).
  *
- * STRUCT FIELDS (Mirroring relational/cell.h — the payload; the identity is the
+ * STRUCT FIELDS (Mirroring relational/cell.h, the payload; the identity is the
  * block header before it):
  * ----------------------------------------------------------------------------
  *   Cell {
@@ -76,12 +78,18 @@ _Static_assert(CELL_BLOCK_BYTES == sizeof(MemoryHeader) + CELL_PAYLOAD_BYTES,
  * ============================================================================
  */
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 
 ;;SETTER
-static inline fn Cell_setPad(Cell *cell, u64 pad) { (*cell).pad = pad; }
+static inline fn Cell_setPad(Cell *cell, u64 pad)
+{
+    (*cell).pad = pad;
+}
 ;;GETTER
-static inline u64 Cell_pad(const Cell *cell) { return (*cell).pad; }
+static inline u64 Cell_pad(const Cell *cell)
+{
+    return (*cell).pad;
+}
 
 Cell *Cell_2(u64 typeId, pointer value) {
     Cell *cell = Memory_alloc(typeId, Re_arena(), CELL_PAYLOAD_BYTES);
@@ -109,7 +117,7 @@ fn Cell_free(Cell *cell) {
         Memory_free(cell);
 }
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 
 u64 Cell_typeId(const Cell *cell) {
     if (!cell) 
@@ -125,7 +133,7 @@ bool Cell_check(const Cell *cell, u64 typeId) {
     return Memory_type((any) cell) == typeId;
 }
 
-// SETTERS
+/** SETTERS */
 
 fn Cell_setValue(Cell *cell, pointer value) {
     if (!cell) 
@@ -134,7 +142,7 @@ fn Cell_setValue(Cell *cell, pointer value) {
     (*cell).value = value;
 }
 
-// GETTERS
+/** GETTERS */
 
 ;;GETTER
 pointer Cell_getValue(const Cell *cell) {
@@ -144,9 +152,9 @@ pointer Cell_getValue(const Cell *cell) {
     return (*cell).value;
 }
 
-// STRING PROJECTIONS (the toString Law)
+/** STRING PROJECTIONS (the toString Law) */
 
-fn Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
+fn Cell_toString(const Cell *cell, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -168,7 +176,7 @@ fn Cell_toString(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
     }
 }
 
-fn Cell_toStringStruct(const Cell *cell, char *dest, bytes cap, bool *outTruncated) {
+fn Cell_toStringStruct(const Cell *cell, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 

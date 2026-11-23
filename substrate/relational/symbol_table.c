@@ -1,8 +1,10 @@
-// substrate/relational/symbol_table.c — SymbolTable registry port (Legacy: substrate/variable/SymbolTable.java).
-//
-// Rows reference shared pool slots by index (never inline names); lookup
-// goes pool-first, then one sparse hop (slot -> var id). Typed queries
-// filter rows by classId — one structure, no segregated lists.
+/**
+ * substrate/relational/symbol_table.c, SymbolTable registry port (Legacy: substrate/variable/SymbolTable.java).
+ *
+ * Rows reference shared pool slots by index (never inline names); lookup
+ * goes pool-first, then one sparse hop (slot  to  var id). Typed queries
+ * filter rows by classId, one structure, no segregated lists.
+ */
 
 #include "vex.h"
 #include "substrate/relational/symbol_table.h"
@@ -21,8 +23,8 @@
  * DEFINITION: SymbolTable
  * ============================================================================
  * The relational symbol registry: dense SymbolRow records (varId == index,
- * append-only) reference shared StringPool slots by index — never inline
- * names — and a sparse bySlot hop maps pool slot back to varId. Names are
+ * append-only) reference shared StringPool slots by index, never inline
+ * names, and a sparse bySlot hop maps pool slot back to varId. Names are
  * validated cold (ASCII alnum/underscore/dot, folded lowercase, max
  * STRING_POOL_NAME_MAX) before interning; typed queries filter rows by
  * classId over one structure with no segregated lists. Rows and the bySlot
@@ -45,7 +47,7 @@
  *     SymbolRow *rows; // dense rows, varId == index (append-only)
  *     u32 count; // live rows
  *     u32 capacity; // allocated rows
- *     i32 *bySlot; // pool slot -> varId, -1 empty (sparse, grown)
+ *     i32 *bySlot; // pool slot  to  varId, -1 empty (sparse, grown)
  *     u32 bySlotCap; // bySlot slots allocated
  *   }
  *
@@ -79,10 +81,12 @@
  * ============================================================================
  */
 
-// Validate + fold to lowercase for pool space. Dots ride along for dotted
-// paths (character.position.x); everything outside ASCII alnum/underscore/
-// dot — including multibyte UTF-8/16 garbage — is rejected cold.
-static bool clean_name(const char *name, char *lowered) {
+/**
+ * Validate + fold to lowercase for pool space. Dots ride along for dotted
+ * paths (character.position.x); everything outside ASCII alnum/underscore/
+ * dot, including multibyte UTF-8/16 garbage, is rejected cold.
+ */
+static bool clean_name(string name, utf8 *lowered) {
     if (!name || name[0] == '\0') 
         return false;
 
@@ -99,7 +103,7 @@ static bool clean_name(const char *name, char *lowered) {
         if (!ok) 
             return false;
 
-        lowered[i] = (c >= 'A' && c <= 'Z') ? (char) (c + 32) : (char) c;
+        lowered[i] = (c >= 'A' && c <= 'Z') ? (utf8) (c + 32) : (utf8) c;
     }
 
     lowered[len] = '\0';
@@ -108,37 +112,85 @@ static bool clean_name(const char *name, char *lowered) {
 }
 
 ;;GETTER
-static inline bool SymbolTable_active(const SymbolTable *v) { return (*v).active; }
+static inline bool SymbolTable_active(const SymbolTable *v)
+{
+    return (*v).active;
+}
 ;;SETTER
-static inline fn SymbolTable_setActive(SymbolTable *v, bool active) { (*v).active = active; }
+static inline fn SymbolTable_setActive(SymbolTable *v, bool active)
+{
+    (*v).active = active;
+}
 ;;GETTER
-static inline SymbolRow *SymbolTable_rows(const SymbolTable *v) { return (*v).rows; }
+static inline SymbolRow *SymbolTable_rows(const SymbolTable *v)
+{
+    return (*v).rows;
+}
 ;;SETTER
-static inline fn SymbolTable_setRows(SymbolTable *v, SymbolRow *rows) { (*v).rows = rows; }
+static inline fn SymbolTable_setRows(SymbolTable *v, SymbolRow *rows)
+{
+    (*v).rows = rows;
+}
 ;;GETTER
-static inline u32 SymbolTable_count(const SymbolTable *v) { return (*v).count; }
+static inline u32 SymbolTable_count(const SymbolTable *v)
+{
+    return (*v).count;
+}
 ;;SETTER
-static inline fn SymbolTable_setCount(SymbolTable *v, u32 count) { (*v).count = count; }
+static inline fn SymbolTable_setCount(SymbolTable *v, u32 count)
+{
+    (*v).count = count;
+}
 ;;GETTER
-static inline u32 SymbolTable_capacity(const SymbolTable *v) { return (*v).capacity; }
+static inline u32 SymbolTable_capacity(const SymbolTable *v)
+{
+    return (*v).capacity;
+}
 ;;SETTER
-static inline fn SymbolTable_setCapacity(SymbolTable *v, u32 cap) { (*v).capacity = cap; }
+static inline fn SymbolTable_setCapacity(SymbolTable *v, u32 cap)
+{
+    (*v).capacity = cap;
+}
 ;;GETTER
-static inline i32 *SymbolTable_bySlot(const SymbolTable *v) { return (*v).bySlot; }
+static inline i32 *SymbolTable_bySlot(const SymbolTable *v)
+{
+    return (*v).bySlot;
+}
 ;;SETTER
-static inline fn SymbolTable_setBySlot(SymbolTable *v, i32 *bySlot) { (*v).bySlot = bySlot; }
+static inline fn SymbolTable_setBySlot(SymbolTable *v, i32 *bySlot)
+{
+    (*v).bySlot = bySlot;
+}
 ;;GETTER
-static inline u32 SymbolTable_bySlotCap(const SymbolTable *v) { return (*v).bySlotCap; }
+static inline u32 SymbolTable_bySlotCap(const SymbolTable *v)
+{
+    return (*v).bySlotCap;
+}
 ;;SETTER
-static inline fn SymbolTable_setBySlotCap(SymbolTable *v, u32 cap) { (*v).bySlotCap = cap; }
+static inline fn SymbolTable_setBySlotCap(SymbolTable *v, u32 cap)
+{
+    (*v).bySlotCap = cap;
+}
 ;;GETTER
-static inline pointer SymbolRow_pointer(const SymbolRow *row) { return (*row).pointer; }
+static inline pointer SymbolRow_pointer(const SymbolRow *row)
+{
+    return (*row).pointer;
+}
 ;;SETTER
-static inline fn SymbolRow_setPointer(SymbolRow *row, pointer ptr) { (*row).pointer = ptr; }
+static inline fn SymbolRow_setPointer(SymbolRow *row, pointer ptr)
+{
+    (*row).pointer = ptr;
+}
 ;;GETTER
-static inline u32 SymbolRow_classId(const SymbolRow *row) { return (*row).classId; }
+static inline u32 SymbolRow_classId(const SymbolRow *row)
+{
+    return (*row).classId;
+}
 ;;GETTER
-static inline i32 SymbolRow_slot(const SymbolRow *row) { return (*row).slot; }
+static inline i32 SymbolRow_slot(const SymbolRow *row)
+{
+    return (*row).slot;
+}
 
 static SymbolRow *row_at(SymbolTable *v, i32 varId) {
     if (!v || !SymbolTable_active(v) || !SymbolTable_rows(v) || varId < 0 || (u32) varId >= SymbolTable_count(v)) 
@@ -149,8 +201,10 @@ static SymbolRow *row_at(SymbolTable *v, i32 varId) {
     return &rows[varId];
 }
 
-// Pool slot -> var id through the sparse hop. -1 when unmapped (a pool slot
-// may exist globally without belonging to this scope).
+/**
+ * Pool slot  to  var id through the sparse hop. -1 when unmapped (a pool slot
+ * may exist globally without belonging to this scope).
+ */
 static i32 slot_var(SymbolTable *v, i32 slot) {
     if (slot < 0 || (u32) slot >= SymbolTable_bySlotCap(v)) 
         return -1;
@@ -242,31 +296,31 @@ fn SymbolTable_shutdown(SymbolTable *v) {
     SymbolTable_setActive(v, false);
 }
 
-i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer targetPointer) {
+i32 SymbolTable_instant(SymbolTable *v, string name, u32 classId, pointer targetPointer) {
     if (!v || !SymbolTable_active(v)) {
-        fprintf(stderr, "[variable] instant: inactive registry\n");
+        fprint(stderr, "[variable] instant: inactive registry");
 
         return -1;
     }
 
     if (!name || name[0] == '\0') {
-        fprintf(stderr, "[variable] instant: empty name rejected\n");
+        fprint(stderr, "[variable] instant: empty name rejected");
 
         return -1;
     }
 
-    char lowered[24];
+    utf8 lowered[24];
 
     bytes rawLen = strlen(name);
 
     if (rawLen > STRING_POOL_NAME_MAX) {
-        fprintf(stderr, "[variable] instant: name too long ('%.32s', max 23)\n", name);
+        fprint(stderr, "[variable] instant: name too long ('", name, "', max 23)");
 
         return -1;
     }
 
     if (!clean_name(name, lowered)) {
-        fprintf(stderr, "[variable] instant: illegal name ('%.32s'): ascii alnum, underscore, dot only\n", name);
+        fprint(stderr, "[variable] instant: illegal name ('", name, "'): ascii alnum, underscore, dot only");
 
         return -1;
     }
@@ -274,13 +328,13 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
     i32 slot = StringPool_find(lowered);
 
     if (slot >= 0 && slot_var(v, slot) >= 0) {
-        fprintf(stderr, "[variable] instant: name already registered ('%s')\n", lowered);
+        fprint(stderr, "[variable] instant: name already registered ('", lowered, "')");
 
         return -1;
     }
 
     if (!ensure_byslot(v, StringPool_count())) {
-        fprintf(stderr, "[variable] instant: out of memory ('%s')\n", lowered);
+        fprint(stderr, "[variable] instant: out of memory ('", lowered, "')");
 
         return -1;
     }
@@ -288,7 +342,7 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
     slot = StringPool_intern(lowered);
 
     if (slot < 0) {
-        fprintf(stderr, "[variable] instant: intern failed ('%s')\n", lowered);
+        fprint(stderr, "[variable] instant: intern failed ('", lowered, "')");
 
         return -1;
     }
@@ -301,7 +355,7 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
         SymbolRow *next = (SymbolRow*) Memory_realloc(SymbolTable_rows(v), newCap * sizeof(SymbolRow));
 
         if (!next) {
-            fprintf(stderr, "[variable] instant: out of memory ('%s')\n", lowered);
+            fprint(stderr, "[variable] instant: out of memory ('", lowered, "')");
 
             return -1;
         }
@@ -330,11 +384,11 @@ i32 SymbolTable_instant(SymbolTable *v, const char *name, u32 classId, pointer t
     return (i32) id;
 }
 
-i32 SymbolTable_getId(SymbolTable *v, const char *name) {
+i32 SymbolTable_getId(SymbolTable *v, string name) {
     if (!v || !SymbolTable_active(v) || !name) 
         return -1;
 
-    char lowered[24];
+    utf8 lowered[24];
 
     if (!clean_name(name, lowered)) 
         return -1;
@@ -347,25 +401,25 @@ i32 SymbolTable_getId(SymbolTable *v, const char *name) {
     return slot_var(v, slot);
 }
 
-bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName) {
+bool SymbolTable_rename(SymbolTable *v, string oldName, string newName) {
     if (!v || !SymbolTable_active(v)) {
-        fprintf(stderr, "[variable] rename: inactive registry\n");
+        fprint(stderr, "[variable] rename: inactive registry");
 
         return false;
     }
 
-    char oldLower[24];
+    utf8 oldLower[24];
 
-    char newLower[24];
+    utf8 newLower[24];
 
     if (!oldName || !clean_name(oldName, oldLower)) {
-        fprintf(stderr, "[variable] rename: bad old name\n");
+        fprint(stderr, "[variable] rename: bad old name");
 
         return false;
     }
 
     if (!newName || !clean_name(newName, newLower)) {
-        fprintf(stderr, "[variable] rename: bad new name\n");
+        fprint(stderr, "[variable] rename: bad new name");
 
         return false;
     }
@@ -375,7 +429,7 @@ bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName
     i32 id = oldSlot >= 0 ? slot_var(v, oldSlot) : -1;
 
     if (id < 0) {
-        fprintf(stderr, "[variable] rename: unknown name ('%s')\n", oldLower);
+        fprint(stderr, "[variable] rename: unknown name ('", oldLower, "')");
 
         return false;
     }
@@ -383,13 +437,13 @@ bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName
     i32 newSlot = StringPool_find(newLower);
 
     if (newSlot >= 0 && slot_var(v, newSlot) >= 0) {
-        fprintf(stderr, "[variable] rename: name already registered ('%s')\n", newLower);
+        fprint(stderr, "[variable] rename: name already registered ('", newLower, "')");
 
         return false;
     }
 
     if (!ensure_byslot(v, StringPool_count())) {
-        fprintf(stderr, "[variable] rename: out of memory ('%s')\n", newLower);
+        fprint(stderr, "[variable] rename: out of memory ('", newLower, "')");
 
         return false;
     }
@@ -397,7 +451,7 @@ bool SymbolTable_rename(SymbolTable *v, const char *oldName, const char *newName
     newSlot = StringPool_intern(newLower);
 
     if (newSlot < 0) {
-        fprintf(stderr, "[variable] rename: intern failed ('%s')\n", newLower);
+        fprint(stderr, "[variable] rename: intern failed ('", newLower, "')");
 
         return false;
     }
@@ -474,7 +528,7 @@ u32 SymbolTable_getClassId(SymbolTable *v, i32 varId) {
     return row ? SymbolRow_classId(row) : 0;
 }
 
-const char *SymbolTable_getName(const SymbolTable *v, i32 varId) {
+string SymbolTable_getName(const SymbolTable *v, i32 varId) {
     const SymbolRow *row = row_at((SymbolTable*) v, varId);
 
     if (!row) 

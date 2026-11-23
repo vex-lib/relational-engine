@@ -1,7 +1,9 @@
-// substrate/variable/variable_mini_map.c — the scoped name => pointer mini map.
-//
-// One bucket level: first folded char -> a lazily-minted ChunkedList of
-// VariableSlot rows. Cold path only.
+/**
+ * substrate/variable/variable_mini_map.c, the scoped name => pointer mini map.
+ *
+ * One bucket level: first folded utf8  to  a lazily-minted ChunkedList of
+ * VariableSlot rows. Cold path only.
+ */
 
 #include "vex.h"
 #include "substrate/variable/variable_mini_map.h"
@@ -21,7 +23,7 @@
  * The scoped sibling of VariableHashMap: the same first-character bucketing with
  * a single level, for names that belong to one owner (a class's fields or
  * methods). 39 buckets, each a lazily-minted ChunkedList of VariableSlot rows
- * with 16 rows per leaf — so an empty mini map is 39 pointers and a used one
+ * with 16 rows per leaf, so an empty mini map is 39 pointers and a used one
  * costs one small leaf per active first character. Names fold and validate
  * through the atom, dotted field paths included.
  *
@@ -45,7 +47,7 @@
  *   VariableMiniMap {
  *     bool active;      // runtime-active flag
  *     u32 count;   // live entries
- *     ChunkedList *buckets[39]; // first-char -> lazily minted slot list
+ *     ChunkedList *buckets[39]; // first-utf8  to  lazily minted slot list
  *   }
  *
  * PRIVATE HELPERS (kept file-local, pure logic, no behavior of their own): none.
@@ -78,8 +80,8 @@
  * ============================================================================
  */
 
-// Find a row by folded name inside one bucket list. Null on a hole or a miss.
-static VariableSlot *findRow(ChunkedList *list, const char *name) {
+/** Find a row by folded name inside one bucket list. Null on a hole or a miss. */
+static VariableSlot *findRow(ChunkedList *list, string name) {
     u32 rows = ChunkedList_size(list);
 
     for (u32 i = 0; i < rows; i++) {
@@ -93,17 +95,32 @@ static VariableSlot *findRow(ChunkedList *list, const char *name) {
 }
 
 ;;GETTER
-static inline bool VariableMiniMap_active(const VariableMiniMap *map) { return (*map).active; }
+static inline bool VariableMiniMap_active(const VariableMiniMap *map)
+{
+    return (*map).active;
+}
 ;;SETTER
-static inline fn VariableMiniMap_setActive(VariableMiniMap *map, bool active) { (*map).active = active; }
+static inline fn VariableMiniMap_setActive(VariableMiniMap *map, bool active)
+{
+    (*map).active = active;
+}
 ;;SETTER
-static inline fn VariableMiniMap_setCount(VariableMiniMap *map, u32 count) { (*map).count = count; }
+static inline fn VariableMiniMap_setCount(VariableMiniMap *map, u32 count)
+{
+    (*map).count = count;
+}
 ;;GETTER
-static inline ChunkedList *VariableMiniMap_bucketAt(const VariableMiniMap *map, u32 b) { return (*map).buckets[b]; }
+static inline ChunkedList *VariableMiniMap_bucketAt(const VariableMiniMap *map, u32 b)
+{
+    return (*map).buckets[b];
+}
 ;;SETTER
-static inline fn VariableMiniMap_setBucketAt(VariableMiniMap *map, u32 b, ChunkedList *l) { (*map).buckets[b] = l; }
+static inline fn VariableMiniMap_setBucketAt(VariableMiniMap *map, u32 b, ChunkedList *l)
+{
+    (*map).buckets[b] = l;
+}
 
-// Mint a bucket's list on first use: one root slot, 16-row leaves.
+/** Mint a bucket's list on first use: one root slot, 16-row leaves. */
 static ChunkedList *ensureBucket(VariableMiniMap *map, u32 bucket) {
     ChunkedList *list = VariableMiniMap_bucketAt(map, bucket);
 
@@ -120,7 +137,7 @@ static ChunkedList *ensureBucket(VariableMiniMap *map, u32 bucket) {
     return list;
 }
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 
 bool VariableMiniMap_init(VariableMiniMap *map) {
     if (!map) 
@@ -175,13 +192,13 @@ fn VariableMiniMap_free(VariableMiniMap *map) {
     Memory_free(map);
 }
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 
-bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer) {
+bool VariableMiniMap_add(VariableMiniMap *map, string name, pointer pointer) {
     if (!map || !VariableMiniMap_active(map)) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return false;
@@ -217,11 +234,11 @@ bool VariableMiniMap_add(VariableMiniMap *map, const char *name, pointer pointer
     return true;
 }
 
-pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
+pointer VariableMiniMap_get(const VariableMiniMap *map, string name) {
     if (!map || !VariableMiniMap_active(map)) 
         return 0u;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return 0u;
@@ -244,11 +261,11 @@ pointer VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
     return VariableSlot_getPointer(row);
 }
 
-bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name) {
+bool VariableMiniMap_contains(const VariableMiniMap *map, string name) {
     if (!map || !VariableMiniMap_active(map)) 
         return false;
 
-    char folded[VARIABLE_SLOT_NAME_BYTES];
+    utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return false;
@@ -284,7 +301,7 @@ fn VariableMiniMap_forEach(VariableMiniMap *map, VariableMiniMapVisitFn fn, any 
     }
 }
 
-// GETTERS
+/** GETTERS */
 
 u32 VariableMiniMap_count(const VariableMiniMap *map) {
     return map ? (*map).count : 0u;
@@ -297,9 +314,9 @@ bool VariableMiniMap_isEmpty(const VariableMiniMap *map) {
     return VariableMiniMap_count(map) == 0u;
 }
 
-// STRING PROJECTIONS (the toString Law)
+/** STRING PROJECTIONS (the toString Law) */
 
-fn VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
+fn VariableMiniMap_toString(const VariableMiniMap *map, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -320,7 +337,7 @@ fn VariableMiniMap_toString(const VariableMiniMap *map, char *dest, bytes cap, b
     }
 }
 
-fn VariableMiniMap_toStringStruct(const VariableMiniMap *map, char *dest, bytes cap, bool *outTruncated) {
+fn VariableMiniMap_toStringStruct(const VariableMiniMap *map, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
