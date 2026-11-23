@@ -3,46 +3,48 @@
 
 #include "vex.h"
 
-// re_type.h — the R2 type-id ALGEBRA (Relational Engine owner).
-//
-// The project-agnostic half of the One Type Registry Law: the 64-bit id
-// encoding, its masks, and the pure readers. This is the Relational Engine's
-// own *-type.h: it carries the shared algebra plus this project's class
-// registry. It must never include another project's registry (for example
-// Vexspoke's oop/type.h), or the registry that includes it would recurse.
-// The 16-byte block-header contract lives with the allocator in nio/mem.h
-// (MemoryHeader); the old vexspoke TypeHeader was dead and is removed.
-//
-//     0xF'PRPR'M'W1'W2'BE6C'CCCCCC
-// Bits: 4 + 8 + 4 + 4 + 4 + 16 + 24 = 64.
-//
-//      Field map:
-//      0xF PRPR M W1 W2 BE6C CCCCCC
-//        | |    | |  |  |    `-------- class      (24 bits, which struct, per-project)
-//        | |    | |  |  `------------- sugar      ("векс" / vex)
-//        | |    | |  `---------------- wrapper 2  (probable/future/choice)
-//        | |    | `------------------- wrapper 1  (proactive/reactive)
-//        | |    `--------------------- modifier   (global/locale/transient)
-//        | `-------------------------- project    (8 bits, owning repo, 256 projects)
-//        `--------------------------- form       (singleton/array/..., struct layouts)
-//
-// INTENTIONAL(vex): BE6C is the author's stylized Cyrillic "векс" / vex
-// signature, stamped as recognizable sugar in every id. It is a fixed format
-// marker, not a checksum or a stale-generation check. A [typeId:8]
-// [pointer-or-inline-value:8] slot therefore stays 16 Bytes.
-//
-// Uniform per-project numbering: every project numbers its classes starting at
-// 1; the project byte disambiguates identical local numbers across repos. Bare
-// ID_* constants carry no project byte; they are interpreted against the
-// registry that defines them. This header defines the Relational Engine's own
-// registry below. Cross-project dispatch ships full type ids
-// (PROJ_* | FORM_* | class), and Type_arch reads the byte back.
-//
-// The parent-chain resolver (Type_registerParents / Type_getParentClass /
-// Type_isA) is project-agnostic: a project registers its chain once (keyed by
-// its project byte) and this file walks it. Vexspoke's own legacy bare-id
-// chain is registered through Type_registerBareParents, so this algebra never
-// hardcodes a project's class numbers.
+/**
+ * re_type.h, the R2 type-id ALGEBRA (Relational Engine owner).
+ *
+ * The project-agnostic half of the One Type Registry Law: the 64-bit id
+ * encoding, its masks, and the pure readers. This is the Relational Engine's
+ * own *-type.h: it carries the shared algebra plus this project's class
+ * registry. It must never include another project's registry (for example
+ * Vexspoke's oop/type.h), or the registry that includes it would recurse.
+ * The 16-byte block-header contract lives with the allocator in nio/mem.h
+ * (MemoryHeader); the old vexspoke TypeHeader was dead and is removed.
+ *
+ * 0xF'PRPR'M'W1'W2'BE6C'CCCCCC
+ * Bits: 4 + 8 + 4 + 4 + 4 + 16 + 24 = 64.
+ *
+ * Field map:
+ * 0xF PRPR M W1 W2 BE6C CCCCCC
+ * | |    | |  |  |    `-------- class      (24 bits, which struct, per-project)
+ * | |    | |  |  `------------- sugar      ("векс" / vex)
+ * | |    | |  `---------------- wrapper 2  (probable/future/choice)
+ * | |    | `------------------- wrapper 1  (proactive/reactive)
+ * | |    `--------------------- modifier   (global/locale/transient)
+ * | `-------------------------- project    (8 bits, owning repo, 256 projects)
+ * `--------------------------- form       (singleton/array/..., struct layouts)
+ *
+ * BE6C is the author's stylized Cyrillic "векс" / vex signature, stamped as
+ * recognizable sugar in every id. It is a fixed format marker, not a checksum
+ * or a stale-generation check. A [typeId:8][pointer-or-inline-value:8] slot
+ * therefore stays 16 Bytes.
+ *
+ * Uniform per-project numbering: every project numbers its classes starting at
+ * 1; the project byte disambiguates identical local numbers across repos. Bare
+ * ID_* constants carry no project byte; they are interpreted against the
+ * registry that defines them. This header defines the Relational Engine's own
+ * registry below. Cross-project dispatch ships full type ids
+ * (PROJ_* | FORM_* | class), and Type_arch reads the byte back.
+ *
+ * The parent-chain resolver (Type_registerParents / Type_getParentClass /
+ * Type_isA) is project-agnostic: a project registers its chain once (keyed by
+ * its project byte) and this file walks it. Vexspoke's own legacy bare-id
+ * chain is registered through Type_registerBareParents, so this algebra never
+ * hardcodes a project's class numbers.
+ */
 
 #define MASK_FORM       0xF'00'0'0'0'0000'000000ULL
 #define MASK_PROJECT    0x0'FF'0'0'0'0000'000000ULL
@@ -50,7 +52,8 @@
 #define MASK_WRAPPER_1  0x0'00'0'F'0'0000'000000ULL
 #define MASK_WRAPPER_2  0x0'00'0'0'F'0000'000000ULL
 #define MASK_SUGAR      0x0'00'0'0'0'FFFF'000000ULL
-#define SUGAR_VEX       0x0'00'0'0'0'BE6C'000000ULL // INTENTIONAL(vex) "векс"
+;;INTENTION("BE6C is the author's stylized Cyrillic vex signature sugar, a fixed format marker, not a checksum")
+#define SUGAR_VEX       0x0'00'0'0'0'BE6C'000000ULL /** "векс" */
 #define MASK_CLASS      0x0'00'0'0'0'0000'FFFFFFULL
 
 #define FORM_SINGLETON          0x1'00'0'0'0'0000'000000ULL
@@ -63,8 +66,8 @@
 #define FORM_ARRAY_AOS          0x8'00'0'0'0'0000'000000ULL
 #define FORM_STRUCT_COEXISTENT  0x9'00'0'0'0'0000'000000ULL
 
-// Project byte: which repo owns the class. 256 projects fit the same stack.
-#define PROJ_GENERIC             0x0'00'0'0'0'0000'000000ULL  // zero lol
+/** Project byte: which repo owns the class. 256 projects fit the same stack. */
+#define PROJ_GENERIC             0x0'00'0'0'0'0000'000000ULL /** zero lol */
 #define PROJ_VEXSPOKE            0x0'01'0'0'0'0000'000000ULL
 #define PROJ_GRAPHVEX            0x0'02'0'0'0'0000'000000ULL
 #define PROJ_HOTCWAP             0x0'03'0'0'0'0000'000000ULL
@@ -86,8 +89,10 @@
 #define WRAP2_FUTURE            0x0'00'0'0'3'0000'000000ULL
 #define WRAP2_CHOICE            0x0'00'0'0'4'0000'000000ULL
 
-// Architecture layer owning an id (ARCH_* — one per project byte). Bare ids
-// report ARCH_VEXSPOKE, since bare numbers always mean vexspoke's class space.
+/**
+ * Architecture layer owning an id (ARCH_*, one per project byte). Bare ids
+ * report ARCH_VEXSPOKE, since bare numbers always mean vexspoke's class space.
+ */
 #define ARCH_VEXSPOKE  1u
 #define ARCH_HOTCWAP   2u
 #define ARCH_DARLING   3u
@@ -98,9 +103,7 @@
 
 #define Type_make(proj, form, classId) (((proj) & MASK_PROJECT) | ((form) & MASK_FORM) | SUGAR_VEX | ((classId) & MASK_CLASS))
 
-//
-// Shared scalar & plain-container class IDs (compatible with vexspoke's legacy table).
-//
+/** Shared scalar & plain-container class IDs (compatible with vexspoke's legacy table). */
 #define ID_INT          0x0001u
 #define ID_LONG         0x0002u
 #define ID_f64          0x0003u
@@ -167,14 +170,14 @@
 #define TYPE_POINT_SINGLETON   (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_POINT)
 #define TYPE_RECT_SINGLETON    (SUGAR_VEX | PROJ_VEXSPOKE | FORM_SINGLETON | ID_RECT)
 
-//
-// TYPES FOR RELATIONAL ENGINE SPECIFICALLY!!!
-//
-// Relational Engine class registry (project byte 0x07). The class numbers are
-// local to this project; the project byte disambiguates them from another
-// repository's registry. These replace the legacy Vexspoke ids that re used to
-// borrow for its own classes.
-//
+/**
+ * TYPES FOR RELATIONAL ENGINE SPECIFICALLY!!!
+ *
+ * Relational Engine class registry (project byte 0x07). The class numbers are
+ * local to this project; the project byte disambiguates them from another
+ * repository's registry. These replace the legacy Vexspoke ids that re used to
+ * borrow for its own classes.
+ */
 
 #define ID_VARIABLE_SLOT       13u
 #define ID_STRING_POOL         14u
@@ -185,6 +188,7 @@
 #define ID_VARIABLE_POOL_ORDER 19u
 #define ID_RELATIONAL_STRING    20u
 #define ID_SYMBOL_TABLE         21u
+#define ID_VARCHAR              22u
 
 #define TYPE_VARIABLE_SLOT              Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_VARIABLE_SLOT)
 #define TYPE_STRING_POOL                Type_make(PROJ_RELATIONAL_ENGINE, FORM_ARRAY,            ID_STRING_POOL)
@@ -195,6 +199,7 @@
 #define TYPE_VARIABLE_POOL_ORDER        Type_make(PROJ_RELATIONAL_ENGINE, FORM_ARRAY,            ID_VARIABLE_POOL_ORDER)
 #define TYPE_RELATIONAL_STRING          Type_make(PROJ_RELATIONAL_ENGINE, FORM_ARRAY,            ID_RELATIONAL_STRING)
 #define TYPE_SYMBOL_TABLE               Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_SYMBOL_TABLE)
+#define TYPE_VARCHAR                    Type_make(PROJ_RELATIONAL_ENGINE, FORM_STRUCT_SINGLETON, ID_VARCHAR)
 
 #define Type_class(typeId) ((typeId) & MASK_CLASS)
 
@@ -227,6 +232,19 @@ u32 Type_isVexspoke(u64 classId);
 u32 Type_isHotcwap(u64 classId);
 u32 Type_isDarling(u64 classId);
 u32 Type_isDarkbase(u64 classId);
+/**
+ * One registered project's parent chain.
+ *
+ * u64 proj           - owning project byte (0 = empty slot)
+ * const u32 *parents - parents[i] = parent class number of class i
+ * u32 count          - 0 row = root; rows past count = root
+ */
+typedef struct TypeParentsRow {
+    u64 proj;
+    const u32 *parents;
+    u32 count;
+} TypeParentsRow;
+
 bool Type_registerParents(u64 proj, const u32 *parents, u32 count);
 bool Type_registerBareParents(const u32 *parents, u32 count);
 u64 Type_getParentClass(u64 classId);

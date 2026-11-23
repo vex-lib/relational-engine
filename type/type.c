@@ -17,7 +17,7 @@
  *
  * Each project keeps its OWN class registry in its own *-type.h and grants its
  * parent chain once here, keyed by the project byte. Vexspoke's own legacy
- * bare-id chain is granted through Type_registerBareParents — so this file
+ * bare-id chain is granted through Type_registerBareParents, so this file
  * never hardcodes a project's class numbers and carries no project registry.
  * The slate is a growable arena-backed table (the Dynamic Scalability &
  * Anti-Hardcoding Law); an unregistered project resolves every class as a root.
@@ -62,41 +62,57 @@
  * ============================================================================
  */
 
-// One registered project's parent chain. Private slot record: pure data, no
-// Class_* behavior of its own (all behavior hangs off Type).
-typedef struct TypeParentsRow {
-    u64 proj;               // owning project byte; 0 = empty slot
-    const u32 *parents;     // parents[i] = parent class # of class # i
-    u32 count;              // 0 row = root; rows past count = root
-} TypeParentsRow;
+/** One registered project's parent chain (struct defined in type/re_type.h). */
 
 ;;GETTER
-static inline u64 TypeParentsRow_proj(const TypeParentsRow *row) { return (*row).proj; }
+static inline u64 TypeParentsRow_proj(const TypeParentsRow *row)
+{
+    return (*row).proj;
+}
 ;;SETTER
-static inline fn TypeParentsRow_setProj(TypeParentsRow *row, u64 proj) { (*row).proj = proj; }
+static inline fn TypeParentsRow_setProj(TypeParentsRow *row, u64 proj)
+{
+    (*row).proj = proj;
+}
 ;;GETTER
-static inline const u32 *TypeParentsRow_parents(const TypeParentsRow *row) { return (*row).parents; }
+static inline const u32 *TypeParentsRow_parents(const TypeParentsRow *row)
+{
+    return (*row).parents;
+}
 ;;SETTER
-static inline fn TypeParentsRow_setParents(TypeParentsRow *row, const u32 *parents) { (*row).parents = parents; }
+static inline fn TypeParentsRow_setParents(TypeParentsRow *row, const u32 *parents)
+{
+    (*row).parents = parents;
+}
 ;;GETTER
-static inline u32 TypeParentsRow_count(const TypeParentsRow *row) { return (*row).count; }
+static inline u32 TypeParentsRow_count(const TypeParentsRow *row)
+{
+    return (*row).count;
+}
 ;;SETTER
-static inline fn TypeParentsRow_setCount(TypeParentsRow *row, u32 count) { (*row).count = count; }
+static inline fn TypeParentsRow_setCount(TypeParentsRow *row, u32 count)
+{
+    (*row).count = count;
+}
 
-// Growable registration slate (the Dynamic Scalability & Anti-Hardcoding Law):
-// starts empty, f64s exponentially on demand, arena-backed. Rows beyond
-// g_typeTableCount are never scanned, so stale Bytes are harmless. Allocated
-// untyped (id 0): the slate is engine-internal and carries no project identity.
+/**
+ * Growable registration slate (the Dynamic Scalability & Anti-Hardcoding Law):
+ * starts empty, f64s exponentially on demand, arena-backed. Rows beyond
+ * g_typeTableCount are never scanned, so stale Bytes are harmless. Allocated
+ * untyped (id 0): the slate is engine-internal and carries no project identity.
+ */
 static TypeParentsRow *g_typeTables = nullptr;
 static bytes g_typeTableCount = 0;
 static bytes g_typeTableCap = 0;
 
-// Vexspoke's own bare-id / PROJ_VEXSPOKE legacy chain, granted once at startup.
+/** Vexspoke's own bare-id / PROJ_VEXSPOKE legacy chain, granted once at startup. */
 static const u32 *g_bareParents = nullptr;
 static u32 g_bareCount = 0;
 
-// Grow the slate to at least `needed` rows (doubling, cold start 8). On OOM
-// the slate is left untouched and registration fails; the caller drops.
+/**
+ * Grow the slate to at least `needed` rows (doubling, cold start 8). On OOM
+ * the slate is left untouched and registration fails; the caller drops.
+ */
 /** Grow the parent-chain registration table to at least needed rows. */
 static bool growSlate(bytes needed) {
     if (needed <= g_typeTableCap) 
@@ -134,10 +150,12 @@ static const TypeParentsRow *findTable(u64 proj) {
     return nullptr;
 }
 
-// A chain is valid when every listed parent is a class number inside the table
-// and no class loops back on itself. A self-parent (parents[i] == i) and a
-// mutual cycle both fail here, so Type_isA can never be handed a spinning
-// table (the Bounded Wait Law).
+/**
+ * A chain is valid when every listed parent is a class number inside the table
+ * and no class loops back on itself. A self-parent (parents[i] == i) and a
+ * mutual cycle both fail here, so Type_isA can never be handed a spinning
+ * table (the Bounded Wait Law).
+ */
 /** Validate parent indices and reject multi-class cycles before chain publication. */
 static bool chainIsValid(const u32 *parents, u32 count) {
     if (parents == nullptr) 
@@ -311,7 +329,7 @@ u32 Type_isA(u64 classId, u64 ancestorId) {
     return 0;
 }
 
-// Cold type predicates. The bit readers stay header-side as macros.
+/** Cold type predicates. The bit readers stay header-side as macros. */
 
 u32 Type_isStruct(u64 form) {
     return form == FORM_STRUCT_SINGLETON || form == FORM_STRUCT_ARRAY
