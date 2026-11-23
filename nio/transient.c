@@ -29,21 +29,7 @@
  * ============================================================================
  */
 
-#define ANTI_TRANSIENT_DEFAULT_SIZE (64 * 1024 * 1024) // 64 MB
-
-typedef struct TransientArena {
-    u8 *buffer;    // 32-aligned scratch base
-    u8 *raw;       // allocation to release (buffer is rounded forward)
-    bytes capacity;
-    bytes bumpOffset;
-    u32 generation;
-    SpinLock lock;
-    bool live;
-    // Same bounded loudness as the permanent arenas: report the first scratch
-    // rejection of an epoch, count the rest.
-    u64 exhaustionCount;
-    bool exhaustionReported;
-} TransientArena;
+#define ANTI_TRANSIENT_DEFAULT_SIZE (64 * 1024 * 1024) /** 64 MB */
 
 static TransientArena s_transient = {
     .buffer = nullptr,
@@ -55,7 +41,7 @@ static TransientArena s_transient = {
 };
 /** Initialize the transient bump arena once, rounding capacity up to the payload floor. */
 bool Memory_initTransient(bytes capacity) {
-    if (capacity > SIZE_MAX - (MEMORY_ALIGN_MASK + MEMORY_PAYLOAD_ALIGN)) 
+    if (capacity > SIZE_MAX - MEMORY_PAGE_SIZE)
         return false;
 
     SpinLock_lock(&s_transient.lock);
@@ -71,7 +57,11 @@ bool Memory_initTransient(bytes capacity) {
 
     bytes aligned_cap = (capacity + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
 
-    u8 *raw = (u8*) Memory_systemAlloc(aligned_cap + MEMORY_PAYLOAD_ALIGN);
+    bytes pages = (aligned_cap + MEMORY_PAGE_SIZE - 1u) >> MEMORY_PAGE_SHIFT;
+
+    PageMeta *pm = MemoryPool_allocPages(MemoryPool_default(), nullptr, pages, MEMORY_PAGE_SPAN_HEAD, 0);
+
+    u8 *raw = MemoryPool_pageBase(pm);
 
     if (!raw) {
         SpinLock_unlock(&s_transient.lock);

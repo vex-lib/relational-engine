@@ -1,7 +1,6 @@
 #include "vex.h"
 #include "nio/mem.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 ;;DEFINITION
@@ -9,11 +8,12 @@
  * ============================================================================
  * DEFINITION: ForeignMemory
  * ============================================================================
- * The master allocator's public ownership layer. Backing storage is carved by
+ * Tier 3 of the relational memory architecture (Pool  to  Arena  to  any).
+ * Growable OS page chunks are owned by pool.c; logical arenas are owned by
  * arena.c; transient scratch is owned by transient.c; this file owns the
- * process-wide Memory_* operations and the single libc backing seam. Every
- * payload carries the 32-byte MemoryHeader and is validated by the shared
- * header hash before it is read, freed, or routed.
+ * process-wide Memory_* VarHandle operations. Every payload carries the
+ * 32-byte MemoryHeader and is validated by the shared header hash before it is
+ * read, freed, or routed.
  * ============================================================================
  */
 
@@ -22,29 +22,11 @@
  * ============================================================================
  * CLASS: ForeignMemory (nio/mem)
  * ============================================================================
- * Master allocation API: default-arena allocation, reallocation, free routing,
- * metadata reads, and lifetime classification. The default arena itself and
- * secondary arenas live in arena.c; scratch allocations live in transient.c.
+ * VarHandle allocation API: allocation, reallocation, free routing, metadata
+ * reads, and lifetime classification. The OS page pool lives in pool.c;
+ * arenas live in arena.c; scratch allocations live in transient.c.
  * ============================================================================
  */
-
-// The only libc allocation calls in the ecosystem: arena.c and transient.c use
-// this seam, never malloc/calloc/realloc/free directly.
-any Memory_systemAlloc(bytes size) {
-    return malloc((bytes) size);
-}
-
-any Memory_systemCalloc(bytes count, bytes size) {
-    return calloc((bytes) count, (bytes) size);
-}
-
-any Memory_systemRealloc(any ptr, bytes size) {
-    return realloc(ptr, (bytes) size);
-}
-
-fn Memory_systemFree(any ptr) {
-    free(ptr);
-}
 
 /** Return Relational Engine's own arena. */
 MemoryArena *Re_arena() {
@@ -93,8 +75,18 @@ fn Memory_free(any userPtr) {
     if (!userPtr) 
         return;
 
+    if (userPtr == FREED) {
+        THROW("memory: double free on FREED sentinel %p", userPtr);
+        return;
+    }
+
     if (Transient_contains(userPtr)) 
         return;
+
+    if (Memory_isFreed(userPtr)) {
+        THROW("memory: double free at %p", userPtr);
+        return;
+    }
 
     if (!Memory_safeHeader(userPtr)) 
         return;
@@ -107,17 +99,12 @@ fn Memory_free(any userPtr) {
     MemoryArena_free(a, userPtr);
 }
 
-;;GETTER
-static inline u64 MemoryHeader_length(const MemoryHeader *h) { return (*h).length; }
-;;GETTER
-static inline u64 MemoryHeader_typeId(const MemoryHeader *h) { return (*h).typeId; }
-
 /** Return a validated block's payload length, or zero when the pointer is rejected. */
 bytes Memory_length(any userPtr) {
     const MemoryHeader *h = Memory_safeHeader(userPtr);
 
     if (h) 
-        return (bytes) MemoryHeader_length(h);
+        return MemoryHeader_length(h);
 
     return 0;
 }
