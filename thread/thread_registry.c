@@ -1,14 +1,16 @@
-// thread/registry.c — thread identity & opaque tags (Legacy: thread/ThreadRegistry.java port).
-//
-// The table is the legacy design verbatim: 256 atomic slots keyed by OS
-// thread id, linear probing with CAS on empty slots. A slot holding the
-// caller's id means "already registered here". Ids come from pthread_self(),
-// which is unique per live thread in this process — the C stand-in for the
-// JVM's Thread.threadId().
-//
-// A tag rides beside the identity table, one u32 per index. It is written
-// once by the owning thread and read by anyone; plain atomics keep it simple.
-// The tag's meaning is policy and belongs to the behavior owner, never here.
+/**
+ * thread/registry.c, thread identity & opaque tags (Legacy: thread/ThreadRegistry.java port).
+ *
+ * The table is the legacy design verbatim: 256 atomic slots keyed by OS
+ * thread id, linear probing with CAS on empty slots. A slot holding the
+ * caller's id means "already registered here". Ids come from pthread_self(),
+ * which is unique per live thread in this process, the C stand-in for the
+ * JVM's Thread.threadId().
+ *
+ * A tag rides beside the identity table, one u32 per index. It is written
+ * once by the owning thread and read by anyone; plain atomics keep it simple.
+ * The tag's meaning is policy and belongs to the behavior owner, never here.
+ */
 
 #include "vex.h"
 #include "thread.h"
@@ -38,7 +40,7 @@
  * ============================================================================
  * thread identity & opaque tags (Legacy: thread/ThreadRegistry.java).
  *
- * STRUCT FIELDS: none — procedural (operates on thread registry table (dense index + tags))
+ * STRUCT FIELDS: none, procedural (operates on thread registry table (dense index + tags))
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -52,7 +54,7 @@
  */
 
 
-static _Atomic u64 s_table[THREAD_REGISTRY_DEFAULT_SIZE]; // 0 = empty slot
+static _Atomic u64 s_table[THREAD_REGISTRY_DEFAULT_SIZE]; /** 0 = empty slot */
 static _Atomic u32 s_tags[THREAD_REGISTRY_DEFAULT_SIZE];
 
 i32 ThreadRegistry_index() {
