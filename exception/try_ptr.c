@@ -9,7 +9,7 @@
  * The pointer value-or-error return, sibling to TryValue. TryPtr_2 builds the
  * pair; TryPtr_ok and TryPtr_error are the two shorthands. A by-value POD, it
  * lives on the stack, returns in registers, and is never freed. It is used where
- * nullptr cannot carry the answer on its own — a nullable field, or a failure
+ * nullptr cannot carry the answer on its own, a nullable field, or a failure
  * whose reason must reach the caller. Setters/getters are complete and null-safe
  * per the Symmetric Getter/Setter Completeness Law; both string projections are
  * bounded and truncation-flagged per the toString Law.
@@ -52,7 +52,7 @@
  * ============================================================================
  */
 
-// Constructs a result containing the pointer payload and status code.
+/** Constructs a result containing the pointer payload and status code. */
 TryPtr TryPtr_2(any value, TryCode code) {
     TryPtr self;
 
@@ -63,22 +63,28 @@ TryPtr TryPtr_2(any value, TryCode code) {
     return self;
 }
 
-// Constructs a successful result carrying value.
+/** Constructs a successful result carrying value. */
 TryPtr TryPtr_ok(any value) {
     return TryPtr_2(value, TRY_OK);
 }
 
-// Constructs an error result carrying nullptr and code.
+/** Constructs an error result carrying nullptr and code. */
 TryPtr TryPtr_error(TryCode code) {
     return TryPtr_2(nullptr, code);
 }
 
 ;;GETTER
-static inline any TryPtr_value(const TryPtr *self) { return (*self).value; }
+static inline any TryPtr_value(const TryPtr *self)
+{
+    return (*self).value;
+}
 ;;GETTER
-static inline TryCode TryPtr_code(const TryPtr *self) { return (*self).code; }
+static inline TryCode TryPtr_code(const TryPtr *self)
+{
+    return (*self).code;
+}
 
-// Returns the stored pointer, or nullptr when self is nullptr.
+/** Returns the stored pointer, or nullptr when self is nullptr. */
 any TryPtr_getValue(const TryPtr *self) {
     if (!self) 
         return nullptr;
@@ -86,7 +92,7 @@ any TryPtr_getValue(const TryPtr *self) {
     return TryPtr_value(self);
 }
 
-// Replaces the pointer payload when self is non-null.
+/** Replaces the pointer payload when self is non-null. */
 fn TryPtr_setValue(TryPtr *self, any value) {
     if (!self) 
         return;
@@ -94,7 +100,7 @@ fn TryPtr_setValue(TryPtr *self, any value) {
     (*self).value = value;
 }
 
-// Returns the stored code, or TRY_NULL_ARG when self is nullptr.
+/** Returns the stored code, or TRY_NULL_ARG when self is nullptr. */
 TryCode TryPtr_getCode(const TryPtr *self) {
     if (!self) 
         return TRY_NULL_ARG;
@@ -102,7 +108,7 @@ TryCode TryPtr_getCode(const TryPtr *self) {
     return TryPtr_code(self);
 }
 
-// Replaces the result code when self is non-null.
+/** Replaces the result code when self is non-null. */
 fn TryPtr_setCode(TryPtr *self, TryCode code) {
     if (!self) 
         return;
@@ -110,7 +116,7 @@ fn TryPtr_setCode(TryPtr *self, TryCode code) {
     (*self).code = code;
 }
 
-// Reports whether a non-null result carries TRY_OK.
+/** Reports whether a non-null result carries TRY_OK. */
 bool TryPtr_isOk(const TryPtr *self) {
     if (!self) 
         return false;
@@ -118,8 +124,8 @@ bool TryPtr_isOk(const TryPtr *self) {
     return TryPtr_code(self) == TRY_OK;
 }
 
-// Formats a value-oriented summary into dest and reports capacity truncation.
-fn TryPtr_toString(const TryPtr *self, char *dest, bytes cap, bool *outTruncated) {
+/** Formats a value-oriented summary into dest and reports capacity truncation. */
+fn TryPtr_toString(const TryPtr *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -148,8 +154,8 @@ fn TryPtr_toString(const TryPtr *self, char *dest, bytes cap, bool *outTruncated
     }
 }
 
-// Formats the result fields into dest and reports capacity truncation.
-fn TryPtr_toStringStruct(const TryPtr *self, char *dest, bytes cap, bool *outTruncated) {
+/** Formats the result fields into dest and reports capacity truncation. */
+fn TryPtr_toStringStruct(const TryPtr *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 

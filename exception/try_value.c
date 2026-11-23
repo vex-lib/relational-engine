@@ -52,7 +52,7 @@
  * ============================================================================
  */
 
-// Constructs a result containing the scalar payload and status code.
+/** Constructs a result containing the scalar payload and status code. */
 TryValue TryValue_2(u64 value, TryCode code) {
     TryValue self;
 
@@ -63,22 +63,28 @@ TryValue TryValue_2(u64 value, TryCode code) {
     return self;
 }
 
-// Constructs a successful result carrying value.
+/** Constructs a successful result carrying value. */
 TryValue TryValue_ok(u64 value) {
     return TryValue_2(value, TRY_OK);
 }
 
-// Constructs an error result carrying zero and code.
+/** Constructs an error result carrying zero and code. */
 TryValue TryValue_error(TryCode code) {
     return TryValue_2(0u, code);
 }
 
 ;;GETTER
-static inline u64 TryValue_value(const TryValue *self) { return (*self).value; }
+static inline u64 TryValue_value(const TryValue *self)
+{
+    return (*self).value;
+}
 ;;GETTER
-static inline TryCode TryValue_code(const TryValue *self) { return (*self).code; }
+static inline TryCode TryValue_code(const TryValue *self)
+{
+    return (*self).code;
+}
 
-// Returns the stored scalar, or zero when self is nullptr.
+/** Returns the stored scalar, or zero when self is nullptr. */
 u64 TryValue_getValue(const TryValue *self) {
     if (!self) 
         return 0u;
@@ -86,7 +92,7 @@ u64 TryValue_getValue(const TryValue *self) {
     return TryValue_value(self);
 }
 
-// Replaces the scalar payload when self is non-null.
+/** Replaces the scalar payload when self is non-null. */
 fn TryValue_setValue(TryValue *self, u64 value) {
     if (!self) 
         return;
@@ -94,7 +100,7 @@ fn TryValue_setValue(TryValue *self, u64 value) {
     (*self).value = value;
 }
 
-// Returns the stored code, or TRY_NULL_ARG when self is nullptr.
+/** Returns the stored code, or TRY_NULL_ARG when self is nullptr. */
 TryCode TryValue_getCode(const TryValue *self) {
     if (!self) 
         return TRY_NULL_ARG;
@@ -102,7 +108,7 @@ TryCode TryValue_getCode(const TryValue *self) {
     return TryValue_code(self);
 }
 
-// Replaces the result code when self is non-null.
+/** Replaces the result code when self is non-null. */
 fn TryValue_setCode(TryValue *self, TryCode code) {
     if (!self) 
         return;
@@ -110,7 +116,7 @@ fn TryValue_setCode(TryValue *self, TryCode code) {
     (*self).code = code;
 }
 
-// Reports whether a non-null result carries TRY_OK.
+/** Reports whether a non-null result carries TRY_OK. */
 bool TryValue_isOk(const TryValue *self) {
     if (!self) 
         return false;
@@ -118,8 +124,8 @@ bool TryValue_isOk(const TryValue *self) {
     return TryValue_code(self) == TRY_OK;
 }
 
-// Formats a value-oriented summary into dest and reports capacity truncation.
-fn TryValue_toString(const TryValue *self, char *dest, bytes cap, bool *outTruncated) {
+/** Formats a value-oriented summary into dest and reports capacity truncation. */
+fn TryValue_toString(const TryValue *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 
@@ -149,8 +155,8 @@ fn TryValue_toString(const TryValue *self, char *dest, bytes cap, bool *outTrunc
     }
 }
 
-// Formats the result fields into dest and reports capacity truncation.
-fn TryValue_toStringStruct(const TryValue *self, char *dest, bytes cap, bool *outTruncated) {
+/** Formats the result fields into dest and reports capacity truncation. */
+fn TryValue_toStringStruct(const TryValue *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated) 
         *outTruncated = false;
 

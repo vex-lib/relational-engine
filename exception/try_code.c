@@ -38,13 +38,13 @@
  * ============================================================================
  */
 
-// Reports whether code denotes successful completion.
+/** Reports whether code denotes successful completion. */
 bool TryCode_isOk(TryCode code) {
     return code == TRY_OK;
 }
 
-// Returns code's stable symbolic name, including an unknown fallback.
-const char *TryCode_name(TryCode code) {
+/** Returns code's stable symbolic name, including an unknown fallback. */
+string TryCode_name(TryCode code) {
     switch (code) {
         case TRY_OK:          return "TRY_OK";
         case TRY_NULL_ARG:    return "TRY_NULL_ARG";
@@ -60,8 +60,8 @@ const char *TryCode_name(TryCode code) {
     }
 }
 
-// Returns the stable explanatory message associated with code.
-const char *TryCode_message(TryCode code) {
+/** Returns the stable explanatory message associated with code. */
+string TryCode_message(TryCode code) {
     switch (code) {
         case TRY_OK:          return "ok";
         case TRY_NULL_ARG:    return "required pointer argument was nullptr";
