@@ -1,7 +1,10 @@
-// Consolidated human-gated test lane for vex/re.
-// Requires explicit OS permission (RE_TEST_SYSTEM_CLIPBOARD=1) to mutate the system clipboard.
+/**
+ * Consolidated human-gated test lane for vex/re.
+ * Requires explicit OS permission (RE_TEST_SYSTEM_CLIPBOARD=1) to mutate the system clipboard.
+ */
 
 #include "vex.h"
+#include "primitive/vex-string.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,28 +15,28 @@
 
 /** Exercises the host clipboard round trip when system clipboard mutation is permitted. */
 static fn suite_clipboard() {
-    const char *test_str = "VexGraph Ecosystem Clipboard Payload";
+    string test_str = "VexGraph Ecosystem Clipboard Payload";
     assert(Clipboard_setText(test_str));
     assert(Clipboard_hasText());
 
-    char out_buf[128];
+    utf8 out_buf[128];
     bytes len = Clipboard_getText(out_buf, sizeof(out_buf));
     assert(len > 0);
-    assert(strcmp(out_buf, test_str) == 0);
+    assert(string_equals(out_buf, test_str));
     Clipboard_clear();
 }
 
 /** Runs human-gated vex/re checks; skips with B_TEST_SKIP unless explicitly opted in. */
-i32 main(i32 argc, char **argv) {
-    const char *filter = argc > 1 ? argv[1] : nullptr;
+i32 main(i32 argc, utf8 **argv) {
+    string filter = argc > 1 ? argv[1] : nullptr;
 
-    if (filter && strcmp(filter, "clipboard") != 0) {
-        fprintf(stderr, "re_manual_test: unknown suite '%s'\n", filter);
+    if (filter && !string_equals(filter, "clipboard")) {
+        fprint(stderr, "re_manual_test: unknown suite '", filter, "'");
         return 2;
     }
 
-    const char *permission = getenv("RE_TEST_SYSTEM_CLIPBOARD");
-    if (!permission || strcmp(permission, "1") != 0) {
+    string permission = getenv("RE_TEST_SYSTEM_CLIPBOARD");
+    if (!permission || !string_equals(permission, "1")) {
         fputs("SKIP: system clipboard mutation requires RE_TEST_SYSTEM_CLIPBOARD=1\n", stderr);
         return B_TEST_SKIP;
     }

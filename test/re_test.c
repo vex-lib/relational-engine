@@ -59,14 +59,14 @@ static utf8 g_dir[256];
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             g_failures++;                                                  \
         }                                                                  \
     } while (0)
 
 /** Creates a fresh per-suite scratch directory under TMPDIR. */
-static bool make_scratch_dir(const utf8 *tag) {
-    const utf8 *base = getenv("TMPDIR");
+static bool make_scratch_dir(string tag) {
+    string base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";
     snprintf(g_dir, sizeof(g_dir), "%s/vex_re_%s_%d", base, tag, getpid());
@@ -75,12 +75,12 @@ static bool make_scratch_dir(const utf8 *tag) {
 }
 
 /** Joins the active scratch directory with a relative leaf path. */
-static fn path_of(utf8 *out, bytes cap, const utf8 *leaf) {
+static fn path_of(utf8 *out, bytes cap, string leaf) {
     snprintf(out, cap, "%s/%s", g_dir, leaf);
 }
 
 /** Reads a file's byte length via stdio for on-disk verification. */
-static i64 read_file_size(const utf8 *p) {
+static i64 read_file_size(string p) {
     FILE *f = fopen(p, "rb");
     if (!f)
         return -1;
@@ -137,7 +137,7 @@ static fn suite_findex() {
 
     MemoryArena *arena = MemoryArena(64u * 1024u * 1024u);
     assert(arena);
-    FIndex arenad = FIndex_createArena(2, arena);
+    FIndex arenad = FIndex(2, arena);
     assert(FIndex_live(&arenad));
     assert(FIndex_insert(&arenad, 42, 420, 42));
     assert(FIndex_find(&arenad, 42, &offset, &length) && offset == 420 && length == 42);
@@ -170,7 +170,7 @@ static fn suite_log() {
     CHECK(Log_init(&log, path, 8));
     CHECK(Log_isEnabled(&log));
     CHECK(Log_isActive(&log));
-    CHECK(strcmp(Log_path(&log), path) == 0);
+    CHECK(string_equals(Log_path(&log), path));
     CHECK(Log_appended(&log) == 0);
     CHECK(Log_dropped(&log) == 0);
     CHECK(Log_written(&log) == 0);
@@ -248,8 +248,7 @@ static fn suite_filewriter() {
     CHECK(FileWriter_bytesWritten(&w) == 5);
 
     enum { BIG = 200000 };
-    u8 *big = (u8*) malloc(BIG);
-    CHECK(big != nullptr);
+    static u8 big[BIG];
     for (i32 i = 0; i < BIG; i++)
         big[i] = (u8) (i * 31 + 7);
     FileWriter_write(&w, big, BIG);
@@ -266,16 +265,11 @@ static fn suite_filewriter() {
         CHECK(fread(head, 1, 5, f) == 5);
         CHECK(memcmp(head, "hello", 5) == 0);
         CHECK(fseek(f, 5, SEEK_SET) == 0);
-        u8 *back = (u8*) malloc(BIG);
-        CHECK(back != nullptr);
-        if (back) {
-            CHECK(fread(back, 1, BIG, f) == (bytes) BIG);
-            CHECK(memcmp(back, big, BIG) == 0);
-            free(back);
-        }
+        static u8 back[BIG];
+        CHECK(fread(back, 1, BIG, f) == (bytes) BIG);
+        CHECK(memcmp(back, big, BIG) == 0);
         fclose(f);
     }
-    free(big);
 
     FileWriter_write(&w, (const u8*) "late", 4);
     CHECK(FileWriter_bytesWritten(&w) == (u64) (5 + BIG));
@@ -326,7 +320,7 @@ static fn file_write_read() {
     File *f = File_open(p, FILE_MODE_WRITE | FILE_MODE_CREATE | FILE_MODE_TRUNCATE);
     CHECK(f != nullptr);
     CHECK(File_mode(f) == (FILE_MODE_WRITE | FILE_MODE_CREATE | FILE_MODE_TRUNCATE));
-    CHECK(File_name(f) != nullptr && strcmp(File_name(f), p) == 0);
+    CHECK(File_name(f) != nullptr && string_equals(File_name(f), p));
     CHECK(File_handle(f) != nullptr);
     CHECK(File_size(f) == 0);
     CHECK(File_pos(f) == 0);
@@ -601,25 +595,25 @@ static fn logparser_format_and_kinds() {
                                    1012345000LL, 1000000000LL, nullptr,
                                    1, 2, 3, 4, 5);
     CHECK(n > 0);
-    CHECK(strstr(out, "12.345 ms") != nullptr);
-    CHECK(strstr(out, "produce") != nullptr);
-    CHECK(strstr(out, "1  2  3  4  5") != nullptr);
+    CHECK(string_contains(out, "12.345 ms"));
+    CHECK(string_contains(out, "produce"));
+    CHECK(string_contains(out, "1  2  3  4  5"));
 
     n = LogParser_formatRecord(out, sizeof(out), 2, 5, 0, "custom", 0, 0, 0, 0, 0);
     CHECK(n > 0);
-    CHECK(strstr(out, "0.000 ms") != nullptr);
-    CHECK(strstr(out, "custom") != nullptr);
+    CHECK(string_contains(out, "0.000 ms"));
+    CHECK(string_contains(out, "custom"));
 
     utf8 small[8];
     CHECK(LogParser_formatRecord(small, sizeof(small), 1, 1, 0, "x", 0, 0, 0, 0, 0) == -1);
 
-    CHECK(strcmp(LogParser_kindName(1), "produce") == 0);
-    CHECK(strcmp(LogParser_kindName(2), "present") == 0);
-    CHECK(strcmp(LogParser_kindName(3), "drop") == 0);
-    CHECK(strcmp(LogParser_kindName(10), "keyDown") == 0);
-    CHECK(strcmp(LogParser_kindName(33), "touchCancel") == 0);
-    CHECK(strcmp(LogParser_kindName(999), "kind#999") == 0);
-    CHECK(strcmp(LogParser_kindName(-3), "kind#-3") == 0);
+    CHECK(string_equals(LogParser_kindName(1), "produce"));
+    CHECK(string_equals(LogParser_kindName(2), "present"));
+    CHECK(string_equals(LogParser_kindName(3), "drop"));
+    CHECK(string_equals(LogParser_kindName(10), "keyDown"));
+    CHECK(string_equals(LogParser_kindName(33), "touchCancel"));
+    CHECK(string_equals(LogParser_kindName(999), "kind#999"));
+    CHECK(string_equals(LogParser_kindName(-3), "kind#-3"));
 }
 
 /** Runs all LogParser owner cases in an isolated scratch directory. */
@@ -664,7 +658,7 @@ static TestLabel *TestLabel_0() {
 }
 
 /** Replaces label text with an owned permanent copy, releasing prior owned text. */
-static fn TestLabel_setText(TestLabel *lbl, const utf8 *text) {
+static fn TestLabel_setText(TestLabel *lbl, string text) {
     if (!lbl)
         return;
     if (TestLabel_text(lbl) && TestLabel_ownsText(lbl))
@@ -683,12 +677,12 @@ static fn TestLabel_setText(TestLabel *lbl, const utf8 *text) {
 }
 
 /** Replaces label text with a borrowed pointer and aborts on transient escape under DEBUG_BORROW_CHECK. */
-static fn TestLabel_setTextBorrowed(TestLabel *lbl, const utf8 *text) {
+static fn TestLabel_setTextBorrowed(TestLabel *lbl, string text) {
     if (!lbl)
         return;
 #if defined(DEBUG_BORROW_CHECK)
     if (Transient_contains(text) && !Transient_contains(lbl)) {
-        fprintf(stderr, "[LIFETIME ESCAPE] TestLabel_setTextBorrowed: escape abort\n");
+        fprint(stderr, "[LIFETIME ESCAPE] TestLabel_setTextBorrowed: escape abort");
         abort();
     }
 #endif
@@ -710,11 +704,11 @@ static fn TestLabel_free(TestLabel *lbl) {
 /** Verifies transient lifetime classification, auto-promotion, poisoning, and escape death test. */
 static fn suite_transient_lifetime() {
     assert(Memory_init(0));
-    const utf8 *lit = "literal_constant_string";
+    string lit = "literal_constant_string";
     assert(Memory_getLifetime(lit) == MEMORY_LIFETIME_UNKNOWN);
 
     utf8 stackBuf[64];
-    strcpy(stackBuf, "stack_buffer_array");
+    memcpy(stackBuf, "stack_buffer_array", strlen("stack_buffer_array") + 1);
     assert(Memory_getLifetime(stackBuf) == MEMORY_LIFETIME_UNKNOWN);
 
     any perm = Memory_alloc(1, Re_arena(), 128);
@@ -730,7 +724,7 @@ static fn suite_transient_lifetime() {
     Memory_free(trans);
 
     utf8 *transStr = (utf8*) Transient_alloc(3, 32);
-    strcpy(transStr, "transient_string_123");
+    memcpy(transStr, "transient_string_123", strlen("transient_string_123") + 1);
     TestLabel *lbl = TestLabel_0();
     assert(lbl != nullptr);
     TestLabel_setText(lbl, transStr);
@@ -738,16 +732,16 @@ static fn suite_transient_lifetime() {
     assert(Memory_getLifetime(TestLabel_text(lbl)) == MEMORY_LIFETIME_PERMANENT);
 
     Transient_reset();
-    assert(strcmp(TestLabel_text(lbl), "transient_string_123") == 0);
+    assert(string_equals(TestLabel_text(lbl), "transient_string_123"));
 
-    const utf8 *staticStr = "constant_borrowed_literal";
+    string staticStr = "constant_borrowed_literal";
     TestLabel_setTextBorrowed(lbl, staticStr);
     assert(TestLabel_ownsText(lbl) == false);
     assert(TestLabel_text(lbl) == staticStr);
 
     TestLabel_setText(lbl, "next_owned_value");
     assert(TestLabel_ownsText(lbl) == true);
-    assert(strcmp(TestLabel_text(lbl), "next_owned_value") == 0);
+    assert(string_equals(TestLabel_text(lbl), "next_owned_value"));
     TestLabel_free(lbl);
 
     bytes allocBytes = 65536;
@@ -765,7 +759,7 @@ static fn suite_transient_lifetime() {
     if (pid == 0) {
         freopen("/dev/null", "w", stderr);
         utf8 *escapeStr = (utf8*) Transient_alloc(5, 32);
-        strcpy(escapeStr, "escaped_transient");
+        memcpy(escapeStr, "escaped_transient", strlen("escaped_transient") + 1);
         TestLabel *escapeLbl = TestLabel_0();
         TestLabel_setTextBorrowed(escapeLbl, escapeStr);
         exit(0);
@@ -790,6 +784,15 @@ static _Alignas(16) u8 g_foreign[64];
 /** Verifies Memory/MemoryArena alignment, overflow refusal, foreign pointers, realloc, and transient generation. */
 static fn suite_mem() {
     CHECK(Memory_init(0));
+    CHECK(FREED != nullptr);
+    CHECK(((pointer) FREED & 31) == 0);
+    CHECK(Memory_isFreed(FREED) == true);
+    CHECK(Memory_isFreed(nullptr) == false);
+    CHECK(Memory_isFreed(g_foreign) == false);
+    CHECK(Memory_length(FREED) == 0);
+    CHECK(Memory_type(FREED) == 0);
+    Memory_free(FREED);
+    CHECK(Memory_realloc(FREED, 32) == nullptr);
     CHECK(Memory_length(nullptr) == 0);
     CHECK(Memory_type(nullptr) == 0);
     Memory_free(nullptr);
@@ -863,7 +866,12 @@ static fn suite_mem() {
     any found[8] = { 0 };
     CHECK(Memory_findAll(0xABCDu, found, 1) == 3);
     CHECK(found[0] != nullptr);
+    CHECK(Memory_isFreed(found[0]) == false);
     Memory_free(found[0]);
+    CHECK(Memory_isFreed(found[0]) == true);
+    const MemoryHeader *freedHdr = (const MemoryHeader*) ((const u8*) found[0] - sizeof(MemoryHeader));
+    CHECK(MemoryHeader_pointer(freedHdr) == (u64) (pointer) FREED);
+    CHECK(MemoryHeader_hash(freedHdr) == 0);
     CHECK(Memory_findAll(0xABCDu, nullptr, 0) == 2);
     CHECK(Memory_length(found[0]) == 0);
     Memory_free(found[0]);
@@ -959,35 +967,32 @@ static const u64 EX_TYPE_B = UINT64_C(0x1300000000000041);
 static bytes g_heapCalls;
 static i32 g_failAfter = -1;
 
-/** Injects a failure at a chosen allocation stage; otherwise delegates to libc. */
-static bool failHeap() {
-    g_heapCalls++;
+/** Injects a failure at a chosen page-allocation stage; otherwise delegates to MemoryPool. */
+static bool failHeap()
+{
     if (g_failAfter < 0)
         return false;
+
+    g_heapCalls++;
+
     if (g_failAfter == 0) {
         g_failAfter = -1;
         return true;
     }
+
     g_failAfter--;
     return false;
 }
 
-/** Fault-injecting malloc seam for mem.o when compiled with MEM_TEST_FAULTS. */
-any MemTest_malloc(bytes size)
-{
-    return failHeap() ? nullptr : malloc(size);
-}
+extern PageMeta *MemoryPool_allocPages(MemoryPool *pool, MemoryArena *owner, bytes count, u8 kind, u8 slabClass);
 
-/** Fault-injecting calloc seam for mem.o when compiled with MEM_TEST_FAULTS. */
-any MemTest_calloc(bytes count, bytes elementBytes)
+/** Fault-injecting page-allocation seam for arena.o when compiled with MEM_TEST_FAULTS. */
+PageMeta *MemTest_allocPages(MemoryPool *pool, MemoryArena *owner, bytes count, u8 kind, u8 slabClass)
 {
-    return failHeap() ? nullptr : calloc(count, elementBytes);
-}
+    if (failHeap())
+        return nullptr;
 
-/** Fault-injecting realloc seam for mem.o when compiled with MEM_TEST_FAULTS. */
-any MemTest_realloc(any ptr, bytes size)
-{
-    return failHeap() ? nullptr : realloc(ptr, size);
+    return MemoryPool_allocPages(pool, owner, count, kind, slabClass);
 }
 
 /** Asserts every byte in a range matches the expected value. */
@@ -1000,7 +1005,7 @@ static fn checkBytes(const u8 *ptr, bytes length, u8 value) {
 static fn ex_construction() {
 #if defined(MEM_TEST_FAULTS)
     g_failAfter = 0;
-    assert(MemoryArena_createPages(4) == nullptr);
+    assert(MemoryArena_pages(4) == nullptr);
 #endif
     g_failAfter = -1;
 
@@ -1011,7 +1016,7 @@ static fn ex_construction() {
     assert(MemoryArena_capacity(tiny) == MEMORY_PAGE_SIZE);
     MemoryArena_destroy(tiny);
 
-    MemoryArena *unbounded = MemoryArena_createPages(0);
+    MemoryArena *unbounded = MemoryArena();
     assert(unbounded != nullptr);
     assert(MemoryArena_maxPages(unbounded) == 0);
     assert(MemoryArena_usedPages(unbounded) == 0);
@@ -1026,7 +1031,7 @@ static fn ex_construction() {
     enum { MANY_ARENAS = 256 };
     MemoryArena *owners[MANY_ARENAS];
     for (bytes i = 0; i < MANY_ARENAS; i++) {
-        owners[i] = MemoryArena_createPages(2);
+        owners[i] = MemoryArena_pages(2);
         assert(owners[i] != nullptr);
         u8 *p = MemoryArena_alloc(owners[i], EX_TYPE_A, 32);
         assert(p != nullptr && Memory_type(p) == EX_TYPE_A);
@@ -1038,7 +1043,7 @@ static fn ex_construction() {
     assert(MemoryPool_usedPages(pool) == usedBefore);
 
     bytes chunksBefore = MemoryPool_chunkCount(pool);
-    MemoryArena *spike = MemoryArena_createPages(0);
+    MemoryArena *spike = MemoryArena();
     assert(spike != nullptr);
     u8 *bigA = MemoryArena_alloc(spike, EX_TYPE_A, 40u * MIB);
     u8 *bigB = MemoryArena_alloc(spike, EX_TYPE_B, 40u * MIB);
@@ -1051,14 +1056,14 @@ static fn ex_construction() {
 
 /** Exhausts a 1-page arena budget, verifies no heap fallback, preserves bytes, and returns pages to pool. */
 static fn ex_exhaustion() {
-    const bytes pageSlots = MEMORY_PAGE_SIZE / 64u;
-    MemoryArena *a = MemoryArena_createPages(1);
+    enum { PAGE_SLOTS = MEMORY_PAGE_SIZE / 64u };
+    const bytes pageSlots = PAGE_SLOTS;
+    MemoryArena *a = MemoryArena_pages(1);
     assert(a != nullptr);
     assert(MemoryArena_exhaustionCount(a) == 0);
     assert(MemoryArena_usedPages(a) == 0);
 
-    u8 **blocks = (u8**) malloc(pageSlots * sizeof(u8*));
-    assert(blocks != nullptr);
+    u8 *blocks[PAGE_SLOTS];
 
     bytes calls = g_heapCalls;
     for (bytes i = 0; i < pageSlots; i++) {
@@ -1085,12 +1090,15 @@ static fn ex_exhaustion() {
         checkBytes(blocks[i], SMALL_PAYLOAD, (u8) i);
 
     u8 *victim = blocks[0];
+    assert(!Memory_isFreed(victim));
     MemoryArena_free(a, victim);
+    assert(Memory_isFreed(victim));
     MemoryArena_free(a, victim);
     assert(Memory_length(victim) == 0);
 
     u8 *reused = MemoryArena_alloc(a, EX_TYPE_B, SMALL_PAYLOAD);
     assert(reused == victim);
+    assert(!Memory_isFreed(reused));
     assert(Memory_type(reused) == EX_TYPE_B);
 
     u64 beforeReject = MemoryArena_exhaustionCount(a);
@@ -1108,13 +1116,12 @@ static fn ex_exhaustion() {
     assert(MemoryArena_alloc(a, EX_TYPE_A, SMALL_PAYLOAD) != nullptr);
     assert(MemoryArena_usedPages(a) == 1);
     MemoryArena_destroy(a);
-    free(blocks);
 }
 
 /** Exercises exact page-budget boundaries, failed realloc, shrink, and cross-arena transfer. */
 static fn ex_boundaries() {
-    MemoryArena *a = MemoryArena_createPages(1);
-    MemoryArena *b = MemoryArena_createPages(2);
+    MemoryArena *a = MemoryArena_pages(1);
+    MemoryArena *b = MemoryArena_pages(2);
     assert(a && b);
 
     u8 *p = MemoryArena_alloc(a, EX_TYPE_A, 4096u - MEMORY_HEADER_SIZE);
@@ -1124,7 +1131,7 @@ static fn ex_boundaries() {
     assert(MemoryArena_alloc(a, EX_TYPE_A, MEMORY_PAGE_SIZE) == nullptr);
     MemoryArena_destroy(a);
 
-    a = MemoryArena_createPages(2);
+    a = MemoryArena_pages(2);
     assert(a);
     p = MemoryArena_alloc(a, EX_TYPE_A, MEMORY_PAGE_SIZE);
     assert(p && Memory_length(p) == MEMORY_PAGE_SIZE);
@@ -1153,7 +1160,7 @@ static fn ex_boundaries() {
 /** Exhausts every slab size class in a 1-page arena independently, then verifies free, reuse, and page return. */
 static fn ex_allClasses() {
     const bytes blockSizes[] = { 64, 128, 256, 512, 1024, 2048, 4096 };
-    MemoryArena *a = MemoryArena_createPages(1);
+    MemoryArena *a = MemoryArena_pages(1);
     assert(a);
 
     for (bytes c = 0; c < sizeof(blockSizes) / sizeof(blockSizes[0]); c++) {
@@ -1187,7 +1194,7 @@ static fn ex_allClasses() {
 
 /** Rejects misaligned pointers and tampered headers while preserving unrelated blocks. */
 static fn ex_hostile() {
-    MemoryArena *a = MemoryArena_createPages(4);
+    MemoryArena *a = MemoryArena_pages(4);
     assert(a);
     u8 *p = MemoryArena_alloc(a, EX_TYPE_A, 48);
     u8 *other = MemoryArena_alloc(a, EX_TYPE_B, 48);
@@ -1246,7 +1253,7 @@ static fn ex_model() {
     bytes lengths[MODEL_SLOTS] = { 0 };
     u32 random = UINT32_C(0xA110CA7E);
 
-    MemoryArena *a = MemoryArena_createPages(0);
+    MemoryArena *a = MemoryArena();
     assert(a);
 
     for (bytes step = 0; step < MODEL_STEPS; step++) {
@@ -1306,7 +1313,7 @@ static any ex_worker(any context) {
 static fn ex_concurrent() {
     atomic_store_explicit(&g_ready, 0, memory_order_relaxed);
     atomic_store_explicit(&g_start, false, memory_order_relaxed);
-    g_threadArena = MemoryArena_createPages(0);
+    g_threadArena = MemoryArena();
     assert(g_threadArena);
 
     thread threads[WORKERS];
@@ -1326,7 +1333,7 @@ static fn ex_concurrent() {
 
 /** Proves multi-page span allocation, pool page coalescing, and full return without heap calls. */
 static fn ex_coalesce() {
-    MemoryArena *a = MemoryArena_createPages(8);
+    MemoryArena *a = MemoryArena_pages(8);
     assert(a != nullptr);
 
     bytes calls = g_heapCalls;
@@ -1415,7 +1422,7 @@ static inline fn WatchRec_setLastSize(WatchRec *r, i64 s)
     (*r).lastSize = s;
 }
 ;;GETTER
-static inline const utf8 *WatchEv_rel(const FileWatchEvent *e)
+static inline string WatchEv_rel(const FileWatchEvent *e)
 {
     return (*e).relativePath;
 }
@@ -1439,7 +1446,7 @@ static inline i64 WatchEv_size(const FileWatchEvent *e)
 static fn onWatchRec(const FileWatchEvent *ev, any userdata) {
     WatchRec *r = (WatchRec*) userdata;
     WatchRec_setCount(r, WatchRec_count(r) + 1);
-    const utf8 *rel = WatchEv_rel(ev);
+    string rel = WatchEv_rel(ev);
     if (rel)
         snprintf(WatchRec_lastRelMut(r), 128, "%s", rel);
     WatchRec_setLastType(r, WatchEv_type(ev));
@@ -1458,8 +1465,8 @@ static fn suite_file_watch() {
     CHECK(defs.latencyMs == 100u && defs.debounceMs == 50u);
     CHECK(defs.recursive && !defs.emitDirs && defs.ignoreHidden);
 
-    const utf8 *ignores[] = { "*.swp", "build/" };
-    const utf8 *includes[] = { ".c", ".h" };
+    string ignores[] = { "*.swp", "build/" };
+    string includes[] = { ".c", ".h" };
     FileWatchProps props = defs;
     props.latencyMs = 25u;
     props.debounceMs = 500u;
@@ -1469,9 +1476,9 @@ static fn suite_file_watch() {
     props.includeCount = 2;
 
     WatchRec rec = { 0 };
-    FileEventWatcher *w = FileEventWatcher_createWithProps(g_dir, FILE_EVENT_ALL, &props, onWatchRec, &rec);
+    FileEventWatcher *w = FileEventWatcher(g_dir, FILE_EVENT_ALL, &props, onWatchRec, &rec);
     CHECK(w != nullptr);
-    CHECK(strcmp(FileEventWatcher_getPath(w), g_dir) == 0);
+    CHECK(string_equals(FileEventWatcher_getPath(w), g_dir));
     CHECK(FileEventWatcher_getMask(w) == FILE_EVENT_ALL);
     CHECK(!FileEventWatcher_isRunning(w));
     CHECK(FileEventWatcher_pendingCount(w) == 0);
@@ -1515,7 +1522,7 @@ static fn suite_file_watch() {
     FileEventWatcher_pump(w);
     CHECK(FileEventWatcher_pendingCount(w) == 0);
     CHECK(rec.count == 1);
-    CHECK(strcmp(rec.lastRel, "hello.c") == 0);
+    CHECK(string_equals(rec.lastRel, "hello.c"));
     CHECK(rec.lastType == (FILE_EVENT_CREATED | FILE_EVENT_MODIFIED));
     CHECK(rec.lastEpoch > 1700000000LL);
     CHECK(rec.lastSize == 11);
@@ -1558,7 +1565,7 @@ static i32 s_hash_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if(!(cond)) {                                                      \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_hash_g_failures++;                                                  \
         }                                                                  \
     } while(0)
@@ -1672,13 +1679,13 @@ static i32 suite_hash() {
 
     if(s_hash_g_failures == 0) {
 
-        printf("hash_test: all assertions held\n");
+        print("hash_test: all assertions held");
 
         return 0;
 
     }
 
-    printf("hash_test: %d FAILURES\n", s_hash_g_failures);
+    print("hash_test: ", s_hash_g_failures, " FAILURES");
 
     return 1;
 
@@ -1720,7 +1727,7 @@ static i32 s_cell_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_cell_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -1823,9 +1830,9 @@ static fn test_to_string() {
 
     CHECK(!trunc);
 
-    CHECK(strstr(buf, "Cell(typeId=0x") != nullptr);
+    CHECK(string_contains(buf, "Cell(typeId=0x"));
 
-    CHECK(strstr(buf, "abcd") != nullptr);
+    CHECK(string_contains(buf, "abcd"));
 
     trunc = false;
 
@@ -1833,9 +1840,9 @@ static fn test_to_string() {
 
     CHECK(!trunc);
 
-    CHECK(strstr(buf, "Cell { value=0x") != nullptr);
+    CHECK(string_contains(buf, "Cell { value=0x"));
 
-    CHECK(strstr(buf, "pad=0x") != nullptr);
+    CHECK(string_contains(buf, "pad=0x"));
 
     utf8 tiny[8];
 
@@ -1851,11 +1858,11 @@ static fn test_to_string() {
 
     CHECK(!trunc);
 
-    CHECK(strcmp(buf, "nullptr") == 0);
+    CHECK(string_equals(buf, "nullptr"));
 
     Cell_toStringStruct(nullptr, buf, sizeof(buf), &trunc);
 
-    CHECK(strcmp(buf, "nullptr") == 0);
+    CHECK(string_equals(buf, "nullptr"));
 
     trunc = true;
 
@@ -1896,12 +1903,12 @@ static i32 suite_cell() {
     test_null_safety();
 
     if (s_cell_g_failures == 0) {
-        printf("cell_test: all assertions held\n");
+        print("cell_test: all assertions held");
 
         return 0;
     }
 
-    printf("cell_test: %d FAILURES\n", s_cell_g_failures);
+    print("cell_test: ", s_cell_g_failures, " FAILURES");
 
     return 1;
 }
@@ -1919,7 +1926,7 @@ static fn suite_cell_wrap() {
 
 
 static i32 s_class_relational_g_failures = 0;
-#define CHECK(cond) do{ if(!(cond)){ printf("FAIL %s:%d %s\n",__FILE__,__LINE__,#cond); s_class_relational_g_failures++; } }while(0)
+#define CHECK(cond) do{ if(!(cond)){ print("FAIL ", __FILE__, ":", __LINE__, " ", #cond); s_class_relational_g_failures++; } }while(0)
 
 /** Exercises relational name/value/function lookup, ranked scopes, and rename behavior. */
 static fn testRelationalSpotlight(){
@@ -1947,7 +1954,7 @@ static fn testRelationalSpotlight(){
 
     CHECK(n==3);
 
-    CHECK(strcmp(SymbolTable_getName(&global, out[0]), "health")==0);
+    CHECK(string_equals(SymbolTable_getName(&global, out[0]), "health"));
 
     n = Relational_search(&global, "health_", out, 10);
 
@@ -1967,7 +1974,7 @@ static fn testRelationalSpotlight(){
 
     CHECK(p != nullptr);
 
-    CHECK(strcmp(Relational_getString(&global, "health_ui"), "panel")==0);
+    CHECK(string_equals(Relational_getString(&global, "health_ui"), "panel"));
 
     any fn = (any) 0x12345;
 
@@ -1994,9 +2001,9 @@ static i32 suite_class_relational(){
     testRelationalSpotlight();
 
     if(s_class_relational_g_failures==0) 
-       printf("class_relational_test: all checks passed\n");
+       print("class_relational_test: all checks passed");
     else
-        printf("class_relational_test: %d FAILURES\n", s_class_relational_g_failures);
+        print("class_relational_test: ", s_class_relational_g_failures, " FAILURES");
 
     return s_class_relational_g_failures==0?0:1;
 }
@@ -2036,13 +2043,13 @@ static i32 s_shelf_g_checks = 0;
         s_shelf_g_checks++;                                                       \
         if (!(cond)) {                                                    \
             s_shelf_g_fail++;                                                     \
-            printf("  FAIL line %d: %s\n", __LINE__, #cond);              \
+            print("  FAIL line ", __LINE__, ": ", #cond);              \
         }                                                                 \
     } while (0)
 
 /** Checks Cell layout, header identity, value storage, and null-safe destruction. */
 static fn testCell() {
-    printf("[1] identity cell: 32 B block, header identity, value slot\n");
+    print("[1] identity cell: 32 B block, header identity, value slot");
 
     CHECK(sizeof(Cell) == 16u);
 
@@ -2087,7 +2094,7 @@ static fn testCell() {
 
 /** Checks Cell value and structure projections, including truncation and nullptr rendering. */
 static fn testCellStrings() {
-    printf("[2] cell string projections\n");
+    print("[2] cell string projections");
 
     Cell *c = Cell_2(0x2Cu, 0x1Fu);
 
@@ -2097,11 +2104,11 @@ static fn testCellStrings() {
 
     Cell_toString(c, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "Cell(typeId=0x2c, value=0x1f)") == 0);
+    CHECK(truncated == false && string_equals(buf, "Cell(typeId=0x2c, value=0x1f)"));
 
     Cell_toStringStruct(c, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "Cell { value=0x1f, pad=0x0 }") == 0);
+    CHECK(truncated == false && string_equals(buf, "Cell { value=0x1f, pad=0x0 }"));
 
     utf8 tiny[4];
 
@@ -2113,14 +2120,14 @@ static fn testCellStrings() {
 
     Cell_toString(nullptr, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "nullptr") == 0);
+    CHECK(truncated == false && string_equals(buf, "nullptr"));
 
     Cell_free(c);
 }
 
 /** Exercises shelf insertion, linked traversal, invalid indices, and head updates. */
 static fn testShelfBasics() {
-    printf("[3] shelf: node pool, cells, u32 edges, head walk\n");
+    print("[3] shelf: node pool, cells, u32 edges, head walk");
 
     Shelf *shelf = Shelf_0();
 
@@ -2197,7 +2204,7 @@ static fn testShelfBasics() {
 
 /** Verifies cell addresses and values remain stable as the shelf grows to 500 entries. */
 static fn testShelfStability() {
-    printf("[4] node/cell addresses stay stable across growth\n");
+    print("[4] node/cell addresses stay stable across growth");
 
     Shelf *shelf = Shelf_0();
 
@@ -2239,7 +2246,7 @@ static fn testShelfStability() {
 
 /** Checks Shelf null-safe operations, lifecycle idempotence, and bounded projections. */
 static fn testShelfNullAndStrings() {
-    printf("[5] shelf null-safety + string projections\n");
+    print("[5] shelf null-safety + string projections");
 
     CHECK(Shelf_count(nullptr) == 0u);
 
@@ -2277,13 +2284,13 @@ static fn testShelfNullAndStrings() {
 
     Shelf_toString(&shelf, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "Shelf(count=1)") == 0);
+    CHECK(truncated == false && string_equals(buf, "Shelf(count=1)"));
 
     Shelf_toStringStruct(&shelf, buf, sizeof(buf), &truncated);
 
-    const utf8 *prefix = "Shelf { active=true, count=1, head=-1, nodes=0x";
+    string prefix = "Shelf { active=true, count=1, head=-1, nodes=0x";
 
-    CHECK(truncated == false && strncmp(buf, prefix, strlen(prefix)) == 0);
+    CHECK(truncated == false && string_startsWith(buf, prefix, strlen(prefix)));
 
     utf8 tiny[4];
 
@@ -2295,7 +2302,7 @@ static fn testShelfNullAndStrings() {
 
     Shelf_toString(nullptr, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "nullptr") == 0);
+    CHECK(truncated == false && string_equals(buf, "nullptr"));
 
     Shelf_shutdown(&shelf);
 
@@ -2308,7 +2315,7 @@ static fn testShelfNullAndStrings() {
 
 /** Runs Cell and Shelf identity, collection, growth, projection, and null-safety checks. */
 static i32 suite_shelf() {
-    printf("=== Cell + Shelf Test Suite ===\n\n");
+    print("=== Cell + Shelf Test Suite ===\n");
 
     testCell();
 
@@ -2320,10 +2327,10 @@ static i32 suite_shelf() {
 
     testShelfNullAndStrings();
 
-    printf("\n%d checks, %d failed\n", s_shelf_g_checks, s_shelf_g_fail);
+    print("\n", s_shelf_g_checks, " checks, ", s_shelf_g_fail, " failed");
 
     if (s_shelf_g_fail == 0) 
-        printf("=== Cell + Shelf Test Suite: ALL PASS ===\n");
+        print("=== Cell + Shelf Test Suite: ALL PASS ===");
 
     return s_shelf_g_fail == 0 ? 0 : 1;
 }
@@ -2368,7 +2375,7 @@ static i32 s_symbol_table_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_symbol_table_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -2543,7 +2550,7 @@ static fn test_get_name(SymbolTable *v) {
 
     CHECK(id >= 0);
 
-    CHECK(strcmp(SymbolTable_getName(v, id), "gn_name") == 0);
+    CHECK(string_equals(SymbolTable_getName(v, id), "gn_name"));
 
     CHECK(SymbolTable_getName(v, -1) == nullptr);
 
@@ -2630,7 +2637,7 @@ static fn test_observability(SymbolTable *v) {
     utf8 line[512];
 
     while (fgets(line, sizeof(line), capture) != nullptr) {
-        CHECK(strstr(line, "[variable]") != nullptr);
+        CHECK(string_contains(line, "[variable]"));
 
         lines++;
     }
@@ -2689,13 +2696,15 @@ static i32 suite_symbol_table() {
 
     test_shutdown();
 
+    StringPool_shutdown();
+
     if (s_symbol_table_g_failures == 0) {
-        printf("symbol_table_test: all assertions held\n");
+        print("symbol_table_test: all assertions held");
 
         return 0;
     }
 
-    printf("symbol_table_test: %d FAILURES\n", s_symbol_table_g_failures);
+    print("symbol_table_test: ", s_symbol_table_g_failures, " FAILURES");
 
     return 1;
 }
@@ -2730,7 +2739,7 @@ static i32 suite_var() {
 
     assert(v);
 
-    assert(strcmp(var_name(v), "health") == 0);
+    assert(string_equals(var_name(v), "health"));
 
     assert(var_value(v) == 0);
 
@@ -2750,7 +2759,7 @@ static i32 suite_var() {
 
     var_toString(v, buffer, sizeof buffer, &truncated);
 
-    assert(!truncated && strstr(buffer, "health") != nullptr);
+    assert(!truncated && string_contains(buffer, "health"));
 
     var_unsubscribe(v, observer, &g_calls);
 
@@ -2811,18 +2820,18 @@ static i32 s_variable_hash_map_g_checks = 0;
         s_variable_hash_map_g_checks++;                                                       \
         if (!(cond)) {                                                    \
             s_variable_hash_map_g_fail++;                                                     \
-            printf("  FAIL line %d: %s\n", __LINE__, #cond);              \
+            print("  FAIL line ", __LINE__, ": ", #cond);              \
         }                                                                 \
     } while (0)
 
 /** Mirror the map's slot index so the test can force a real collision. */
-static u32 slotOf(const utf8 *name) {
+static u32 slotOf(string name) {
     utf8 folded[VARIABLE_SLOT_NAME_BYTES];
 
     if (!VariableSlot_foldName(name, folded)) 
         return 0xFFFFFFFFu;
 
-    const utf8 *tail = folded + 1;
+    string tail = folded + 1;
 
     u64 seed = Hash_fnv1a64((const u8*) tail, strlen(tail));
 
@@ -2831,7 +2840,7 @@ static u32 slotOf(const utf8 *name) {
 
 /** Checks initialization, empty lookup defaults, null receiver behavior, and idempotent shutdown. */
 static fn testLifecycle() {
-    printf("[1] init / empty / count / null-safety\n");
+    print("[1] init / empty / count / null-safety");
 
     VariableHashMap map;
 
@@ -2870,7 +2879,7 @@ static fn testLifecycle() {
 
 /** Checks case folding, lookup, and same-key upsert without duplicate count growth. */
 static fn testFoldAndBucket() {
-    printf("[2] lowercase folding + upsert semantics\n");
+    print("[2] lowercase folding + upsert semantics");
 
     VariableHashMap map;
 
@@ -2901,13 +2910,13 @@ static fn testFoldAndBucket() {
 
 /** Admits and resolves a key in every supported first-character bucket. */
 static fn testAllBuckets() {
-    printf("[3] every first-utf8 bucket is reachable (39 of them)\n");
+    print("[3] every first-utf8 bucket is reachable (39 of them)");
 
     VariableHashMap map;
 
     VariableHashMap_init(&map);
 
-    const utf8 *firsts = "abcdefghijklmnopqrstuvwxyz0123456789_$-";
+    string firsts = "abcdefghijklmnopqrstuvwxyz0123456789_$-";
 
     bytes n = strlen(firsts);
 
@@ -2932,7 +2941,7 @@ static fn testAllBuckets() {
 
 /** Checks invalid-name rejection and accepted dotted/name-length boundary forms. */
 static fn s_variable_hash_map_testRejection() {
-    printf("[4] illegal / malformed names rejected; dotted names accepted\n");
+    print("[4] illegal / malformed names rejected; dotted names accepted");
 
     VariableHashMap map;
 
@@ -2965,7 +2974,7 @@ static fn s_variable_hash_map_testRejection() {
 
 /** Finds two distinct keys sharing a bucket/slot and verifies both remain retrievable. */
 static fn testCollisionChain() {
-    printf("[5] forced collision: two names share a bucket+slot and both resolve\n");
+    print("[5] forced collision: two names share a bucket+slot and both resolve");
 
     bool seen[1024] = { false };
 
@@ -3035,7 +3044,7 @@ static fn testCollisionChain() {
 
 /** Inserts and resolves 3,000 same-bucket names to exercise chained-slot volume. */
 static fn testVolume() {
-    printf("[6] volume: 3000 same-bucket names, all resolve (chained slots)\n");
+    print("[6] volume: 3000 same-bucket names, all resolve (chained slots)");
 
     VariableHashMap map;
 
@@ -3078,7 +3087,7 @@ static fn testVolume() {
 
 /** Checks value/structure projections, null rendering, and truncation reporting. */
 static fn testStrings() {
-    printf("[7] toString / toStringStruct: bounded + truncation flagged\n");
+    print("[7] toString / toStringStruct: bounded + truncation flagged");
 
     VariableHashMap map;
 
@@ -3092,12 +3101,12 @@ static fn testStrings() {
 
     VariableHashMap_toString(&map, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "VariableHashMap(count=1)") == 0);
+    CHECK(truncated == false && string_equals(buf, "VariableHashMap(count=1)"));
 
     VariableHashMap_toStringStruct(&map, buf, sizeof(buf), &truncated);
 
     CHECK(truncated == false &&
-          strcmp(buf, "VariableHashMap { active=true, count=1, bands=<array[39]> }") == 0);
+          string_equals(buf, "VariableHashMap { active=true, count=1, bands=<array[39]> }"));
 
     utf8 tiny[4];
 
@@ -3109,7 +3118,7 @@ static fn testStrings() {
 
     VariableHashMap_toString(nullptr, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "nullptr") == 0);
+    CHECK(truncated == false && string_equals(buf, "nullptr"));
 
     VariableHashMap_shutdown(&map);
 }
@@ -3122,7 +3131,7 @@ static inline bool VariableHashMap_active(const VariableHashMap *map)
 }
 
 static fn testArity() {
-    printf("[8] arity constructor + free\n");
+    print("[8] arity constructor + free");
 
     VariableHashMap *map = VariableHashMap();
 
@@ -3183,7 +3192,7 @@ static fn visitFn(VariableSlot *slot, any userdata) {
 
 /** Checks forEach visits each live entry and safely ignores null callback/receiver. */
 static fn testForEach() {
-    printf("[9] forEach visits every live entry\n");
+    print("[9] forEach visits every live entry");
 
     VariableHashMap map;
 
@@ -3216,7 +3225,7 @@ static fn testForEach() {
 
 /** Runs lifecycle, key policy, collision/growth, projection, constructor, and iteration checks. */
 static i32 suite_variable_hash_map() {
-    printf("=== VariableHashMap Test Suite ===\n\n");
+    print("=== VariableHashMap Test Suite ===\n");
 
     testLifecycle();
 
@@ -3236,10 +3245,10 @@ static i32 suite_variable_hash_map() {
 
     testForEach();
 
-    printf("\n%d checks, %d failed\n", s_variable_hash_map_g_checks, s_variable_hash_map_g_fail);
+    print("\n", s_variable_hash_map_g_checks, " checks, ", s_variable_hash_map_g_fail, " failed");
 
     if (s_variable_hash_map_g_fail == 0) 
-        printf("=== VariableHashMap Test Suite: ALL PASS ===\n");
+        print("=== VariableHashMap Test Suite: ALL PASS ===");
 
     return s_variable_hash_map_g_fail == 0 ? 0 : 1;
 }
@@ -3278,13 +3287,13 @@ static i32 s_variable_mini_map_g_checks = 0;
         s_variable_mini_map_g_checks++;                                                       \
         if (!(cond)) {                                                    \
             s_variable_mini_map_g_fail++;                                                     \
-            printf("  FAIL line %d: %s\n", __LINE__, #cond);              \
+            print("  FAIL line ", __LINE__, ": ", #cond);              \
         }                                                                 \
     } while (0)
 
 /** Checks map initialization, empty/missing lookup, basic insertion, null safety, and shutdown. */
 static fn s2_testLifecycle() {
-    printf("[1] init / empty / count / null-safety\n");
+    print("[1] init / empty / count / null-safety");
 
     VariableMiniMap map;
 
@@ -3329,13 +3338,13 @@ static fn s2_testLifecycle() {
 
 /** Covers all buckets, case-folded dotted keys, and in-place upsert behavior. */
 static fn testBucketsAndFold() {
-    printf("[2] 39 buckets + folding + dotted names + upsert\n");
+    print("[2] 39 buckets + folding + dotted names + upsert");
 
     VariableMiniMap map;
 
     VariableMiniMap_init(&map);
 
-    const utf8 *firsts = "abcdefghijklmnopqrstuvwxyz0123456789_$-";
+    string firsts = "abcdefghijklmnopqrstuvwxyz0123456789_$-";
 
     bytes n = strlen(firsts);
 
@@ -3372,7 +3381,7 @@ static fn testBucketsAndFold() {
 
 /** Checks malformed and overlong key rejection without changing the entry count. */
 static fn s_variable_mini_map_testRejection() {
-    printf("[3] illegal names rejected\n");
+    print("[3] illegal names rejected");
 
     VariableMiniMap map;
 
@@ -3399,7 +3408,7 @@ static fn s_variable_mini_map_testRejection() {
 
 /** Checks constructor/free forms, bounded projections, and safe no-op iteration inputs. */
 static fn testForEachAndStrings() {
-    printf("[4] forEach + string projections + arity ctor\n");
+    print("[4] forEach + string projections + arity ctor");
 
     VariableMiniMap *map = VariableMiniMap();
 
@@ -3422,11 +3431,11 @@ static fn testForEachAndStrings() {
 
     VariableMiniMap_toString(map, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "VariableMiniMap(count=3)") == 0);
+    CHECK(truncated == false && string_equals(buf, "VariableMiniMap(count=3)"));
 
     VariableMiniMap_toStringStruct(map, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "VariableMiniMap { active=true, count=3, buckets=<array[39]> }") == 0);
+    CHECK(truncated == false && string_equals(buf, "VariableMiniMap { active=true, count=3, buckets=<array[39]> }"));
 
     utf8 tiny[4];
 
@@ -3438,7 +3447,7 @@ static fn testForEachAndStrings() {
 
     VariableMiniMap_toString(nullptr, buf, sizeof(buf), &truncated);
 
-    CHECK(truncated == false && strcmp(buf, "nullptr") == 0);
+    CHECK(truncated == false && string_equals(buf, "nullptr"));
 
     VariableMiniMap_forEach(map, nullptr, nullptr);
 
@@ -3453,7 +3462,7 @@ static fn testForEachAndStrings() {
 
 /** Runs map lifecycle, key policy, projection, and iteration cases. */
 static i32 suite_variable_mini_map() {
-    printf("=== VariableMiniMap (scoped) Test Suite ===\n\n");
+    print("=== VariableMiniMap (scoped) Test Suite ===\n");
 
     s2_testLifecycle();
 
@@ -3463,10 +3472,10 @@ static i32 suite_variable_mini_map() {
 
     testForEachAndStrings();
 
-    printf("\n%d checks, %d failed\n", s_variable_mini_map_g_checks, s_variable_mini_map_g_fail);
+    print("\n", s_variable_mini_map_g_checks, " checks, ", s_variable_mini_map_g_fail, " failed");
 
     if (s_variable_mini_map_g_fail == 0) 
-        printf("=== VariableMiniMap Test Suite: ALL PASS ===\n");
+        print("=== VariableMiniMap Test Suite: ALL PASS ===");
 
     return s_variable_mini_map_g_fail == 0 ? 0 : 1;
 }
@@ -3501,8 +3510,8 @@ static fn suite_variable_mini_map_wrap() {
 static i32 s_variable_pool_g_failures = 0;
 
 #define CHECK(name, cond) do { \
-    if (cond) { printf("[variable_pool_test] PASS %s\n", name); } \
-    else { printf("[variable_pool_test] FAIL %s\n", name); s_variable_pool_g_failures++; } \
+    if (cond) { print("[variable_pool_test] PASS ", name); } \
+    else { print("[variable_pool_test] FAIL ", name); s_variable_pool_g_failures++; } \
 } while (0)
 
 /** Exercises static StringPool lifecycle, validation, deduplication, growth, and relinking. */
@@ -3513,7 +3522,7 @@ static inline u64 StringSlot_self(const StringSlot *slot)
 }
 
 static i32 suite_variable_pool() {
-    printf("=== Running Variable Pool Test Suite ===\n");
+    print("=== Running Variable Pool Test Suite ===");
 
     {
         CHECK("pre-init intern closed", StringPool_intern("label") == -1);
@@ -3551,11 +3560,11 @@ static i32 suite_variable_pool() {
         CHECK("intern dedup", a >= 0 && a == b);
         CHECK("count one", StringPool_count() == 1);
         CHECK("find hit", StringPool_find("label") == a);
-        const utf8 *edge23 = "abcdefghijklmnopqrstuvw";
+        string edge23 = "abcdefghijklmnopqrstuvw";
         CHECK("23-utf8 edge length", strlen(edge23) == 23);
         i32 e = StringPool_intern(edge23);
         CHECK("23-utf8 accepted", e >= 0);
-        CHECK("name round-trip", strcmp(StringPool_name((u32) e), edge23) == 0);
+        CHECK("name round-trip", string_equals(StringPool_name((u32) e), edge23));
         const StringSlot *slot = StringPool_slot((u32) a);
         CHECK("slot self link", slot != nullptr && StringSlot_self(slot) == (u64) (pointer) slot);
         CHECK("isSlot live", StringPool_isSlot(slot) == true);
@@ -3570,7 +3579,7 @@ static i32 suite_variable_pool() {
     {
         MemoryArena *arena = MemoryArena(64u << 20);
         StringPool_init(arena);
-        const utf8 *words[] = { "delta", "alpha", "charlie", "bravo" };
+        string words[] = { "delta", "alpha", "charlie", "bravo" };
         for (i32 i = 0; i < 4; i++) 
             StringPool_intern(words[i]);
         CHECK("count four", StringPool_count() == 4);
@@ -3578,7 +3587,7 @@ static i32 suite_variable_pool() {
         for (i32 i = 0; i < 4; i++) {
             i32 idx = StringPool_find(words[i]);
 
-            if (idx < 0 || strcmp(StringPool_name((u32) idx), words[i]) != 0) 
+            if (idx < 0 || !string_equals(StringPool_name((u32) idx), words[i])) 
                 allFound = false;
         }
 
@@ -3599,7 +3608,7 @@ static i32 suite_variable_pool() {
         MemoryArena_destroy(arena);
     }
 
-    printf("\n=== Variable Pool Test Summary: %d failures ===\n", s_variable_pool_g_failures);
+    print("\n=== Variable Pool Test Summary: ", s_variable_pool_g_failures, " failures ===");
 
     return s_variable_pool_g_failures > 0 ? 1 : 0;
 }
@@ -3635,13 +3644,13 @@ static fn suite_variable_pool_wrap() {
 static i32 s_variable_slot_g_failures = 0;
 
 #define CHECK(name, cond) do { \
-    if (cond) { printf("[variable_slot_test] PASS %s\n", name); } \
-    else { printf("[variable_slot_test] FAIL %s\n", name); s_variable_slot_g_failures++; } \
+    if (cond) { print("[variable_slot_test] PASS ", name); } \
+    else { print("[variable_slot_test] FAIL ", name); s_variable_slot_g_failures++; } \
 } while (0)
 
 /** Checks VariableSlot layout, name grammar/folding, accessors, constructors, strings, and null safety. */
 static i32 suite_variable_slot() {
-    printf("=== Running Variable Slot Test Suite ===\n");
+    print("=== Running Variable Slot Test Suite ===");
 
     CHECK("sizeof slot is 32", sizeof(VariableSlot) == 32u);
 
@@ -3650,7 +3659,7 @@ static i32 suite_variable_slot() {
         memset(&slot, 0, sizeof(slot));
         CHECK("init ok", VariableSlot_init(&slot, "Health", 0xABCDu) == true);
         CHECK("pointer bound", VariableSlot_getPointer(&slot) == 0xABCDu);
-        CHECK("name folded to lowercase", strcmp(VariableSlot_getName(&slot), "health") == 0);
+        CHECK("name folded to lowercase", string_equals(VariableSlot_getName(&slot), "health"));
         CHECK("not empty", VariableSlot_isEmpty(&slot) == false);
         CHECK("nameEquals case-insensitive", VariableSlot_nameEquals(&slot, "HEALTH") == true);
         CHECK("nameEquals differs", VariableSlot_nameEquals(&slot, "health_ui") == false);
@@ -3659,7 +3668,7 @@ static i32 suite_variable_slot() {
     {
         VariableSlot slot;
         CHECK("camel fold ok", VariableSlot_init(&slot, "helloWorld", 0) == true);
-        CHECK("camel folded", strcmp(VariableSlot_getName(&slot), "helloworld") == 0);
+        CHECK("camel folded", string_equals(VariableSlot_getName(&slot), "helloworld"));
     }
 
     {
@@ -3682,7 +3691,7 @@ static i32 suite_variable_slot() {
     {
         VariableSlot dotted;
         VariableSlot_init(&dotted, "Character.Position.X", 0);
-        CHECK("dotted folded", strcmp(VariableSlot_getName(&dotted), "character.position.x") == 0);
+        CHECK("dotted folded", string_equals(VariableSlot_getName(&dotted), "character.position.x"));
         CHECK("dotted nameEquals", VariableSlot_nameEquals(&dotted, "CHARACTER.position.x") == true);
     }
 
@@ -3690,9 +3699,9 @@ static i32 suite_variable_slot() {
         VariableSlot slot;
         VariableSlot_init(&slot, "first", 1);
         CHECK("setName bad rejected", VariableSlot_setName(&slot, "bad name") == false);
-        CHECK("old name survives bad set", strcmp(VariableSlot_getName(&slot), "first") == 0);
+        CHECK("old name survives bad set", string_equals(VariableSlot_getName(&slot), "first"));
         CHECK("setName ok", VariableSlot_setName(&slot, "Second") == true);
-        CHECK("name replaced + folded", strcmp(VariableSlot_getName(&slot), "second") == 0);
+        CHECK("name replaced + folded", string_equals(VariableSlot_getName(&slot), "second"));
         VariableSlot_setPointer(&slot, 0x99u);
         CHECK("pointer replaced", VariableSlot_getPointer(&slot) == 0x99u);
     }
@@ -3730,10 +3739,10 @@ static i32 suite_variable_slot() {
         utf8 buf[96];
         bool truncated = true;
         VariableSlot_toString(&slot, buf, sizeof(buf), &truncated);
-        CHECK("toString fits", truncated == false && strcmp(buf, "VariableSlot(health => 0x1f)") == 0);
+        CHECK("toString fits", truncated == false && string_equals(buf, "VariableSlot(health => 0x1f)"));
         VariableSlot_toStringStruct(&slot, buf, sizeof(buf), &truncated);
         CHECK("toStringStruct fits", truncated == false &&
-              strcmp(buf, "VariableSlot { name=\"health\", pointer=0x1f }") == 0);
+              string_equals(buf, "VariableSlot { name=\"health\", pointer=0x1f }"));
 
         utf8 tiny[4];
         VariableSlot_toString(&slot, tiny, sizeof(tiny), &truncated);
@@ -3743,10 +3752,10 @@ static i32 suite_variable_slot() {
 
         truncated = true;
         VariableSlot_toString(nullptr, buf, sizeof(buf), &truncated);
-        CHECK("toString null renders nullptr", truncated == false && strcmp(buf, "nullptr") == 0);
+        CHECK("toString null renders nullptr", truncated == false && string_equals(buf, "nullptr"));
     }
 
-    printf("=== Variable Slot: %d failure(s) ===\n", s_variable_slot_g_failures);
+    print("=== Variable Slot: ", s_variable_slot_g_failures, " failure(s) ===");
 
     return s_variable_slot_g_failures == 0 ? 0 : 1;
 }
@@ -3780,13 +3789,13 @@ static fn suite_variable_slot_wrap() {
 static i32 s_variable_strict_g_failures = 0;
 
 #define CHECK(name, cond) do { \
-    if (cond) { printf("[variable_strict_test] PASS %s\n", name); } \
-    else { printf("[variable_strict_test] FAIL %s\n", name); s_variable_strict_g_failures++; } \
+    if (cond) { print("[variable_strict_test] PASS ", name); } \
+    else { print("[variable_strict_test] FAIL ", name); s_variable_strict_g_failures++; } \
 } while (0)
 
 /** Exercises strict SymbolTable rejection, class filtering, rename, and relational rebinding flows. */
 static i32 suite_variable_strict() {
-    printf("=== Running SymbolTable Strict Test Suite ===\n");
+    print("=== Running SymbolTable Strict Test Suite ===");
 
     if (!Memory_init(0u)) 
        return 1;
@@ -3827,7 +3836,7 @@ static i32 suite_variable_strict() {
 
     CHECK("case folds", SymbolTable_getId(&scope, "Character.Position.X") == f);
 
-    CHECK("getName dotted", strcmp(SymbolTable_getName(&scope, f), "character.position.x") == 0);
+    CHECK("getName dotted", string_equals(SymbolTable_getName(&scope, f), "character.position.x"));
 
     SymbolTable_instant(&scope, "mp", 1, (pointer) 0x400);
 
@@ -3880,10 +3889,10 @@ static i32 suite_variable_strict() {
     Relational_setString(&scope, "title", "hello");
 
     CHECK("setString create", Relational_getString(&scope, "title") != nullptr &&
-        strcmp(Relational_getString(&scope, "title"), "hello") == 0);
+        string_equals(Relational_getString(&scope, "title"), "hello"));
     Relational_setString(&scope, "title", "world");
 
-    CHECK("setString replace", strcmp(Relational_getString(&scope, "title"), "world") == 0);
+    CHECK("setString replace", string_equals(Relational_getString(&scope, "title"), "world"));
 
     CHECK("active count", SymbolTable_getActiveCount(&scope) == 7);
 
@@ -3891,7 +3900,7 @@ static i32 suite_variable_strict() {
 
     SymbolTable_shutdown(&scope);
 
-    printf("\n=== SymbolTable Strict Test Summary: %d failures ===\n", s_variable_strict_g_failures);
+    print("\n=== SymbolTable Strict Test Summary: ", s_variable_strict_g_failures, " failures ===");
 
     return s_variable_strict_g_failures > 0 ? 1 : 0;
 }
@@ -3919,7 +3928,7 @@ static i32 s_buffer_g_failures = 0;
 
 #define CHECK(cond) do { \
     if (!(cond)) { \
-        printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); \
+        print("FAIL ", __FILE__, ":", __LINE__, ": ", #cond); \
         s_buffer_g_failures++; \
     } \
 } while (0)
@@ -3973,9 +3982,9 @@ static i32 suite_buffer() {
     Buffer_free(copied);
 
     if (s_buffer_g_failures == 0)
-        printf("buffer_test: PASS\n");
+        print("buffer_test: PASS");
     else
-        printf("buffer_test: %d FAILURES\n", s_buffer_g_failures);
+        print("buffer_test: ", s_buffer_g_failures, " FAILURES");
     return s_buffer_g_failures != 0;
 }
 #undef CHECK
@@ -4008,57 +4017,61 @@ static i32 s_vex_string_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_vex_string_g_failures++;                                                  \
         }                                                                  \
     } while (0)
 
-/** Covers string allocation forms, value identity, copying, chooser arities, and freeing. */
-static fn test_allocate() {
-    CHECK(string_allocate(nullptr) == nullptr);
+/** Covers immutable string literals, arena constructors, cloning, ownership, and freeing. */
+static fn test_allocate()
+{
+    string literal = "hello";
+    CHECK(!string_isOwned(literal));
+    CHECK(string_length(literal) == 5u);
+    CHECK(string_capacity(literal) == 6u);
+    CHECK(string_type(literal) == 0u);
+    CHECK(!string_isArray(literal));
+    string_free(literal);
 
-    u8 *s = string_allocate("hello");
-    CHECK(s != nullptr);
-    CHECK(strcmp(string_get(s), "hello") == 0);
-    CHECK(string_length(s) == 5);
-    CHECK(string_capacity(s) == 6);
+    CHECK(string_1(nullptr) == nullptr);
+    CHECK(string_clone(nullptr) == nullptr);
+
+    string s = string("hello");
+    CHECK(s != nullptr && s != literal);
+    CHECK(string_isOwned(s));
+    CHECK(string_equals(s, "hello"));
+    CHECK(string_length(s) == 5u);
+    CHECK(string_capacity(s) == 6u);
     CHECK(string_type(s) == TYPE_STRING_ARRAY);
     CHECK(string_isArray(s));
     CHECK(string_classId() == ID_STRING);
-    CHECK(string_equalsCString(s, "hello"));
-    CHECK(!string_equalsCString(s, "hell"));
-    CHECK(!string_equalsCString(s, "hello!"));
-    CHECK(!string_equalsCString(s, nullptr));
+    CHECK(string_equals(s, "hello"));
+    CHECK(string_equals("hello", s));
+    CHECK(!string_equals(s, "hell"));
+    CHECK(!string_equals(s, "hello!"));
+    CHECK(!string_equals(s, nullptr));
 
-    u8 *e = string_allocate("");
-    CHECK(e != nullptr && string_length(e) == 0 && strcmp(string_get(e), "") == 0);
+    string e = string("");
+    CHECK(e != nullptr && string_length(e) == 0u && string_equals(e, ""));
 
-    u8 *b = string_allocateBytes((const u8*) "abc", 3);
-    CHECK(b != nullptr && string_length(b) == 3 && strcmp(string_get(b), "abc") == 0);
-    u8 *z = string_allocateBytes(nullptr, 0);
-    CHECK(z != nullptr && string_length(z) == 0);
-    CHECK(string_allocateBytes(nullptr, 3) == nullptr);
+    string b = string("abcdef", 3u);
+    CHECK(b != nullptr && string_length(b) == 3u && string_equals(b, "abc"));
+    string z = string(nullptr, 0u);
+    CHECK(z != nullptr && string_length(z) == 0u);
+    CHECK(string(nullptr, 3u) == nullptr);
 
-    u8 *u = string_allocateUninitialized(4);
-    CHECK(u != nullptr && string_length(u) == 4);
-    for (i32 i = 0; i < 4; i++)
-        CHECK(u[i] == 0);
-    CHECK(u[4] == '\0');
+    string c = string_clone(s);
+    CHECK(c != nullptr && c != s && string_equals(c, "hello"));
 
-    u8 *c = string_copy(s);
-    CHECK(c != nullptr && c != s && string_equalsCString(c, "hello"));
-    CHECK(string_copy(nullptr) == nullptr);
-
-    u8 *chooser0 = String();
-    CHECK(chooser0 != nullptr && string_length(chooser0) == 0);
-    u8 *chooser1 = String("world");
-    CHECK(chooser1 != nullptr && string_equalsCString(chooser1, "world"));
+    string chooser0 = string();
+    CHECK(chooser0 != nullptr && string_length(chooser0) == 0u);
+    string chooser1 = string("world");
+    CHECK(chooser1 != nullptr && string_equals(chooser1, "world"));
 
     string_free(s);
     string_free(e);
     string_free(b);
     string_free(z);
-    string_free(u);
     string_free(c);
     string_free(chooser0);
     string_free(chooser1);
@@ -4066,44 +4079,50 @@ static fn test_allocate() {
 }
 
 /** Checks safe defaults from every string introspection and equality call on null inputs. */
-static fn test_null_introspection() {
-    CHECK(string_get(nullptr) == nullptr);
-    CHECK(string_length(nullptr) == 0);
-    CHECK(string_type(nullptr) == 0);
+static fn test_null_introspection()
+{
+    CHECK(string_length(nullptr) == 0u);
+    CHECK(string_type(nullptr) == 0u);
+    CHECK(!string_isOwned(nullptr));
     CHECK(!string_isArray(nullptr));
-    CHECK(string_capacity(nullptr) == 0);
-    CHECK(!string_equalsCString(nullptr, "x"));
-    CHECK(!string_equalsCString(nullptr, nullptr));
+    CHECK(string_capacity(nullptr) == 0u);
+    CHECK(!string_equals(nullptr, "x"));
+    CHECK(!string_equals(nullptr, nullptr));
 }
 
 /** Checks ordering, containment, index lookup, in-string matching, and null arguments. */
-static fn test_compare_search() {
-    u8 *a = string_allocate("apple");
-    u8 *b = string_allocate("banana");
-    u8 *apple2 = string_allocate("apple");
+static fn test_compare_search()
+{
+    string a = string("apple");
+    string b = string("banana");
+    string apple2 = string("apple");
 
-    CHECK(String_compare(a, b) < 0);
-    CHECK(String_compare(b, a) > 0);
-    CHECK(String_compare(a, apple2) == 0);
-    CHECK(String_compare(nullptr, nullptr) == 0);
-    CHECK(String_compare(nullptr, a) < 0);
-    CHECK(String_compare(a, nullptr) > 0);
+    CHECK(string_compare(a, b) < 0);
+    CHECK(string_compare(b, a) > 0);
+    CHECK(string_compare(a, apple2) == 0);
+    CHECK(string_compare(a, "apple") == 0);
+    CHECK(string_compare("apple", "banana") < 0);
+    CHECK(string_compare(nullptr, nullptr) == 0);
+    CHECK(string_compare(nullptr, a) < 0);
+    CHECK(string_compare(a, nullptr) > 0);
 
-    u8 *needle = string_allocate("nan");
-    CHECK(String_contains(b, needle));
-    CHECK(String_containsLiteral(b, "ban"));
-    CHECK(String_containsLiteral(b, "xyz") == false);
-    CHECK(!String_contains(nullptr, a));
-    CHECK(!String_containsLiteral(b, nullptr));
+    string needle = string("nan");
+    CHECK(string_contains(b, needle));
+    CHECK(string_contains(b, "ban"));
+    CHECK(string_contains("banana", needle));
+    CHECK(!string_contains(b, "xyz"));
+    CHECK(!string_contains(nullptr, a));
+    CHECK(!string_contains(b, nullptr));
     string_free(needle);
 
-    CHECK(String_indexOfLiteral(b, "ana") == 1);
-    CHECK(String_indexOfLiteral(b, "zzz") == (bytes) -1);
-    CHECK(String_indexOf(nullptr, b) == (bytes) -1);
+    CHECK(string_indexOf(b, "ana") == 1u);
+    CHECK(string_indexOf("banana", "ana") == 1u);
+    CHECK(string_indexOf(b, "zzz") == SIZE_MAX);
+    CHECK(string_indexOf(nullptr, b) == SIZE_MAX);
 
-    CHECK(String_instringLiteral(1, b, "ana"));
-    CHECK(!String_instringLiteral(0, b, "ana"));
-    CHECK(!String_instringLiteral(0, b, "zzz"));
+    CHECK(string_instring(1u, b, "ana"));
+    CHECK(!string_instring(0u, b, "ana"));
+    CHECK(!string_instring(0u, b, "zzz"));
 
     string_free(a);
     string_free(b);
@@ -4111,30 +4130,34 @@ static fn test_compare_search() {
 }
 
 /** Checks substring clamping, empty out-of-range results, and first/last projections. */
-static fn test_substrings() {
-    u8 *s = string_allocate("hello world");
+static fn test_substrings()
+{
+    string s = string("hello world");
 
-    u8 *sub = String_substring(s, 6, 5);
-    CHECK(string_equalsCString(sub, "world"));
-    u8 *clamped = String_substring(s, 6, 999);
-    CHECK(string_equalsCString(clamped, "world"));
-    u8 *empty = String_substring(s, 11, 3);
-    CHECK(string_length(empty) == 0);
-    CHECK(String_substring(nullptr, 0, 1) == nullptr);
+    string sub = string_substring(s, 6u, 5u);
+    CHECK(string_equals(sub, "world"));
+    string clamped = string_substring(s, 6u, 999u);
+    CHECK(string_equals(clamped, "world"));
+    string empty = string_substring(s, 11u, 3u);
+    CHECK(string_length(empty) == 0u);
+    CHECK(string_substring(nullptr, 0u, 1u) == nullptr);
 
-    u8 *lit = String_substringLiteral("abcdef", 2, 3);
-    CHECK(string_equalsCString(lit, "cde"));
+    string lit = string_substring("abcdef", 2u, 3u);
+    CHECK(string_equals(lit, "cde"));
 
-    u8 *firstChar = String_subFirstChar(s);
-    CHECK(string_equalsCString(firstChar, "h"));
-    u8 *lastChar = String_subLastChar(s);
-    CHECK(string_equalsCString(lastChar, "d"));
-    u8 *first = String_subFirst(s, 5);
-    CHECK(string_equalsCString(first, "hello"));
-    u8 *last = String_subLast(s, 5);
-    CHECK(string_equalsCString(last, "world"));
-    u8 *all = String_subLast(s, 999);
-    CHECK(string_equalsCString(all, "hello world"));
+    string firstChar = string_subFirstChar(s);
+    CHECK(string_equals(firstChar, "h"));
+    string lastChar = string_subLastChar(s);
+    CHECK(string_equals(lastChar, "d"));
+    string first = string_subFirst(s, 5u);
+    CHECK(string_equals(first, "hello"));
+    string last = string_subLast(s, 5u);
+    CHECK(string_equals(last, "world"));
+    string all = string_subLast(s, 999u);
+    CHECK(string_equals(all, "hello world"));
+
+    string view = s;
+    CHECK(string_length(view) == 11u && string_startsWith(view, "hello"));
 
     string_free(s);
     string_free(sub);
@@ -4148,48 +4171,113 @@ static fn test_substrings() {
     string_free(all);
 }
 
-/** Checks append variants, null identities, destination capacity, and append-first growth. */
-static fn test_append() {
-    u8 *a = string_allocate("foo");
-    u8 *b = string_allocate("bar");
+/** Checks immutable append over arena strings and literals, including null identities. */
+static fn test_append()
+{
+    string a = string("foo");
+    string b = string("bar");
 
-    u8 *ab = String_append(a, b);
-    CHECK(string_equalsCString(ab, "foobar"));
-    CHECK(string_equalsCString(String_append(a, nullptr), "foo"));
-    CHECK(string_equalsCString(String_append(nullptr, b), "bar"));
-    CHECK(string_length(String_append(nullptr, nullptr)) == 0);
+    string ab = string_append(a, b);
+    CHECK(string_equals(ab, "foobar"));
 
-    u8 *lit = String_appendLiteral(a, "baz");
-    CHECK(string_equalsCString(lit, "bazfoo") == false);
-    CHECK(string_equalsCString(lit, "foobaz"));
-    CHECK(string_equalsCString(String_appendLiterals("ab", "cd"), "abcd"));
-    CHECK(string_equalsCString(String_appendLiterals(nullptr, "cd"), "cd"));
-    CHECK(string_equalsCString(String_appendLiterals("ab", nullptr), "ab"));
+    string aOnly = string_append(a, nullptr);
+    string bOnly = string_append(nullptr, b);
+    string none = string_append(nullptr, nullptr);
+    CHECK(string_equals(aOnly, "foo"));
+    CHECK(string_equals(bOnly, "bar"));
+    CHECK(string_length(none) == 0u);
 
-    u8 *dest = string_allocateUninitialized(6);
-    String_appendInto(a, b, dest);
-    CHECK(string_equalsCString(dest, "foobar"));
-    u8 *small = string_allocateUninitialized(3);
-    memcpy(small, "xy", 2);
-    small[2] = '\0';
-    String_appendInto(a, b, small);
-    CHECK(memcmp(small, "xy", 2) == 0);
+    string lit = string_append(a, "baz");
+    CHECK(!string_equals(lit, "bazfoo"));
+    CHECK(string_equals(lit, "foobaz"));
 
-    u8 *inplace = string_allocate("ab");
-    inplace = String_appendFirst(inplace, b);
-    CHECK(string_equalsCString(inplace, "abbar"));
-    inplace = String_appendFirstLiteral(inplace, "c");
-    CHECK(string_equalsCString(inplace, "abbarc"));
-    CHECK(string_equalsCString(String_appendFirst(inplace, nullptr), "abbarc"));
-    CHECK(string_equalsCString(String_appendFirst(nullptr, b), "bar"));
+    string lits = string_append("ab", "cd");
+    string litR = string_append(nullptr, "cd");
+    string litL = string_append("ab", nullptr);
+    CHECK(string_equals(lits, "abcd"));
+    CHECK(string_equals(litR, "cd"));
+    CHECK(string_equals(litL, "ab"));
 
     string_free(a);
     string_free(b);
     string_free(ab);
+    string_free(aOnly);
+    string_free(bOnly);
+    string_free(none);
     string_free(lit);
-    string_free(dest);
-    string_free(small);
-    string_free(inplace);
+    string_free(lits);
+    string_free(litR);
+    string_free(litL);
+}
+
+static i32 failures = 0;
+static i32 checks = 0;
+
+static fn check(bool condition, string label)
+{
+    ++checks;
+    if (!condition)
+    {
+        print("FAIL ", label);
+        ++failures;
+    }
+}
+
+/** Verifies string comparison, prefix/suffix, search, and bounded slice constructors. */
+static i32 test_string_views()
+{
+    string alpha = "alpha";
+    string alphaCopy = "alpha";
+    string beta = "beta";
+    string empty = "";
+
+    check(string_length(alpha) == 5, "length");
+    check(string_isEmpty(empty), "empty view");
+    check(!string_isEmpty(alpha), "non-empty view");
+    check(string_compare(alpha, alphaCopy) == 0, "equal compare");
+    check(string_compare(alpha, beta) < 0, "shorter prefix sorts first");
+    check(string_compare(beta, alpha) > 0, "reverse compare");
+    check(string_compare(empty, empty) == 0, "two empty views");
+    check(string_compare(empty, alpha) < 0, "empty before text");
+    check(string_equals(alpha, alphaCopy), "equals");
+    check(!string_equals(alpha, beta), "not equals");
+
+    check(string_compare("ab", "abc") < 0,
+          "prefix is less, not equal");
+
+    check(string_startsWith(alpha, "alp"), "starts with");
+    check(!string_startsWith(alpha, "lph"), "not starts with");
+    check(string_endsWith(alpha, "pha"), "ends with");
+    check(!string_endsWith(alpha, "alpha!") , "suffix longer than view");
+    check(string_startsWith(alpha, "al"), "has prefix literal");
+
+    check(string_indexOf(alpha, "ph") == 2, "find substring");
+    check(string_indexOf(alpha, "zz") == SIZE_MAX, "find absent");
+    check(string_indexOf(alpha, empty) == 0, "find empty needle");
+    check(string_findChar(alpha, 'h') == 3, "find utf8");
+    check(string_findChar(alpha, 'z') == SIZE_MAX, "find absent utf8");
+
+    const utf8 raw[3] = {'x', 'y', 'z'};
+    string unterminated = string_2(raw, 3);
+    check(string_length(unterminated) == 3, "unterminated length");
+    check(string_equals(unterminated, "xyz"),
+          "unterminated compares equal to a C string");
+    check(string_indexOf(unterminated, "yz") == 1,
+          "unterminated search stays inside the bound");
+    string_free(unterminated);
+
+    string head = string_2("abc", 2);
+    check(string_compare(head, "abc") < 0, "bounded view is shorter");
+    check(string_findChar(head, 'c') == SIZE_MAX, "search honours the bound");
+    string_free(head);
+
+    if (failures == 0)
+    {
+        print("primitive/vex-string views: ", checks, " checks passed");
+        return 0;
+    }
+    print("primitive/vex-string views: ", failures, " of ", checks, " check(s) failed");
+    return 1;
 }
 
 /** Initializes the memory substrate, runs each string contract case, and returns aggregate failures. */
@@ -4200,12 +4288,14 @@ static i32 suite_vex_string() {
     test_compare_search();
     test_substrings();
     test_append();
+    if (test_string_views() != 0)
+        s_vex_string_g_failures++;
 
     if (s_vex_string_g_failures == 0) {
-        printf("string_test: all assertions held\n");
+        print("string_test: all assertions held");
         return 0;
     }
-    printf("string_test: %d FAILURES\n", s_vex_string_g_failures);
+    print("string_test: ", s_vex_string_g_failures, " FAILURES");
     return 1;
 }
 #undef CHECK
@@ -4216,77 +4306,106 @@ static fn suite_vex_string_wrap() {
         g_failures++;
 }
 
-/** Suite: char_sequence (from primitive/char_sequence/char_sequence_test.c). */
-static i32 failures = 0;
-static i32 checks = 0;
+/** Suite: varchar (arena-backed immutable varchar constructors, conversion, cloning, and string_clone). */
+static i32 s_varchar_failures = 0;
 
-static fn check(bool condition, const utf8 *label)
+static fn varchar_check(bool condition, string label)
 {
-    ++checks;
-    if (!condition)
-    {
-        printf("FAIL %s\n", label);
-        ++failures;
+    if (!condition) {
+        print("FAIL varchar: ", label);
+        s_varchar_failures++;
     }
 }
 
-static i32 suite_char_sequence()
+static i32 suite_varchar()
 {
-    CharSequence alpha = CharSequence_cstr("alpha");
-    CharSequence alphaCopy = CharSequence_cstr("alpha");
-    CharSequence beta = CharSequence_cstr("beta");
-    CharSequence empty = CharSequence_zero();
+    s_varchar_failures = 0;
+    varchar_check(Memory_init(0), "Memory_init");
 
-    check(CharSequence_length(alpha) == 5, "length");
-    check(CharSequence_isEmpty(empty), "empty view");
-    check(!CharSequence_isEmpty(alpha), "non-empty view");
-    check(CharSequence_compare(alpha, alphaCopy) == 0, "equal compare");
-    check(CharSequence_compare(alpha, beta) < 0, "shorter prefix sorts first");
-    check(CharSequence_compare(beta, alpha) > 0, "reverse compare");
-    check(CharSequence_compare(empty, empty) == 0, "two empty views");
-    check(CharSequence_compare(empty, alpha) < 0, "empty before text");
-    check(CharSequence_equals(alpha, alphaCopy), "equals");
-    check(!CharSequence_equals(alpha, beta), "not equals");
+    varchar empty = varchar(100);
+    varchar_check(empty != nullptr && varchar_limit(empty) == 100u && varchar_length(empty) == 0u && varchar_byteLength(empty) == 0u && varchar_isEmpty(empty), "varchar(100)");
+    varchar_check(Memory_type((any) (pointer) empty) == TYPE_VARCHAR, "TYPE_VARCHAR header");
 
-    check(CharSequence_compare(CharSequence_cstr("ab"), CharSequence_cstr("abc")) < 0,
-          "prefix is less, not equal");
+    varchar hello = varchar(100, "hello world");
+    varchar_check(hello != nullptr && varchar_limit(hello) == 100u && varchar_length(hello) == 11u && varchar_byteLength(hello) == 11u && varchar_format(hello) == FORMAT_UTF8, "varchar(100, hello world)");
+    varchar_check(varchar_string(hello) != nullptr && string_equals(varchar_string(hello), "hello world"), "varchar_string borrow");
+    varchar_check(varchar_equalsString(hello, "hello world"), "varchar_equalsString");
 
-    check(CharSequence_startsWith(alpha, CharSequence_cstr("alp")), "starts with");
-    check(!CharSequence_startsWith(alpha, CharSequence_cstr("lph")), "not starts with");
-    check(CharSequence_endsWith(alpha, CharSequence_cstr("pha")), "ends with");
-    check(!CharSequence_endsWith(alpha, CharSequence_cstr("alpha!")) , "suffix longer than view");
-    check(CharSequence_hasPrefix(alpha, "al"), "has prefix literal");
+    varchar copy = varchar_clone(hello);
+    varchar_check(copy != nullptr && copy != hello && varchar_equals(hello, copy) && varchar_limit(copy) == 100u, "varchar_clone distinct immutable copy");
 
-    check(CharSequence_find(alpha, CharSequence_cstr("ph")) == 2, "find substring");
-    check(CharSequence_find(alpha, CharSequence_cstr("zz")) == SIZE_MAX, "find absent");
-    check(CharSequence_find(alpha, empty) == 0, "find empty needle");
-    check(CharSequence_findChar(alpha, 'h') == 3, "find utf8");
-    check(CharSequence_findChar(alpha, 'z') == SIZE_MAX, "find absent utf8");
+    string unicode = "A\xC3\xA9\xE6\x97\xA5\xF0\x9F\x94\xA5";
+    varchar u16 = varchar(10, unicode, FORMAT_UTF16);
+    varchar_check(u16 != nullptr && varchar_format(u16) == FORMAT_UTF16 && varchar_limit(u16) == 10u && varchar_length(u16) == 4u && varchar_byteLength(u16) == 10u, "varchar(10, unicode, FORMAT_UTF16)");
+    varchar_check(varchar_equalsString(u16, unicode), "utf16 equalsString");
 
-    const utf8 raw[3] = {'x', 'y', 'z'};
-    CharSequence unterminated = CharSequence_2(raw, 3);
-    check(CharSequence_length(unterminated) == 3, "unterminated length");
-    check(CharSequence_equals(unterminated, CharSequence_cstr("xyz")),
-          "unterminated compares equal to a C string");
-    check(CharSequence_find(unterminated, CharSequence_cstr("yz")) == 1,
-          "unterminated search stays inside the bound");
+    varchar u32 = varchar_convert(u16, FORMAT_UTF32);
+    varchar_check(u32 != nullptr && varchar_format(u32) == FORMAT_UTF32 && varchar_limit(u32) == 10u && varchar_length(u32) == 4u && varchar_byteLength(u32) == 16u, "varchar_convert to FORMAT_UTF32");
+    varchar_check(varchar_equalsCodePoints(u16, u32), "utf16 vs utf32 code points");
 
-    CharSequence head = CharSequence_2("abc", 2);
-    check(CharSequence_compare(head, CharSequence_cstr("abc")) < 0, "bounded view is shorter");
-    check(CharSequence_findChar(head, 'c') == SIZE_MAX, "search honours the bound");
+    varchar cesu = varchar_convert(u32, FORMAT_CESU8);
+    varchar_check(cesu != nullptr && varchar_format(cesu) == FORMAT_CESU8 && varchar_length(cesu) == 4u && varchar_byteLength(cesu) == 12u, "varchar_convert to FORMAT_CESU8");
+    varchar_check(varchar_equalsCodePoints(u16, cesu), "utf16 vs cesu8 code points");
 
-    if (failures == 0)
-    {
-        printf("primitive/char_sequence: %d checks passed\n", checks);
+    varchar fromRaw = varchar_fromBytes(10u, varchar_value(u16), (bytes) varchar_byteLength(u16), FORMAT_UTF16);
+    varchar_check(fromRaw != nullptr && fromRaw != u16 && varchar_equals(fromRaw, u16), "varchar_fromBytes utf16");
+
+    varchar over = varchar(3, unicode);
+    varchar_check(over == nullptr, "limit exceeded returns nullptr");
+    varchar badAscii = varchar(10, unicode, FORMAT_ASCII);
+    varchar_check(badAscii == nullptr, "non-ascii rejected for FORMAT_ASCII");
+    varchar badLatin = varchar(10, unicode, FORMAT_LATIN1);
+    varchar_check(badLatin == nullptr, "non-latin1 rejected for FORMAT_LATIN1");
+
+    MemoryArena *customArena = MemoryArena(65536u);
+    varchar_check(customArena != nullptr, "custom MemoryArena");
+    varchar inCustom = varchar_in(customArena, 32u, "arena-owned", FORMAT_UTF8);
+    varchar_check(inCustom != nullptr && varchar_equalsString(inCustom, "arena-owned") && varchar_limit(inCustom) == 32u, "varchar_in custom arena");
+    varchar cloneCustom = varchar_cloneIn(customArena, inCustom);
+    varchar_check(cloneCustom != nullptr && cloneCustom != inCustom && varchar_equals(inCustom, cloneCustom), "varchar_cloneIn custom arena");
+
+    string literal = "immutable text";
+    string sClone1 = string_clone(literal);
+    string sClone2 = string_clone(literal);
+    varchar_check(sClone1 != nullptr && sClone2 != nullptr && sClone1 != literal && sClone1 != sClone2, "string_clone never pools");
+    varchar_check(string_equals(sClone1, literal) && string_equals(sClone2, literal), "string_clone content");
+    varchar_check(Memory_type((any) (pointer) sClone1) == TYPE_STRING_ARRAY, "TYPE_STRING_ARRAY header");
+
+    string sSlice = string_sliceIn(customArena, literal, 9u);
+    varchar_check(sSlice != nullptr && string_equals(sSlice, "immutable"), "string_sliceIn");
+
+    string_free(sSlice);
+    string_free(sClone2);
+    string_free(sClone1);
+    string_free(literal);
+    string_free(nullptr);
+
+    varchar_free(cloneCustom);
+    varchar_free(inCustom);
+    MemoryArena_destroy(customArena);
+
+    varchar_free(fromRaw);
+    varchar_free(cesu);
+    varchar_free(u32);
+    varchar_free(u16);
+    varchar_free(copy);
+    varchar_free(hello);
+    varchar_free(empty);
+    varchar_free(nullptr);
+
+    if (s_varchar_failures == 0) {
+        print("primitive/varchar: PASS");
         return 0;
     }
-    printf("primitive/char_sequence: %d of %d check(s) failed\n", failures, checks);
+
+    print("primitive/varchar: ", s_varchar_failures, " FAILURES");
     return 1;
 }
 
-/** Void adapter for char_sequence suite. */
-static fn suite_char_sequence_wrap() {
-    if (suite_char_sequence() != 0)
+/** Void adapter for varchar suite. */
+static fn suite_varchar_wrap()
+{
+    if (suite_varchar() != 0)
         g_failures++;
 }
 
@@ -4313,7 +4432,7 @@ static i32 s_spin_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_spin_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -4516,12 +4635,12 @@ static i32 suite_spin() {
     test_contention();
 
     if (s_spin_g_failures == 0) {
-        printf("spin_test: all assertions held\n");
+        print("spin_test: all assertions held");
 
         return 0;
     }
 
-    printf("spin_test: %d FAILURES\n", s_spin_g_failures);
+    print("spin_test: ", s_spin_g_failures, " FAILURES");
 
     return 1;
 }
@@ -4560,7 +4679,7 @@ static i32 s_array_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_array_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -4669,12 +4788,12 @@ static i32 suite_array() {
     Array_free(a);
 
     if (s_array_g_failures == 0) {
-        printf("array_test: all assertions held\n");
+        print("array_test: all assertions held");
 
         return 0;
     }
 
-    printf("array_test: %d FAILURES\n", s_array_g_failures);
+    print("array_test: ", s_array_g_failures, " FAILURES");
 
     return 1;
 }
@@ -4709,7 +4828,7 @@ static i32 s_chunked_list_g_checks = 0;
         s_chunked_list_g_checks++;                                                       \
         if (!(cond)) {                                                    \
             s_chunked_list_g_fail++;                                                     \
-            printf("  FAIL line %d: %s\n", __LINE__, #cond);              \
+            print("  FAIL line ", __LINE__, ": ", #cond);              \
         }                                                                 \
     } while (0)
 
@@ -4756,7 +4875,7 @@ static inline fn s_chunked_list_Row16_setD(Row16 *r, u32 v)
 
 /** Checks empty-list defaults, row geometry, and initial capacity. */
 static fn testDefaults() {
-    printf("[1] defaults: 128-byte budget, 16-byte rows -> 8 rows/chunk\n");
+    print("[1] defaults: 128-byte budget, 16-byte rows -> 8 rows/chunk");
 
     ChunkedList *list = ChunkedList_3(ID_INT, 16u, VEX_CHUNKED_BYTES_DEFAULT);
 
@@ -4810,7 +4929,7 @@ static fn testDefaults() {
 
 /** Verifies row addresses remain stable when the chunk directory grows. */
 static fn testStableAddresses() {
-    printf("[2] stable addresses + chunk boundaries across growth\n");
+    print("[2] stable addresses + chunk boundaries across growth");
 
     ChunkedList *list = ChunkedList_3(ID_INT, 16u, 128u);
 
@@ -4916,7 +5035,7 @@ static fn testStableAddresses() {
 
 /** Exercises explicit reservation, including its accepted and rejected bounds. */
 static fn testReserve() {
-    printf("[3] reserve pre-allocates chunks without activating rows\n");
+    print("[3] reserve pre-allocates chunks without activating rows");
 
     ChunkedList *list = ChunkedList_3(ID_INT, 16u, 128u);
 
@@ -4955,7 +5074,7 @@ static fn testReserve() {
 
 /** Checks packing rows into caller-provided storage and preserves output on rejection. */
 static fn testPackInto() {
-    printf("[4] packInto snapshot: dest-last + truncation flag\n");
+    print("[4] packInto snapshot: dest-last + truncation flag");
 
     ChunkedList *list = ChunkedList_3(ID_INT, 16u, 128u);
 
@@ -5028,7 +5147,7 @@ static fn testPackInto() {
 
 /** Verifies chunk-byte budgeting limits admission without corrupting existing rows. */
 static fn testChunkBytesBudget() {
-    printf("[5] chunk byte budget: settable before growth, rejected after\n");
+    print("[5] chunk byte budget: settable before growth, rejected after");
 
     ChunkedList *list = ChunkedList_3(ID_INT, 16u, 128u);
 
@@ -5076,7 +5195,7 @@ static fn testChunkBytesBudget() {
 
 /** Confirms nullable list operations return safe defaults without mutation. */
 static fn testNullSafety() {
-    printf("[6] cold-path null safety (no crash on null self)\n");
+    print("[6] cold-path null safety (no crash on null self)");
 
     CHECK(ChunkedList_size(nullptr) == 0u);
 
@@ -5113,7 +5232,7 @@ static fn testNullSafety() {
 
 /** Exercises overflow-checked capacity and byte-size calculations. */
 static fn testCheckedMath() {
-    printf("[7] checked size math: extreme budgets fail closed, never wrap\n");
+    print("[7] checked size math: extreme budgets fail closed, never wrap");
 
     ChunkedList *huge = ChunkedList_3(ID_INT, 1u, UINT32_MAX);
 
@@ -5227,7 +5346,7 @@ static i32 cmpPtr(const_any a, const_any b) {
 
 /** Runs concurrent appenders and checks completion and the resulting row set. */
 static fn testConcurrentWriters() {
-    printf("[8] concurrent writers claim every row exactly once; readers see no holes\n");
+    print("[8] concurrent writers claim every row exactly once; readers see no holes");
 
     ChunkedList *list = ChunkedList_3(ID_INT, 16u, 128u);
 
@@ -5283,13 +5402,11 @@ static fn testConcurrentWriters() {
 
     CHECK(ChunkedList_size(list) == (u32) CONC_TOTAL);
 
-    u8 *seen = (u8*) calloc((bytes) CONC_TOTAL + 1u, 1u);
+    static u8 seen[CONC_TOTAL + 1u];
+    memset(seen, 0, sizeof(seen));
+    static u8 *ptrs[CONC_TOTAL];
 
-    u8 **ptrs = (u8**) malloc((bytes) CONC_TOTAL * sizeof(u8*));
-
-    CHECK(seen != nullptr && ptrs != nullptr);
-
-    bool stampsOk = seen != nullptr && ptrs != nullptr;
+    bool stampsOk = true;
 
     for (u32 i = 0u; stampsOk && i < (u32) CONC_TOTAL; i++) {
         u8 *row = ChunkedList_slot(list, i);
@@ -5332,10 +5449,6 @@ static fn testConcurrentWriters() {
 
     CHECK(distinct);
 
-    free(seen);
-
-    free(ptrs);
-
     g_concList = nullptr;
 
     ChunkedList_free(list);
@@ -5343,7 +5456,7 @@ static fn testConcurrentWriters() {
 
 /** Runs the chunked-list geometry, stability, rejection, and concurrency cases. */
 static i32 suite_chunked_list() {
-    printf("=== ChunkedList Test Suite ===\n\n");
+    print("=== ChunkedList Test Suite ===\n");
 
     testDefaults();
 
@@ -5361,10 +5474,10 @@ static i32 suite_chunked_list() {
 
     testConcurrentWriters();
 
-    printf("\n%d checks, %d failed\n", s_chunked_list_g_checks, s_chunked_list_g_fail);
+    print("\n", s_chunked_list_g_checks, " checks, ", s_chunked_list_g_fail, " failed");
 
     if (s_chunked_list_g_fail == 0) 
-        printf("=== ChunkedList Test Suite: ALL PASS ===\n");
+        print("=== ChunkedList Test Suite: ALL PASS ===");
 
     return s_chunked_list_g_fail == 0 ? 0 : 1;
 }
@@ -5408,7 +5521,7 @@ static i32 s_chunked_paged_g_checks = 0;
         s_chunked_paged_g_checks++;                                                       \
         if (!(cond)) {                                                    \
             s_chunked_paged_g_fail++;                                                     \
-            printf("  FAIL line %d: %s\n", __LINE__, #cond);              \
+            print("  FAIL line ", __LINE__, ": ", #cond);              \
         }                                                                 \
     } while (0)
 
@@ -5455,7 +5568,7 @@ static inline fn s_chunked_paged_Row16_setD(Row16 *r, u32 v)
 
 /** Confirms the public sentinel values used by paged chunk traversal. */
 static fn testSentinels() {
-    printf("[1] sentinels: FourCC sugars are negative and byte-exact\n");
+    print("[1] sentinels: FourCC sugars are negative and byte-exact");
 
     CHECK(CHUNKED_LIST_TWO_LAYER_DEFAULT < 0);
 
@@ -5468,7 +5581,7 @@ static fn testSentinels() {
 
 /** Checks page geometry and index-to-page calculations at their boundaries. */
 static fn testGeometry() {
-    printf("[2] radix geometry: explicit depth, page leaf, pow2 rounding\n");
+    print("[2] radix geometry: explicit depth, page leaf, pow2 rounding");
 
     ChunkedList *l3 = ChunkedList(ID_INT, 16u, 4, 4, 4);
 
@@ -5513,7 +5626,7 @@ static fn testGeometry() {
 
 /** Verifies initial layer geometry and its empty-state defaults. */
 static fn testLayerDefaults() {
-    printf("[3] *_LAYER_DEFAULT presets select depth + page leaf\n");
+    print("[3] *_LAYER_DEFAULT presets select depth + page leaf");
 
     ChunkedList *two = ChunkedList(ID_INT, 16u, CHUNKED_LIST_TWO_LAYER_DEFAULT);
 
@@ -5554,7 +5667,7 @@ static fn testLayerDefaults() {
 
 /** Exercises multi-level growth and checks that previously admitted entries remain accessible. */
 static fn testDeepGrowth() {
-    printf("[4] 3-level growth: stable rows across root doubling, leaf boundaries\n");
+    print("[4] 3-level growth: stable rows across root doubling, leaf boundaries");
 
     ChunkedList *list = ChunkedList(ID_INT, 16u, 4, 4, 4);
 
@@ -5674,7 +5787,7 @@ static fn chainFn(u8 *chunk, u32 index, any userdata) {
 
 /** Verifies chain traversal visits the expected chunks in order. */
 static fn testChain() {
-    printf("[5] leaf tail-link chain: nextChunk + forEachChunk\n");
+    print("[5] leaf tail-link chain: nextChunk + forEachChunk");
 
     ChunkedList *list = ChunkedList(ID_INT, 16u, 4, 4, 4);
 
@@ -5758,7 +5871,7 @@ static fn testChain() {
 
 /** Runs the paged-chunk sentinel, geometry, growth, and chain callback checks. */
 static i32 suite_chunked_paged() {
-    printf("=== ChunkedList Paged (radix) Test Suite ===\n\n");
+    print("=== ChunkedList Paged (radix) Test Suite ===\n");
 
     testSentinels();
 
@@ -5770,10 +5883,10 @@ static i32 suite_chunked_paged() {
 
     testChain();
 
-    printf("\n%d checks, %d failed\n", s_chunked_paged_g_checks, s_chunked_paged_g_fail);
+    print("\n", s_chunked_paged_g_checks, " checks, ", s_chunked_paged_g_fail, " failed");
 
     if (s_chunked_paged_g_fail == 0) 
-        printf("=== ChunkedList Paged Test Suite: ALL PASS ===\n");
+        print("=== ChunkedList Paged Test Suite: ALL PASS ===");
 
     return s_chunked_paged_g_fail == 0 ? 0 : 1;
 }
@@ -5803,7 +5916,7 @@ static i32 s_collection_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_collection_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -5913,12 +6026,12 @@ static i32 suite_collection() {
     Array_free(a);
 
     if (s_collection_g_failures == 0) {
-        printf("collection_test: all assertions held\n");
+        print("collection_test: all assertions held");
 
         return 0;
     }
 
-    printf("collection_test: %d FAILURES\n", s_collection_g_failures);
+    print("collection_test: ", s_collection_g_failures, " FAILURES");
 
     return 1;
 }
@@ -5940,7 +6053,7 @@ static i32 s_deque_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_deque_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -6032,12 +6145,12 @@ static i32 suite_deque() {
     Deque_free(d);
 
     if (s_deque_g_failures == 0) {
-        printf("deque_test: all assertions held\n");
+        print("deque_test: all assertions held");
 
         return 0;
     }
 
-    printf("deque_test: %d FAILURES\n", s_deque_g_failures);
+    print("deque_test: ", s_deque_g_failures, " FAILURES");
 
     return 1;
 }
@@ -6065,7 +6178,7 @@ static i32 s_exhaustion_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_exhaustion_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -6139,12 +6252,12 @@ static i32 suite_exhaustion() {
     List_free(ok);
 
     if (s_exhaustion_g_failures == 0) {
-        printf("exhaustion_test: all assertions held\n");
+        print("exhaustion_test: all assertions held");
 
         return 0;
     }
 
-    printf("exhaustion_test: %d FAILURES\n", s_exhaustion_g_failures);
+    print("exhaustion_test: ", s_exhaustion_g_failures, " FAILURES");
 
     return 1;
 }
@@ -6176,7 +6289,7 @@ static i32 s_list_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_list_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -6342,12 +6455,12 @@ static i32 suite_list() {
     List_free(big);
 
     if (s_list_g_failures == 0) {
-        printf("list_test: all assertions held (1,000,000 elements / 4 threads)\n");
+        print("list_test: all assertions held (1,000,000 elements / 4 threads)");
 
         return 0;
     }
 
-    printf("list_test: %d FAILURES\n", s_list_g_failures);
+    print("list_test: ", s_list_g_failures, " FAILURES");
 
     return 1;
 }
@@ -6369,7 +6482,7 @@ static i32 s_map_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_map_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -6449,12 +6562,12 @@ static i32 suite_map() {
     Map_free(m);
 
     if (s_map_g_failures == 0) {
-        printf("map_test: all assertions held\n");
+        print("map_test: all assertions held");
 
         return 0;
     }
 
-    printf("map_test: %d FAILURES\n", s_map_g_failures);
+    print("map_test: ", s_map_g_failures, " FAILURES");
 
     return 1;
 }
@@ -6476,7 +6589,7 @@ static i32 s_queue_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_queue_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -6552,12 +6665,12 @@ static i32 suite_queue() {
     Queue_free(q);
 
     if (s_queue_g_failures == 0) {
-        printf("queue_test: all assertions held\n");
+        print("queue_test: all assertions held");
 
         return 0;
     }
 
-    printf("queue_test: %d FAILURES\n", s_queue_g_failures);
+    print("queue_test: ", s_queue_g_failures, " FAILURES");
 
     return 1;
 }
@@ -6593,7 +6706,7 @@ static i32 s_ring_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_ring_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -6916,12 +7029,12 @@ static i32 suite_ring() {
     test_mpmc_exactly_once();
 
     if (s_ring_g_failures == 0) {
-        printf("ring_test: all assertions held\n");
+        print("ring_test: all assertions held");
 
         return 0;
     }
 
-    printf("ring_test: %d FAILURES\n", s_ring_g_failures);
+    print("ring_test: ", s_ring_g_failures, " FAILURES");
 
     return 1;
 }
@@ -6947,7 +7060,7 @@ static i32 s_set_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_set_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -7025,12 +7138,12 @@ static i32 suite_set() {
     Set_free(s);
 
     if (s_set_g_failures == 0) {
-        printf("set_test: all assertions held\n");
+        print("set_test: all assertions held");
 
         return 0;
     }
 
-    printf("set_test: %d FAILURES\n", s_set_g_failures);
+    print("set_test: ", s_set_g_failures, " FAILURES");
 
     return 1;
 }
@@ -7063,18 +7176,18 @@ static fn suite_set_wrap() {
 static i32 s_stack_observability_g_failures = 0;
 
 #define CHECK(name, cond) do { \
-    if (cond) { printf("[stackobs] PASS %s\n", name); } \
-    else { printf("[stackobs] FAIL %s\n", name); s_stack_observability_g_failures++; } \
+    if (cond) { print("[stackobs] PASS ", name); } \
+    else { print("[stackobs] FAIL ", name); s_stack_observability_g_failures++; } \
 } while (0)
 
 #define ARENA_BYTES (32u * 1024u * 1024u)
-#define PUSH_LIMIT  6000000u /** exceeds the 64MB default arena's reachable capacity */
+#define PUSH_LIMIT  9000000u /** exceeds the 64MB default arena's reachable capacity */
 
 static i32 suite_stack_observability() {
-    printf("=== Stack explicit-fault owner suite ===\n");
+    print("=== Stack explicit-fault owner suite ===");
     CHECK("small arena initialized", Memory_init(ARENA_BYTES));
 
-    CHECK("TRY_NO_MEMORY has a name", strcmp(TryCode_name(TRY_NO_MEMORY), "TRY_NO_MEMORY") == 0);
+    CHECK("TRY_NO_MEMORY has a name", string_equals(TryCode_name(TRY_NO_MEMORY), "TRY_NO_MEMORY"));
 
     CHECK("TRY_NO_MEMORY has a message", TryCode_message(TRY_NO_MEMORY)[0] != '\0');
 
@@ -7131,7 +7244,7 @@ static i32 suite_stack_observability() {
 
     CHECK("fault is TRY_NO_MEMORY (the arena, not bounds)", fault == TRY_NO_MEMORY);
 
-    CHECK("fault names the cause", strcmp(TryCode_name(fault), "TRY_NO_MEMORY") == 0);
+    CHECK("fault names the cause", string_equals(TryCode_name(fault), "TRY_NO_MEMORY"));
 
     CHECK("rejected push left size unchanged", Stack_size(s) == beforeExhaust + attempted - 1);
 
@@ -7152,15 +7265,15 @@ static i32 suite_stack_observability() {
 
     Stack_free(s);
 
-    printf("[stackobs] attempted %llu pushes before TRY_NO_MEMORY\n", (u64) attempted);
+    print("[stackobs] attempted ", (u64) attempted, " pushes before TRY_NO_MEMORY");
 
     if (s_stack_observability_g_failures != 0) {
-        printf("=== %d FAILURES ===\n", s_stack_observability_g_failures);
+        print("=== ", s_stack_observability_g_failures, " FAILURES ===");
 
         return 1;
     }
 
-    printf("=== ALL STACKOBS PASS ===\n");
+    print("=== ALL STACKOBS PASS ===");
 
     return 0;
 }
@@ -7184,7 +7297,7 @@ static i32 s_stack_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_stack_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -7271,12 +7384,12 @@ static i32 suite_stack() {
     Stack_free(s);
 
     if (s_stack_g_failures == 0) {
-        printf("stack_test: all assertions held\n");
+        print("stack_test: all assertions held");
 
         return 0;
     }
 
-    printf("stack_test: %d FAILURES\n", s_stack_g_failures);
+    print("stack_test: ", s_stack_g_failures, " FAILURES");
 
     return 1;
 }
@@ -7305,7 +7418,7 @@ static i32 s_stride_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_stride_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -7422,12 +7535,12 @@ static i32 suite_stride() {
     CHECK(Stride_get((u32) customType) == 8u);
 
     if (s_stride_g_failures == 0) {
-        printf("stride_test: all assertions held\n");
+        print("stride_test: all assertions held");
 
         return 0;
     }
 
-    printf("stride_test: %d FAILURES\n", s_stride_g_failures);
+    print("stride_test: ", s_stride_g_failures, " FAILURES");
 
     return 1;
 }
@@ -7464,7 +7577,7 @@ static i32 s_type_algebra_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_type_algebra_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -7689,12 +7802,12 @@ static i32 suite_type_algebra() {
     CHECK(Type_form(TYPE_VARIABLE_POOL_ORDER) == FORM_ARRAY);
 
     if (s_type_algebra_g_failures == 0) {
-        printf("type_test: all assertions held\n");
+        print("type_test: all assertions held");
 
         return 0;
     }
 
-    printf("type_test: %d FAILURES\n", s_type_algebra_g_failures);
+    print("type_test: ", s_type_algebra_g_failures, " FAILURES");
 
     return 1;
 }
@@ -7729,7 +7842,7 @@ static i32 s_registry_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_registry_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -7876,12 +7989,12 @@ static i32 suite_registry() {
     test_concurrent_distinct();
 
     if (s_registry_g_failures == 0) {
-        printf("registry_test: all assertions held\n");
+        print("registry_test: all assertions held");
 
         return 0;
     }
 
-    printf("registry_test: %d FAILURES\n", s_registry_g_failures);
+    print("registry_test: ", s_registry_g_failures, " FAILURES");
 
     return 1;
 }
@@ -7910,7 +8023,7 @@ static i32 s_try_code_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_try_code_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -7936,25 +8049,25 @@ static i32 suite_try_code() {
         CHECK(TryCode_isOk(c) == (c == TRY_OK));
     }
 
-    CHECK(strcmp(TryCode_name(TRY_OK), "TRY_OK") == 0);
+    CHECK(string_equals(TryCode_name(TRY_OK), "TRY_OK"));
 
-    CHECK(strcmp(TryCode_name(TRY_BOUNDS), "TRY_BOUNDS") == 0);
+    CHECK(string_equals(TryCode_name(TRY_BOUNDS), "TRY_BOUNDS"));
 
-    CHECK(strcmp(TryCode_name(TRY_IO), "TRY_IO") == 0);
+    CHECK(string_equals(TryCode_name(TRY_IO), "TRY_IO"));
 
-    CHECK(strcmp(TryCode_name((TryCode) 9999), "TRY_UNKNOWN") == 0);
+    CHECK(string_equals(TryCode_name((TryCode) 9999), "TRY_UNKNOWN"));
 
     CHECK(TryCode_message((TryCode) 9999) != nullptr);
 
     CHECK(!TryCode_isOk((TryCode) 9999));
 
     if (s_try_code_g_failures == 0) {
-        printf("try_code_test: all assertions held\n");
+        print("try_code_test: all assertions held");
 
         return 0;
     }
 
-    printf("try_code_test: %d FAILURES\n", s_try_code_g_failures);
+    print("try_code_test: ", s_try_code_g_failures, " FAILURES");
 
     return 1;
 }
@@ -7982,7 +8095,7 @@ static i32 s_try_ptr_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_try_ptr_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -8048,21 +8161,21 @@ static i32 suite_try_ptr() {
 
     TryPtr_toString(&err, buf, sizeof buf, &trunc);
 
-    CHECK(strstr(buf, "TRY_IO") != nullptr);
+    CHECK(string_contains(buf, "TRY_IO"));
 
     CHECK(!trunc);
 
     TryPtr_toString(&ok, buf, sizeof buf, &trunc);
 
-    CHECK(strstr(buf, "TRY_OK") != nullptr);
+    CHECK(string_contains(buf, "TRY_OK"));
 
     TryPtr_toStringStruct(&ok, buf, sizeof buf, &trunc);
 
-    CHECK(strstr(buf, "value=") != nullptr);
+    CHECK(string_contains(buf, "value="));
 
     TryPtr_toString(nullptr, buf, sizeof buf, &trunc);
 
-    CHECK(strcmp(buf, "nullptr") == 0);
+    CHECK(string_equals(buf, "nullptr"));
 
     trunc = false;
 
@@ -8071,12 +8184,12 @@ static i32 suite_try_ptr() {
     CHECK(trunc);
 
     if (s_try_ptr_g_failures == 0) {
-        printf("try_ptr_test: all assertions held\n");
+        print("try_ptr_test: all assertions held");
 
         return 0;
     }
 
-    printf("try_ptr_test: %d FAILURES\n", s_try_ptr_g_failures);
+    print("try_ptr_test: ", s_try_ptr_g_failures, " FAILURES");
 
     return 1;
 }
@@ -8112,7 +8225,7 @@ static i32 s_try_value_g_failures = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
-            printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #cond);          \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);          \
             s_try_value_g_failures++;                                                  \
         }                                                                  \
     } while (0)
@@ -8217,23 +8330,23 @@ static fn testValueStrings() {
 
     CHECK(!trunc);
 
-    CHECK(strcmp(buf, "TryValue(value=42, code=TRY_OK)") == 0);
+    CHECK(string_equals(buf, "TryValue(value=42, code=TRY_OK)"));
 
     TryValue err = TryValue_error(TRY_BOUNDS);
 
     TryValue_toString(&err, buf, sizeof buf, &trunc);
 
-    CHECK(strstr(buf, "TRY_BOUNDS") != nullptr);
+    CHECK(string_contains(buf, "TRY_BOUNDS"));
 
-    CHECK(strstr(buf, "index outside the active range") != nullptr);
+    CHECK(string_contains(buf, "index outside the active range"));
 
     TryValue_toStringStruct(&ok, buf, sizeof buf, &trunc);
 
-    CHECK(strcmp(buf, "TryValue { value=42, code=TRY_OK }") == 0);
+    CHECK(string_equals(buf, "TryValue { value=42, code=TRY_OK }"));
 
     TryValue_toString(nullptr, buf, sizeof buf, &trunc);
 
-    CHECK(strcmp(buf, "nullptr") == 0);
+    CHECK(string_equals(buf, "nullptr"));
 
     CHECK(!trunc);
 
@@ -8303,15 +8416,15 @@ static fn testPtr() {
 
     TryPtr_toString(&err, buf, sizeof buf, &trunc);
 
-    CHECK(strstr(buf, "TRY_IO") != nullptr);
+    CHECK(string_contains(buf, "TRY_IO"));
 
     TryPtr_toString(&ok, buf, sizeof buf, &trunc);
 
-    CHECK(strstr(buf, "TRY_OK") != nullptr);
+    CHECK(string_contains(buf, "TRY_OK"));
 
     TryPtr_toString(nullptr, buf, sizeof buf, &trunc);
 
-    CHECK(strcmp(buf, "nullptr") == 0);
+    CHECK(string_equals(buf, "nullptr"));
 
     trunc = false;
 
@@ -8335,9 +8448,9 @@ static fn testCodeTaxonomy() {
         CHECK((code == TRY_OK) == TryCode_isOk(code));
     }
 
-    CHECK(strcmp(TryCode_name(TRY_OK), "TRY_OK") == 0);
+    CHECK(string_equals(TryCode_name(TRY_OK), "TRY_OK"));
 
-    CHECK(strcmp(TryCode_name((TryCode) 9999), "TRY_UNKNOWN") == 0);
+    CHECK(string_equals(TryCode_name((TryCode) 9999), "TRY_UNKNOWN"));
 }
 
 /** Runs the TryValue and TryPtr owner cases and reports aggregate assertion status. */
@@ -8357,12 +8470,12 @@ static i32 suite_try_value() {
     testCodeTaxonomy();
 
     if (s_try_value_g_failures == 0) {
-        printf("try_value_test: all checks passed\n");
+        print("try_value_test: all checks passed");
 
         return 0;
     }
 
-    printf("try_value_test: %d FAILURES\n", s_try_value_g_failures);
+    print("try_value_test: ", s_try_value_g_failures, " FAILURES");
 
     return 1;
 }
@@ -8400,7 +8513,7 @@ i32 main(i32 argc, utf8 **argv) {
         { "variable_strict", suite_variable_strict_wrap },
         { "buffer", suite_buffer_wrap },
         { "vex_string", suite_vex_string_wrap },
-        { "char_sequence", suite_char_sequence_wrap },
+        { "varchar", suite_varchar_wrap },
         { "spin", suite_spin_wrap },
         { "array", suite_array_wrap },
         { "chunked_list", suite_chunked_list_wrap },
@@ -8422,22 +8535,22 @@ i32 main(i32 argc, utf8 **argv) {
         { "try_ptr", suite_try_ptr_wrap },
         { "try_value", suite_try_value_wrap },
     };
-    const utf8 *filter = argc > 1 ? argv[1] : nullptr;
+    string filter = argc > 1 ? argv[1] : nullptr;
     bytes ran = 0;
 
     for (bytes i = 0; i < sizeof(suites) / sizeof(suites[0]); i++) {
-        if (filter && strcmp(filter, suites[i].name) != 0)
+        if (filter && !string_equals(filter, suites[i].name))
             continue;
         suites[i].run();
         ran++;
     }
 
     if (filter && ran == 0) {
-        fprintf(stderr, "re_test: unknown suite '%s'\n", filter);
+        fprint(stderr, "re_test: unknown suite '", filter, "'");
         return 2;
     }
     if (g_failures != 0) {
-        fprintf(stderr, "re_test: %d FAILURES\n", g_failures);
+        fprint(stderr, "re_test: ", g_failures, " FAILURES");
         return 1;
     }
     puts("re_test: PASS");

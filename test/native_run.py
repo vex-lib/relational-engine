@@ -19,11 +19,24 @@ LIB = WORKSPACE.parent / "lib"
 assert not (CPU / "nio/mem.c").exists()
 assert not (CPU / "io/mem.c").exists()
 assert not (CPU / "io/file.c").exists()
-sources = [ENGINE / "nio/mem.c", ENGINE / "nio/arena.c", ENGINE / "nio/transient.c",
+sources = [ENGINE / "nio/mem.c", ENGINE / "nio/pool.c", ENGINE / "nio/arena.c",
+           ENGINE / "nio/transient.c",
            ENGINE / "atomic/spin_lock.c",
            *sorted((ENGINE / "io").rglob("*.c")),
            *sorted((ENGINE / "clipboard").glob("*.c")),
-           ENGINE / "clipboard/clipboard_mac.m"]
+           ENGINE / "clipboard/clipboard_mac.m",
+           *sorted((ENGINE / "exception").glob("*.c")),
+           *sorted((ENGINE / "hash").glob("*.c")),
+           *sorted((ENGINE / "primitive").glob("*.c")),
+           *sorted((ENGINE / "struct").glob("*.c")),
+           *sorted((ENGINE / "substrate").rglob("*.c")),
+           *sorted((ENGINE / "thread").glob("*.c")),
+           *sorted((ENGINE / "type").glob("*.c")),
+           *sorted((LIB / "debug").glob("*.c")),
+           *sorted((LIB / "lang").glob("*.c")),
+           *sorted((LIB / "vector").glob("*.c")),
+           *sorted((LIB / "matrix").glob("*.c")),
+           *sorted((LIB / "quaternion").glob("*.c"))]
 owners = [SUITE / "re_test.c", SUITE / "re_manual_test.c"]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--owner", choices=[p.stem for p in owners])
@@ -59,14 +72,13 @@ with tempfile.TemporaryDirectory(prefix="re-native-", dir=os.environ.get("TMPDIR
             owner_flags = []
             run_args = [str(binary)]
             if owner.stem == "re_test":
-                # Compile-time allocator substitution only in re_test's mem.o:
-                # no production test hooks, and re_manual_test retains real libc.
-                injected = tmp / f"{mode}-injected-mem.o"
-                subprocess.run(["clang", *flags, "-Dmalloc=MemTest_malloc",
-                                "-Dcalloc=MemTest_calloc", "-Drealloc=MemTest_realloc",
-                                "-c", str(sources[0]), "-o", str(injected)],
+                # Compile-time page-allocator substitution only in re_test's arena.o:
+                # no production test hooks, and re_manual_test retains real pool.
+                injected = tmp / f"{mode}-injected-arena.o"
+                subprocess.run(["clang", *flags, "-DMemoryPool_allocPages=MemTest_allocPages",
+                                "-c", str(sources[2]), "-o", str(injected)],
                                check=True, timeout=60)
-                owner_objects = [str(injected), *objects[1:]]
+                owner_objects = [objects[0], objects[1], str(injected), *objects[3:]]
                 owner_flags = ["-DMEM_TEST_FAULTS=1"]
                 if args.suite:
                     run_args.append(args.suite)
