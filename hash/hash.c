@@ -8,7 +8,7 @@
  * ============================================================================
  * Pure hash utility (Relational Engine): FNV-1a 64-bit over byte buffers and
  * Murmur3 final-mix avalanche functions for 64-bit and 32-bit keys. Stateless
- * and allocation-free — every function is a pure mapping from input to output,
+ * and allocation-free, every function is a pure mapping from input to output,
  * safe to call from any thread at any time. The mixers are the relational
  * engine's symbol/identity hashing primitives.
  * ============================================================================
@@ -21,7 +21,7 @@
  * ============================================================================
  * The Hash utility: pure FNV-1a and Murmur3 mixing functions.
  *
- * STRUCT FIELDS: none — procedural (operates on byte buffers (pure hash functions))
+ * STRUCT FIELDS: none, procedural (operates on byte buffers (pure hash functions))
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -33,12 +33,12 @@
  * ============================================================================
  */
 
-// hash.c — Hash port (Legacy: util/Hash.java). Pure functions, no state.
+/** hash.c, Hash port (Legacy: util/Hash.java). Pure functions, no state. */
 
 static const u64 FNV_OFFSET = 0xcbf29ce484222325ull;
 static const u64 FNV_PRIME = 0x100000001b3ull;
 
-// Computes the 64-bit FNV-1a hash of the byte span; empty or null input yields zero.
+/** Computes the 64-bit FNV-1a hash of the byte span; empty or null input yields zero. */
 u64 Hash_fnv1a64(const u8 *data, bytes length) {
 
     if(!data || length == 0) 
@@ -60,14 +60,14 @@ u64 Hash_fnv1a64(const u8 *data, bytes length) {
 
 }
 
-// Mixes a pointer's integer representation into a 64-bit hash.
+/** Mixes a pointer's integer representation into a 64-bit hash. */
 u64 Hash_pointer(const_any p) {
 
     return Hash_murmur3Mix64((u64) (pointer) p);
 
 }
 
-// Applies the MurmurHash3 64-bit finalizer to one word.
+/** Applies the MurmurHash3 64-bit finalizer to one word. */
 u64 Hash_murmur3Mix64(u64 k) {
 
     k ^= k >> 33;
@@ -84,7 +84,7 @@ u64 Hash_murmur3Mix64(u64 k) {
 
 }
 
-// Applies the MurmurHash3 32-bit finalizer to one word.
+/** Applies the MurmurHash3 32-bit finalizer to one word. */
 u32 Hash_murmur3Mix32(u32 k) {
 
     k ^= k >> 16;
