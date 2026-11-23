@@ -1,7 +1,7 @@
 #include "vex.h"
 #include "clipboard/clipboard.h"
 #include "lang/platform.h"
-// Production R2 I/O owner: Relational Engine; existing Clipboard ABI preserved.
+/** Production R2 I/O owner: Relational Engine; existing Clipboard ABI preserved. */
 #include <string.h>
 
 #if !defined(VEX_PLATFORM_APPLE)
@@ -12,11 +12,11 @@
  * DEFINITION: Clipboard (platform-exclusive stub)
  * ============================================================================
  * Non-Apple fallback for the system clipboard bridge: a procedural Clipboard
- * API backed by a single static 4096-byte char buffer (s_stubText). Text
+ * API backed by a single static 4096-byte utf8 buffer (s_stubText). Text
  * copy/paste round-trips in-process through that buffer with truncation at
  * the 4095-byte bound; image operations always return false because there is
  * no OS pasteboard to exchange pixels with. Zero allocation, zero threads,
- * zero steady-state cost — the stub exists so R4/R5 callers compile and run
+ * zero steady-state cost, the stub exists so R4/R5 callers compile and run
  * on Linux/Windows while the macOS NSPasteboard implementation carries the
  * real bridge. The whole file is compiled out under VEX_PLATFORM_APPLE.
  * ============================================================================
@@ -29,9 +29,9 @@
  * ============================================================================
  * Platform-exclusive stub for the system clipboard bridge on non-Apple
  * systems without NSPasteboard. Procedural Clipboard API backed by a static
- * char buffer; image operations are unsupported and always return false.
+ * utf8 buffer; image operations are unsupported and always return false.
  *
- * STRUCT FIELDS: none — procedural (static char s_stubText[4096] backing store)
+ * STRUCT FIELDS: none, procedural (static utf8 s_stubText[4096] backing store)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -48,7 +48,7 @@
  * ============================================================================
  */
 
-static char s_stubText[4096] = {0};
+static utf8 s_stubText[4096] = {0};
 
 /** Report whether the non-Apple stub currently contains nonempty text. */
 bool Clipboard_hasText() {
@@ -61,7 +61,7 @@ bool Clipboard_hasImage() {
 }
 
 /** Copy the stub's stored text into the bounded caller buffer and return bytes copied. */
-bytes Clipboard_getText(char *dest, bytes maxBytes) {
+bytes Clipboard_getText(utf8 *dest, bytes maxBytes) {
     if (dest == nullptr || maxBytes == 0) 
        return 0;
 
@@ -78,7 +78,7 @@ bytes Clipboard_getText(char *dest, bytes maxBytes) {
 }
 
 /** Store text in the fixed stub buffer, truncating to its maximum NUL-terminated length. */
-bool Clipboard_setText(const char *text) {
+bool Clipboard_setText(string text) {
     if (text == nullptr) 
        return false;
 

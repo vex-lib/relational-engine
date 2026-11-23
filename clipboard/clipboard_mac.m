@@ -7,7 +7,7 @@
 
 #include "vex.h"
 #include "clipboard/clipboard.h"
-// Production R2 I/O owner: Relational Engine; native pasteboard ABI preserved.
+/** Production R2 I/O owner: Relational Engine; native pasteboard ABI preserved. */
 #include "lang/annotation.h"
 
 ;;DEFINITION
@@ -19,7 +19,7 @@
  * Clipboard_getText copies into a caller-owned buffer (truncation-safe),
  * Clipboard_getImage decodes TIFF/PNG pasteboard data into caller-owned
  * pixel memory with outputs-first width/height outputs, and Clipboard_setImage
- * encodes RGBA8 through NSBitmapImageRep. Zero engine allocation — all
+ * encodes RGBA8 through NSBitmapImageRep. Zero engine allocation, all
  * buffers are the caller's. This is the L4 platform seam; Linux/Wayland
  * builds provide a sibling implementation of the same clipboard/clipboard.h
  * contract. Lives at R2 as a leaf I/O behavior.
@@ -75,7 +75,7 @@ bool Clipboard_hasImage() {
 }
 
 /** Copy pasteboard UTF-8 text into the caller buffer, NUL-terminating and truncating to its capacity. */
-bytes Clipboard_getText(char *dest, bytes maxBytes) {
+bytes Clipboard_getText(utf8 *dest, bytes maxBytes) {
     if (dest == nullptr || maxBytes == 0) 
         return 0;
 
@@ -88,25 +88,25 @@ bytes Clipboard_getText(char *dest, bytes maxBytes) {
             return 0;
         }
 
-        const char *utf8 = [str UTF8String];
-        if (utf8 == nullptr) {
+        string utf8Str = [str UTF8String];
+        if (utf8Str == nullptr) {
             dest[0] = '\0';
 
             return 0;
         }
 
-        bytes len = strlen(utf8);
+        bytes len = strlen(utf8Str);
         if (len >= maxBytes) 
             len = maxBytes - 1;
 
-        memcpy(dest, utf8, len);
+        memcpy(dest, utf8Str, len);
         dest[len] = '\0';
         return len;
     }
 }
 
 /** Replace pasteboard contents with the supplied UTF-8 text. */
-bool Clipboard_setText(const char *text) {
+bool Clipboard_setText(string text) {
     if (text == nullptr) 
         return false;
 
