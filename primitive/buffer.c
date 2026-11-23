@@ -24,7 +24,7 @@
  * ============================================================================
  * the contiguous byte buffer.
  *
- * STRUCT FIELDS: none — procedural (operates on engine Memory blocks)
+ * STRUCT FIELDS: none, procedural (operates on engine Memory blocks)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -44,17 +44,35 @@
 
 
 ;;GETTER
-static inline bytes Buffer_capacityRaw(const Buffer *s) { return (*s).capacity; }
+static inline bytes Buffer_capacityRaw(const Buffer *s)
+{
+    return (*s).capacity;
+}
 ;;SETTER
-static inline fn Buffer_setCapacity(Buffer *s, bytes v) { (*s).capacity = v; }
+static inline fn Buffer_setCapacity(Buffer *s, bytes v)
+{
+    (*s).capacity = v;
+}
 ;;GETTER
-static inline u8 * Buffer_data(const Buffer *s) { return (*s).data; }
+static inline u8 * Buffer_data(const Buffer *s)
+{
+    return (*s).data;
+}
 ;;SETTER
-static inline fn Buffer_setData(Buffer *s, u8 * v) { (*s).data = v; }
+static inline fn Buffer_setData(Buffer *s, u8 * v)
+{
+    (*s).data = v;
+}
 ;;GETTER
-static inline bytes Buffer_lengthRaw(const Buffer *s) { return (*s).length; }
+static inline bytes Buffer_lengthRaw(const Buffer *s)
+{
+    return (*s).length;
+}
 ;;SETTER
-static inline fn Buffer_setLengthRaw(Buffer *s, bytes v) { (*s).length = v; }
+static inline fn Buffer_setLengthRaw(Buffer *s, bytes v)
+{
+    (*s).length = v;
+}
 
 Buffer *Buffer_0() {
     Buffer *self = (Buffer*) Memory_alloc(TYPE_BYTE_ARRAY, Re_arena(), sizeof(Buffer));
