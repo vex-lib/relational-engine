@@ -1,14 +1,16 @@
-// spin.c — SpinLock port (thread/SpinLock.java) on C23 atomics.
-//
-// One word: 0 = free, otherwise owner-encoded:
-//     (threadId & 0x3FFFFFFF) << 1 | 1
-// The low bit marks "held" so 0 is unambiguously free, and the owner id is
-// embedded in the same word — one word means we can embed a lock directly in a
-// RingBuffer header etc. without allocating a separate object.
-//
-// Ordering note (Lesson 20): on ARM the hardware reorders freely, so we use
-// acquire on the successful CAS and release on the store in unlock. Relaxed
-// would "work" on x86 and corrupt on Apple Silicon.
+/**
+ * spin.c, SpinLock port (thread/SpinLock.java) on C23 atomics.
+ *
+ * One word: 0 = free, otherwise owner-encoded:
+ * (threadId & 0x3FFFFFFF) << 1 | 1
+ * The low bit marks "held" so 0 is unambiguously free, and the owner id is
+ * embedded in the same word, one word means we can embed a lock directly in a
+ * RingBuffer header etc. without allocating a separate object.
+ *
+ * Ordering note (Lesson 20): on ARM the hardware reorders freely, so we use
+ * acquire on the successful CAS and release on the store in unlock. Relaxed
+ * would "work" on x86 and corrupt on Apple Silicon.
+ */
 
 #include "vex.h"
 #include "atomic/atomic.h"
@@ -60,22 +62,28 @@
  */
 
 
-// x86 has `pause`; ARM64 has `yield`. Both tell the CPU "I'm spinning" so it
-// can back off power/contention. This is the one place we're arch-specific.
-#if defined(__aarch64__)
+/**
+ * x86 has `pause`; ARM64 has `yield`. Both tell the CPU "I'm spinning" so it
+ * can back off power/contention. This is the one place we're arch-specific.
+ */
+#if defined(VEX_ARCH_ARM64)
 #define SPIN_PAUSE() asm volatile("yield" ::: "memory")
 #else
 #define SPIN_PAUSE() asm volatile("pause" ::: "memory")
 #endif
 
-// Encode a thread id into the lock word: low bit = held, id in the upper 31.
-// Keeps the word 0 (free) unambiguous from any held value.
+/**
+ * Encode a thread id into the lock word: low bit = held, id in the upper 31.
+ * Keeps the word 0 (free) unambiguous from any held value.
+ */
 static u32 ticket(u64 thread_id) {
     return (u32)(((thread_id & 0x3FFFFFFFu) << 1) | 1u);
 }
 
-// Spin until acquired. The CAS publishes with acquire so our critical section
-// sees everything the previous owner wrote before releasing.
+/**
+ * Spin until acquired. The CAS publishes with acquire so our critical section
+ * sees everything the previous owner wrote before releasing.
+ */
 ;;GETTER
 static inline bool SpinLock_casWeakWord(SpinLock *lock, u32 *expected, u32 desired) {
     return atomic_compare_exchange_weak_explicit(&(*lock).word, expected, desired,
@@ -111,7 +119,7 @@ fn SpinLock_lock(SpinLock *lock) {
     }
 }
 
-// One-shot acquire: returns immediately whether it worked or not.
+/** One-shot acquire: returns immediately whether it worked or not. */
 bool SpinLock_tryLock(SpinLock *lock) {
     if (!lock) 
         return false;
@@ -123,8 +131,10 @@ bool SpinLock_tryLock(SpinLock *lock) {
     return SpinLock_casStrongWord(lock, &expected, tk);
 }
 
-// Try until timeout_nanos elapses (or forever if negative). Never returns
-// falsely-successful; the deadline is a hard stop.
+/**
+ * Try until timeout_nanos elapses (or forever if negative). Never returns
+ * falsely-successful; the deadline is a hard stop.
+ */
 bool SpinLock_tryLockTimeout(SpinLock *lock, i64 timeout_nanos) {
     struct timespec start, now;
 
@@ -145,8 +155,10 @@ bool SpinLock_tryLockTimeout(SpinLock *lock, i64 timeout_nanos) {
     return true;
 }
 
-// Release with release semantics so our critical-section writes are visible
-// to the next thread that acquires.
+/**
+ * Release with release semantics so our critical-section writes are visible
+ * to the next thread that acquires.
+ */
 fn SpinLock_unlock(SpinLock *lock) {
     if (!lock) 
         return;
@@ -162,7 +174,7 @@ fn SpinLock_unlock(SpinLock *lock) {
     SpinLock_storeWord(lock, 0);
 }
 
-// is_locked takes a const pointer, so cast away const for the atomic load.
+/** is_locked takes a const pointer, so cast away const for the atomic load. */
 bool SpinLock_isLocked(const SpinLock *lock) {
     if (!lock) 
         return false;
