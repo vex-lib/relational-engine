@@ -390,34 +390,58 @@ static any arena_alloc(MemoryArena *a, u64 typeId, bytes numBytes) {
 }
 
 /** Validate an in-arena payload header and recycle its slab slot or return its pages to the pool. */
-static fn arena_free(MemoryArena *a, any userPtr) {
+static bool arena_free(MemoryArena *a, any userPtr)
+{
     if (!a || !MemoryArena_live(a) || !userPtr)
-        return;
+        return false;
 
-    if (userPtr == FREED) {
-        THROW("memory: double free on FREED sentinel %p", userPtr);
-        return;
-    }
+    if (userPtr == FREED)
+        return Memory_reportFault(
+            "double-free on FREED sentinel",
+            userPtr,
+            a,
+            "this handle already holds FREED -- clear pointers to nullptr on release and fix the duplicate owner, do not silence free"
+        );
 
     pointer u = (pointer) userPtr;
 
     if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
-        return;
+        return Memory_reportFault(
+            "misaligned or interior pointer on MemoryArena_free",
+            userPtr,
+            a,
+            "only pass the exact 32-byte aligned base pointer returned by MemoryArena_alloc -- do not pass interior or unaligned offsets"
+        );
 
     PageMeta *pm = MemoryPool_lookupPage(MemoryArena_pool(a), userPtr);
 
     if (!pm || PageMeta_owner(pm) != a) {
         if (Memory_isFreed(userPtr))
-            THROW("memory: double free at %p", userPtr);
+            return Memory_reportFault(
+                "double-free",
+                userPtr,
+                a,
+                "block was already freed and its page returned -- fix the duplicate owner, do not silence free"
+            );
 
-        return;
+        return Memory_reportFault(
+            "foreign or wrong-arena pointer on MemoryArena_free",
+            userPtr,
+            a,
+            "pointer does not belong to this MemoryArena -- free it through its owning arena or Memory_free"
+        );
     }
 
     SpinLock_lock(MemoryArena_lockMut(a));
 
     if (PageMeta_owner(pm) != a) {
         SpinLock_unlock(MemoryArena_lockMut(a));
-        return;
+        return Memory_reportFault(
+            "double-free race (page released concurrently)",
+            userPtr,
+            a,
+            "another thread freed this block and released its page -- synchronize teardown so one owner frees each block once"
+        );
     }
 
     u8 kind = PageMeta_kind(pm);
@@ -426,13 +450,22 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
     if (header_isFreed(h)) {
         SpinLock_unlock(MemoryArena_lockMut(a));
-        THROW("memory: double free at %p", userPtr);
-        return;
+        return Memory_reportFault(
+            "double-free",
+            userPtr,
+            a,
+            "block header is already stamped FREED -- remove the duplicate free and keep a single owner, do not silence free"
+        );
     }
 
     if (!header_valid(h)) {
         SpinLock_unlock(MemoryArena_lockMut(a));
-        return;
+        return Memory_reportFault(
+            "corrupted or invalid header on MemoryArena_free",
+            userPtr,
+            a,
+            "32-byte block header hash failed -- check for buffer underrun, interior pointer, or memory corruption"
+        );
     }
 
     bytes origLen = MemoryHeader_length(h);
@@ -442,7 +475,7 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
         if (cls >= SLAB_COUNT) {
             SpinLock_unlock(MemoryArena_lockMut(a));
-            return;
+            return false;
         }
 
         u32 slotSize = s_slabSizes[cls];
@@ -450,7 +483,7 @@ static fn arena_free(MemoryArena *a, any userPtr) {
 
         if (offset % slotSize != sizeof(MemoryHeader) || origLen > slotSize - sizeof(MemoryHeader)) {
             SpinLock_unlock(MemoryArena_lockMut(a));
-            return;
+            return false;
         }
 
         Memory_headerStampFreed(h);
@@ -481,13 +514,13 @@ static fn arena_free(MemoryArena *a, any userPtr) {
         if (releasePage)
             MemoryPool_freePages(MemoryArena_pool(a), pm);
 
-        return;
+        return true;
     }
 
     if (kind == MEMORY_PAGE_SPAN_HEAD) {
         if ((u8*) userPtr != pBase + sizeof(MemoryHeader)) {
             SpinLock_unlock(MemoryArena_lockMut(a));
-            return;
+            return false;
         }
 
         bytes alignedLen = (origLen + MEMORY_ALIGN_MASK) & ~(bytes) MEMORY_ALIGN_MASK;
@@ -509,10 +542,11 @@ static fn arena_free(MemoryArena *a, any userPtr) {
         SpinLock_unlock(MemoryArena_lockMut(a));
 
         MemoryPool_freePages(MemoryArena_pool(a), pm);
-        return;
+        return true;
     }
 
     SpinLock_unlock(MemoryArena_lockMut(a));
+    return false;
 }
 
 /** Return all pages owned by arena back to its pool, resetting active bytes and exhaustion state. */
@@ -842,11 +876,11 @@ any MemoryArena_realloc(MemoryArena *a, any userPtr, bytes newBytes) {
 }
 
 /** Attempt to recycle a validated payload within the specified arena. */
-fn MemoryArena_free(MemoryArena *a, any userPtr) {
+bool MemoryArena_free(MemoryArena *a, any userPtr) {
     if (!a)
-        return;
+        return false;
 
-    arena_free(a, userPtr);
+    return arena_free(a, userPtr);
 }
 
 /** Reset every slab and span allocation in the specified arena, returning pages to the pool. */

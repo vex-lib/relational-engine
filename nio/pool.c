@@ -20,12 +20,13 @@
  * DEFINITION: MemoryPool
  * ============================================================================
  * Tier 1 of the relational memory architecture (Pool  to  Arena  to  any).
- * Owns growable OS virtual-memory super-chunks (64 MiB default chunks via
- * mmap / VirtualAlloc, growing indefinitely until OS OOM with no hardcoded
- * limit), hands out architecture-native pages (16 KiB on Apple Silicon,
- * 4 KiB elsewhere) and contiguous multi-page spans to MemoryArena owners, and
- * advises the OS (madvise MADV_FREE / MADV_DONTNEED / MEM_RESET) when freed
- * pages return so physical RAM footprint drops back down.
+ * Owns growable OS virtual-memory super-chunks (1 MiB default chunks -- 64 x
+ * 16 KiB pages on Apple Silicon -- via mmap / VirtualAlloc, growing
+ * indefinitely until OS OOM with no hardcoded limit), hands out
+ * architecture-native pages (16 KiB on Apple Silicon, 4 KiB elsewhere) and
+ * contiguous multi-page spans to MemoryArena owners, and advises the OS
+ * (madvise MADV_FREE_REUSABLE / MADV_FREE / MADV_DONTNEED / MEM_RESET) when
+ * freed pages return so physical RAM footprint drops back down.
  * ============================================================================
  */
 
@@ -40,7 +41,7 @@
  * ============================================================================
  */
 
-#define MEMORY_POOL_CHUNK_BYTES (64u * 1024u * 1024u)
+#define MEMORY_POOL_CHUNK_BYTES (1024u * 1024u)
 
 struct PoolChunk {
     u8 *base;
@@ -229,10 +230,25 @@ static fn os_releasePages(u8 *base, bytes size) {
 
 #if defined(VEX_PLATFORM_WINDOWS)
     VirtualAlloc(base, size, MEM_RESET, PAGE_READWRITE);
+#elif defined(MADV_FREE_REUSABLE)
+    madvise(base, size, MADV_FREE_REUSABLE);
 #elif defined(MADV_FREE)
     madvise(base, size, MADV_FREE);
 #elif defined(MADV_DONTNEED)
     madvise(base, size, MADV_DONTNEED);
+#else
+    (discard) base;
+    (discard) size;
+#endif
+}
+
+/** Advise the OS that recycled pages are being reused. */
+static fn os_reusePages(u8 *base, bytes size) {
+    if (!base || size == 0)
+        return;
+
+#if defined(MADV_FREE_REUSE)
+    madvise(base, size, MADV_FREE_REUSE);
 #else
     (discard) base;
     (discard) size;
@@ -463,6 +479,7 @@ PageMeta *MemoryPool_allocPages(MemoryPool *pool, MemoryArena *owner, bytes coun
     bytes nextCursor = idx + count;
     PoolChunk_setSearchCursor(chosen, nextCursor < PoolChunk_pageCount(chosen) ? nextCursor : 0);
     MemoryPool_setUsedPages(pool, MemoryPool_usedPagesRaw(pool) + count);
+    os_reusePages(PoolChunk_base(chosen) + (idx << MEMORY_PAGE_SHIFT), count << MEMORY_PAGE_SHIFT);
 
     SpinLock_unlock(MemoryPool_lockMut(pool));
 

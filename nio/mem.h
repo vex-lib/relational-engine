@@ -107,15 +107,31 @@ typedef struct MemoryPool MemoryPool;
 typedef struct MemoryArena MemoryArena;
 typedef struct PageMeta PageMeta;
 
+/**
+ * Policy for allocator memory-safety faults (double-free, FREED sentinel,
+ * misaligned, foreign, or tampered pointers).
+ *
+ * MEMORY_FAULT_ABORT        - production default: zero-alloc crash dump + tip + abort()
+ * MEMORY_FAULT_RETURN_FALSE - test-only mode: log THROW and return false for in-process CVE probes
+ */
+typedef enum MemoryFaultPolicy {
+    MEMORY_FAULT_ABORT = 0,
+    MEMORY_FAULT_RETURN_FALSE = 1,
+} MemoryFaultPolicy;
+
 bool Memory_init(bytes totalBytes);
 
 any Memory_alloc(u64 typeId, MemoryArena *arena, bytes numBytes);
 
 any Memory_realloc(any userPtr, bytes newBytes);
 
-fn Memory_free(any userPtr);
+bool Memory_free(any userPtr);
 
 fn Memory_freeAll();
+
+fn Memory_setFaultPolicy(MemoryFaultPolicy policy);
+MemoryFaultPolicy Memory_faultPolicy();
+fn Memory_installCrashHandler();
 
 bytes Memory_length(any userPtr);
 u64 Memory_type(any userPtr);
@@ -328,6 +344,7 @@ fn MemoryPool_freePages(MemoryPool *pool, PageMeta *head);
 PageMeta *MemoryPool_lookupPage(MemoryPool *pool, const_any ptr);
 bool MemoryPool_containsPayload(MemoryPool *pool, const_any ptr);
 u8 *MemoryPool_pageBase(const PageMeta *pm);
+bool Memory_reportFault(string kind, const_any ptr, const MemoryArena *arena, string tip);
 
 /** Round a freshly allocated base forward to the payload floor. */
 static inline u8 *Memory_alignUp(const u8 *raw) {
@@ -427,7 +444,7 @@ bytes MemoryArena_capacityFor(bytes payloadBytes);
 fn MemoryArena_destroy(MemoryArena *a);
 any MemoryArena_alloc(MemoryArena *a, u64 typeId, bytes numBytes);
 any MemoryArena_realloc(MemoryArena *a, any userPtr, bytes newBytes);
-fn MemoryArena_free(MemoryArena *a, any userPtr);
+bool MemoryArena_free(MemoryArena *a, any userPtr);
 fn MemoryArena_freeAll(MemoryArena *a);
 bytes MemoryArena_findAll(MemoryArena *a, u64 typeId, any *outArray, bytes maxCount);
 bytes MemoryArena_activeBytes(MemoryArena *a);
