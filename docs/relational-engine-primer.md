@@ -272,7 +272,7 @@ is a backend, not a host or a driver.
 ---
 
 *Review boundary: this document was rewritten after the Rust move. It was checked
-against `nio/mem.h`, `type/re_type.h`, `thread/thread.h`, `atomic/atomic.h`,
+against `nio/mem.h`, `type/re_type.h`, `thread/re_thread.h`, `atomic/atomic.h`,
 `io/io.h`, `re.h` and the repository README. The Rust side was checked against
 `rangoon/include/relational_engine/` and `rangoon/lib.rs`. This is not a complete
 native IO, Darkbase, R3–R5 application, cross-platform or oldest-supported-macOS
