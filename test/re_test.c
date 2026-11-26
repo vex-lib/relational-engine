@@ -49,7 +49,7 @@
 #include "exception/try_code.h"
 #include "struct/stack.h"
 #include "struct/stride.h"
-#include "thread/thread.h"
+#include "thread/re_thread.h"
 #include "exception/try_ptr.h"
 #include "exception/try.h"
 
