@@ -1,8 +1,6 @@
 #include "vex.h"
 #include "nio/mem.h"
 
-#include <string.h>
-
 ;;DEFINITION
 /**
  * ============================================================================
@@ -55,9 +53,7 @@ any Memory_realloc(any userPtr, bytes newBytes) {
         return nullptr;
 
     u64 typeId = Memory_type(userPtr);
-
     bytes oldLen = Memory_length(userPtr);
-
     any next = Memory_alloc(typeId, arena, newBytes);
 
     if (!next)
