@@ -153,4 +153,21 @@ typedef struct TestCustomVertex {
     d64 weight;
 } TestCustomVertex;
 
+/**
+ * Shared context for the 8-thread atomic double-free race probe.
+ *
+ * MemoryArena *arena - target arena owning sharedPtr
+ * any sharedPtr      - shared pointer raced across worker threads
+ * au32 *go           - atomic start barrier
+ * au32 *trueCount    - atomic count of successful frees (must equal 1)
+ * au32 *falseCount   - atomic count of rejected double-frees (must equal T-1)
+ */
+typedef struct ExRaceCtx {
+    MemoryArena *arena;
+    any sharedPtr;
+    au32 *go;
+    au32 *trueCount;
+    au32 *falseCount;
+} ExRaceCtx;
+
 #endif

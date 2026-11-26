@@ -719,8 +719,10 @@ static fn suite_transient_lifetime() {
     assert(trans != nullptr);
     assert(Memory_getLifetime(trans) == MEMORY_LIFETIME_TRANSIENT);
 
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     Memory_free((any) lit);
     Memory_free((any) stackBuf);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     Memory_free(trans);
 
     utf8 *transStr = (utf8*) Transient_alloc(3, 32);
@@ -791,7 +793,9 @@ static fn suite_mem() {
     CHECK(Memory_isFreed(g_foreign) == false);
     CHECK(Memory_length(FREED) == 0);
     CHECK(Memory_type(FREED) == 0);
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     Memory_free(FREED);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     CHECK(Memory_realloc(FREED, 32) == nullptr);
     CHECK(Memory_length(nullptr) == 0);
     CHECK(Memory_type(nullptr) == 0);
@@ -830,7 +834,9 @@ static fn suite_mem() {
 
     CHECK(Memory_length(g_foreign) == 0);
     CHECK(Memory_type(g_foreign) == 0);
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     Memory_free(g_foreign);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     CHECK(Memory_similar(p, g_foreign) == false);
     CHECK(Memory_similar(g_foreign, p) == false);
     CHECK(Memory_similar(p, nullptr) == false);
@@ -874,7 +880,9 @@ static fn suite_mem() {
     CHECK(MemoryHeader_hash(freedHdr) == 0);
     CHECK(Memory_findAll(0xABCDu, nullptr, 0) == 2);
     CHECK(Memory_length(found[0]) == 0);
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     Memory_free(found[0]);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     CHECK(Memory_findAll(0xABCDu, nullptr, 0) == 2);
     Memory_freeAll();
     CHECK(Memory_findAll(0xABCDu, nullptr, 0) == 0);
@@ -942,6 +950,7 @@ static fn suite_mem() {
 
     pid_t pid = fork();
     if (pid == 0) {
+        Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
         Memory_free((any) (pointer) 0x1000);
         volatile bytes len = Memory_length((any) (pointer) 0x1000);
         _exit(len == 0 ? 0 : 1);
@@ -1093,7 +1102,9 @@ static fn ex_exhaustion() {
     assert(!Memory_isFreed(victim));
     MemoryArena_free(a, victim);
     assert(Memory_isFreed(victim));
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     MemoryArena_free(a, victim);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     assert(Memory_length(victim) == 0);
 
     u8 *reused = MemoryArena_alloc(a, EX_TYPE_B, SMALL_PAYLOAD);
@@ -1150,7 +1161,9 @@ static fn ex_boundaries() {
     assert(MemoryArena_findAll(a, EX_TYPE_A, nullptr, 0) == 0);
     assert(MemoryArena_findAll(b, EX_TYPE_A, nullptr, 0) == 1);
 
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     MemoryArena_free(a, q);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     checkBytes(q, 31, 0xA5);
     assert(Memory_length(q) == 31);
     MemoryArena_destroy(a);
@@ -1206,6 +1219,7 @@ static fn ex_hostile() {
     assert(MemoryArena_alloc(a, EX_TYPE_A, (bytes) UINT32_MAX + 1u) == nullptr);
     assert(MemoryArena_alloc(a, EX_TYPE_A, UINT32_MAX) == nullptr);
 
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
     for (bytes offset = 1; offset < 48; offset++) {
         assert(Memory_type(p + offset) == 0);
         assert(Memory_length(p + offset) == 0);
@@ -1223,6 +1237,7 @@ static fn ex_hostile() {
     assert(Memory_type(p) == 0 && Memory_length(p) == 0);
     assert(MemoryArena_realloc(a, p, 32) == nullptr);
     Memory_free(p);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
     *header = saved;
 
     tampered = saved;
@@ -1378,6 +1393,162 @@ static fn ex_coalesce() {
     MemoryArena_destroy(a);
 }
 
+;;GETTER
+static MemoryArena *ExRaceCtx_arena(const ExRaceCtx *c)
+{
+    return c ? (*c).arena : nullptr;
+}
+;;GETTER
+static any ExRaceCtx_sharedPtr(const ExRaceCtx *c)
+{
+    return c ? (*c).sharedPtr : nullptr;
+}
+;;GETTER
+static au32 *ExRaceCtx_go(const ExRaceCtx *c)
+{
+    return c ? (*c).go : nullptr;
+}
+;;GETTER
+static au32 *ExRaceCtx_trueCount(const ExRaceCtx *c)
+{
+    return c ? (*c).trueCount : nullptr;
+}
+;;GETTER
+static au32 *ExRaceCtx_falseCount(const ExRaceCtx *c)
+{
+    return c ? (*c).falseCount : nullptr;
+}
+
+static any exRaceWorker(any arg)
+{
+    ExRaceCtx *ctx = (ExRaceCtx*) arg;
+    au32 *go = ExRaceCtx_go(ctx);
+    while (atomic_load(go) == 0u) {
+    }
+    if (MemoryArena_free(ExRaceCtx_arena(ctx), ExRaceCtx_sharedPtr(ctx)))
+        atomic_fetch_add(ExRaceCtx_trueCount(ctx), 1u);
+    else
+        atomic_fetch_add(ExRaceCtx_falseCount(ctx), 1u);
+    return nullptr;
+}
+
+/** Spawn a child process under default MEMORY_FAULT_ABORT and assert SIGABRT + tip crash dump. */
+static fn ex_assert_abort_with_tip(bool useFreedSentinel)
+{
+    i32 pipeFd[2] = { -1, -1 };
+    assert(pipe(pipeFd) == 0);
+
+    pid_t pid = fork();
+    assert(pid >= 0);
+
+    if (pid == 0) {
+        close(pipeFd[0]);
+        (discard) dup2(pipeFd[1], STDERR_FILENO);
+        close(pipeFd[1]);
+        Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
+
+        if (useFreedSentinel) {
+            (discard) Memory_free(FREED);
+            _exit(0);
+        }
+
+        MemoryArena *childArena = MemoryArena_pages(4);
+        any blk = MemoryArena_alloc(childArena, EX_TYPE_A, 64);
+        any keep = MemoryArena_alloc(childArena, EX_TYPE_A, 64);
+        (discard) keep;
+        (discard) Memory_free(blk);
+        (discard) Memory_free(blk);
+        _exit(0);
+    }
+
+    close(pipeFd[1]);
+
+    utf8 dump[4096];
+    memset(dump, 0, sizeof(dump));
+    bytes total = 0u;
+
+    while (total + 1u < sizeof(dump)) {
+        i64 n = (i64) read(pipeFd[0], dump + total, sizeof(dump) - 1u - total);
+
+        if (n <= 0)
+            break;
+
+        total += (bytes) n;
+    }
+
+    close(pipeFd[0]);
+
+    i32 status = 0;
+    assert(waitpid(pid, &status, 0) == pid);
+    assert(WIFSIGNALED(status));
+    assert(WTERMSIG(status) == SIGABRT);
+    assert(string_contains(dump, "FATAL MEMORY FAULT"));
+    assert(string_contains(dump, "double-free"));
+    assert(string_contains(dump, "tip:"));
+}
+
+static fn ex_cve_double_free_and_uaf()
+{
+    assert(Memory_faultPolicy() == MEMORY_FAULT_ABORT);
+    ex_assert_abort_with_tip(false);
+    ex_assert_abort_with_tip(true);
+
+    Memory_setFaultPolicy(MEMORY_FAULT_RETURN_FALSE);
+
+    MemoryArena *a = MemoryArena_pages(8);
+    assert(a != nullptr);
+
+    any p = MemoryArena_alloc(a, EX_TYPE_A, 64);
+    any anchor = MemoryArena_alloc(a, EX_TYPE_A, 64);
+    assert(p != nullptr && anchor != nullptr);
+
+    assert(Memory_free(p) == true);
+    assert(Memory_isFreed(p) == true);
+    assert(Memory_free(p) == false);
+    assert(MemoryArena_free(a, p) == false);
+    assert(Memory_free(FREED) == false);
+    assert(MemoryArena_free(a, FREED) == false);
+    assert(Memory_free(nullptr) == false);
+    assert(MemoryArena_free(a, nullptr) == false);
+
+    assert(Memory_safeHeader(p) == nullptr);
+    assert(Memory_type(p) == 0);
+    assert(Memory_length(p) == 0);
+    assert(Memory_realloc(p, 128) == nullptr);
+    assert(MemoryArena_realloc(a, p, 128) == nullptr);
+    assert(Memory_safeHeader(FREED) == nullptr);
+    assert(Memory_realloc(FREED, 64) == nullptr);
+
+    assert(Memory_free(anchor) == true);
+    assert(MemoryArena_free(a, anchor) == false);
+
+    any racePtr = MemoryArena_alloc(a, EX_TYPE_B, 128);
+    assert(racePtr != nullptr);
+    au32 go = 0u;
+    au32 trueCount = 0u;
+    au32 falseCount = 0u;
+    ExRaceCtx ctx;
+    memset(&ctx, 0, sizeof(ExRaceCtx));
+    ctx.arena = a;
+    ctx.sharedPtr = racePtr;
+    ctx.go = &go;
+    ctx.trueCount = &trueCount;
+    ctx.falseCount = &falseCount;
+
+    thread threads[8];
+    for (u32 i = 0u; i < 8u; i++)
+        assert(pthread_create(&threads[i], nullptr, exRaceWorker, &ctx) == 0);
+    atomic_store(&go, 1u);
+    for (u32 i = 0u; i < 8u; i++)
+        pthread_join(threads[i], nullptr);
+
+    assert(atomic_load(&trueCount) == 1u);
+    assert(atomic_load(&falseCount) == 7u);
+    assert(MemoryArena_activeBytes(a) == 0u);
+    MemoryArena_destroy(a);
+    Memory_setFaultPolicy(MEMORY_FAULT_ABORT);
+}
+
 /** Runs all adversarial Memory exhaustion, fault-injection, hostile, and concurrency scenarios. */
 static fn suite_mem_exhaustion() {
     assert(Memory_init(0));
@@ -1389,6 +1560,7 @@ static fn suite_mem_exhaustion() {
     ex_hostile();
     ex_model();
     ex_concurrent();
+    ex_cve_double_free_and_uaf();
 }
 
 ;;GETTER
