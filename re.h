@@ -14,7 +14,7 @@
 #include "struct/struct.h"
 #include "substrate/substrate.h"
 #include "substrate/variable/variable.h"
-#include "thread/thread.h"
+#include "thread/re_thread.h"
 #include "type/re_type.h"
 
 #endif /** VEXGRAPH_ECOSYSTEM_RE_H */
