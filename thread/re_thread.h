@@ -5,7 +5,7 @@
 #include "lang/primitive.h"
 
 /**
- * thread/thread.h, process-wide thread identity and opaque tag table.
+ * thread/re_thread.h, process-wide thread identity and opaque tag table.
  *
  * Mechanism only: every thread registers itself once and receives a dense
  * index in [0, THREAD_REGISTRY_DEFAULT_SIZE). Callers may attach one opaque

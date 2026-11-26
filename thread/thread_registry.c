@@ -13,7 +13,7 @@
  */
 
 #include "vex.h"
-#include "thread.h"
+#include "re_thread.h"
 
 #include <pthread.h>
 
