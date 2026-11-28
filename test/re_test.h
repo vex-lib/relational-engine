@@ -154,6 +154,43 @@ typedef struct TestCustomVertex {
 } TestCustomVertex;
 
 /**
+ * 64-byte over-aligned test payload verifying >32B alignment rejection.
+ *
+ * u8 bytes[64] - 64-byte aligned payload buffer
+ */
+typedef struct Over64 {
+    _Alignas(64) u8 bytes[64];
+} Over64;
+
+/**
+ * Multi-field test struct carrying a constructor macro to prove macro-named
+ * classes pass cleanly into ArrayList(ListDemoRecord) / LinkedList / PagedList.
+ *
+ * u32 id     - logical record id
+ * f32 score  - floating-point weight
+ * u64 tag    - 64-bit payload tag
+ */
+typedef struct ListDemoRecord {
+    u32 id;
+    f32 score;
+    u64 tag;
+} ListDemoRecord;
+
+ListDemoRecord ListDemoRecord_3(u32 id, f32 score, u64 tag);
+#define ListDemoRecord(...) CONSTRUCTOR_DISPATCH(ListDemoRecord, __VA_ARGS__)
+
+/**
+ * Accumulator context for List_forEach verification.
+ *
+ * bytes visits - number of elements visited
+ * u64 sum      - sum of visited u32 elements
+ */
+typedef struct ListVisitCtx {
+    bytes visits;
+    u64 sum;
+} ListVisitCtx;
+
+/**
  * Shared context for the 8-thread atomic double-free race probe.
  *
  * MemoryArena *arena - target arena owning sharedPtr
@@ -169,5 +206,68 @@ typedef struct ExRaceCtx {
     au32 *trueCount;
     au32 *falseCount;
 } ExRaceCtx;
+
+/**
+ * Visitor state for Map_forEach verification.
+ *
+ * bytes visits - number of visited entries
+ * u64 keySum   - sum of visited u32 keys
+ * u64 valSum   - sum of visited u64 values
+ * u32 order[8] - first eight keys in visited order
+ */
+typedef struct MapVisitCtx {
+    bytes visits;
+    u64 keySum;
+    u64 valSum;
+    u32 order[8];
+} MapVisitCtx;
+
+/**
+ * Visitor state for Set_forEach verification.
+ *
+ * bytes visits - number of visited elements
+ * u64 sum      - sum of visited u32 elements
+ * u32 order[8] - first eight elements in visited order
+ */
+typedef struct SetVisitCtx {
+    bytes visits;
+    u64 sum;
+    u32 order[8];
+} SetVisitCtx;
+
+/**
+ * Vertex payload struct for ArrayGraph and LinkedGraph tests.
+ *
+ * u32 code    - city code
+ * string name - city name
+ */
+typedef struct GraphCity {
+    u32 code;
+    string name;
+} GraphCity;
+
+/**
+ * Edge payload struct for ArrayGraph and LinkedGraph tests.
+ *
+ * f32 distance - road length in kilometers
+ * u32 lanes    - road lane count
+ */
+typedef struct GraphRoad {
+    f32 distance;
+    u32 lanes;
+} GraphRoad;
+
+/**
+ * Visitor state for Graph_forEachEdge verification.
+ *
+ * bytes visits      - number of visited edges
+ * f32 totalDistance - accumulated road distance
+ * u32 targets[8]    - visited target vertex ids
+ */
+typedef struct GraphVisitCtx {
+    bytes visits;
+    f32 totalDistance;
+    u32 targets[8];
+} GraphVisitCtx;
 
 #endif

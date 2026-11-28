@@ -35,20 +35,9 @@
 #include "re.h"
 #include <sched.h>
 #include "atomic/atomic.h"
-#include "struct/array.h"
-#include "struct/collection.h"
+#include "struct/struct.h"
 #include "exception/try_value.h"
-#include "struct/chunked_list.h"
-#include "struct/deque.h"
-#include "struct/exhaustion.h"
-#include "struct/list.h"
-#include "struct/map.h"
-#include "struct/queue.h"
-#include "struct/ring.h"
-#include "struct/set.h"
 #include "exception/try_code.h"
-#include "struct/stack.h"
-#include "struct/stride.h"
 #include "thread/re_thread.h"
 #include "exception/try_ptr.h"
 #include "exception/try.h"
@@ -4856,110 +4845,169 @@ static i32 s_array_g_failures = 0;
         }                                                                  \
     } while (0)
 
-/** Tests Array introspection, round trips, hostile indices, observable rejection, and null safety. */
-static i32 suite_array() {
-    Array *a = Array_2(ID_INT, 8);
+static inline u32 ListDemoRecord_id(const ListDemoRecord *rec);
+static inline u64 ListDemoRecord_tag(const ListDemoRecord *rec);
 
+/** Tests arrayOf, Array, Array2D, Array3D, hostile indices, TryValue bounds, and zero-leak cleanup. */
+static i32 suite_array()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
+
+    u32 *raw = arrayOf(u32, 8, arena);
+    CHECK(raw != nullptr);
+    CHECK(arrayLength(raw) == 8);
+    CHECK(arrayBytes(raw) == 8 * sizeof(u32));
+    CHECK(raw[0] == 0 && raw[7] == 0);
+
+    for(u32 i = 0; i < 8; i++)
+        raw[i] = 100u + i;
+
+    u32 *grown = arrayResize(raw, 24);
+    CHECK(grown != nullptr);
+    raw = grown;
+    CHECK(arrayLength(raw) == 24);
+    CHECK(raw[0] == 100u && raw[7] == 107u);
+    CHECK(raw[8] == 0 && raw[23] == 0);
+
+    u32 *shrunk = arrayResize(raw, 4);
+    CHECK(shrunk != nullptr);
+    raw = shrunk;
+    CHECK(arrayLength(raw) == 4);
+    CHECK(raw[0] == 100u && raw[3] == 103u);
+
+    arrayFreeIn(arena, raw);
+    arrayFree(nullptr);
+
+    ListDemoRecord *rawRecs = arrayOf(ListDemoRecord, 4, arena);
+    CHECK(rawRecs != nullptr);
+    CHECK(arrayLength(rawRecs) == 4);
+    rawRecs[2] = ListDemoRecord(77u, 1.5f, 999u);
+    CHECK(ListDemoRecord_id(&rawRecs[2]) == 77u && ListDemoRecord_tag(&rawRecs[2]) == 999u);
+    arrayFreeIn(arena, rawRecs);
+
+    CHECK(arrayOf(u32, 0, arena) == nullptr);
+    CHECK(arrayOf(Over64, 2, arena) == nullptr);
+    u32 *nullU32 = nullptr;
+    CHECK(arrayLength(nullU32) == 0);
+
+    Array *a = Array_2(ID_INT, 8);
     CHECK(a != nullptr);
 
-    if (!a) 
+    if(!a)
         return 1;
 
     CHECK(Array_size(a) == 8);
-
     CHECK(Array_length(a) == 8);
-
     CHECK(Array_capacity(a) == 8);
-
     CHECK(Array_elementClassId(a) == ID_INT);
-
     CHECK(Array_stride(a) == 4);
-
     CHECK(!Array_isEmpty(a));
-
     CHECK(Array_dataBuffer(a) != nullptr);
+    CHECK(Array_getAs(a, 0, u32) == 0);
 
-    CHECK(Array_get(a, 0) == 0);
-
-    Array_set(a, 0, 111);
-
-    Array_set(a, 7, 777);
-
-    CHECK(Array_get(a, 0) == 111);
-
-    CHECK(Array_get(a, 7) == 777);
-
+    CHECK(Array_set(a, 0, (u32) 111));
+    CHECK(Array_set(a, 7, (u32) 777));
+    CHECK(Array_getAs(a, 0, u32) == 111);
+    CHECK(Array_getAs(a, 7, u32) == 777);
+    u32 *p7 = Array_get(a, 7);
+    CHECK(p7 != nullptr && *p7 == 777);
     CHECK(Array_slot(a, 3) != nullptr);
-
-    CHECK(Array_get(a, 8) == 0);
-
-    CHECK(Array_get(a, 999) == 0);
-
-    CHECK(Array_get(a, SIZE_MAX) == 0);
-
-    CHECK(Array_get(a, (bytes) -1) == 0);
-
+    CHECK(Array_get(a, 8) == nullptr);
+    CHECK(Array_get(a, 999) == nullptr);
+    CHECK(Array_get(a, SIZE_MAX) == nullptr);
+    CHECK(Array_get(a, (bytes) -1) == nullptr);
+    CHECK(Array_getAs(a, 8, u32) == 0);
     CHECK(Array_slot(a, 8) == nullptr);
-
     CHECK(Array_slot(a, SIZE_MAX) == nullptr);
-
-    Array_set(a, 8, 5);
-
-    Array_set(a, SIZE_MAX, 5);
-
-    CHECK(Array_get(a, 0) == 111);
-
-    CHECK(Array_get(a, 7) == 777);
+    CHECK(!Array_set(a, 8, (u32) 5));
+    CHECK(!Array_set(a, SIZE_MAX, (u32) 5));
+    CHECK(Array_getAs(a, 0, u32) == 111);
+    CHECK(Array_getAs(a, 7, u32) == 777);
 
     TryValue ok = Array_getTry(a, 0);
-
     CHECK(TryValue_isOk(&ok));
-
     CHECK(TryValue_getValue(&ok) == 111);
-
     TryValue hi = Array_getTry(a, 8);
-
     CHECK(TryValue_getCode(&hi) == TRY_BOUNDS);
-
     TryValue max = Array_getTry(a, SIZE_MAX);
-
     CHECK(TryValue_getCode(&max) == TRY_BOUNDS);
-
     TryValue nul = Array_getTry(nullptr, 0);
-
     CHECK(TryValue_getCode(&nul) == TRY_NULL_ARG);
 
     Collection *c = (Collection*) a;
-
     CHECK(Collection_readSlot(c, 0) == 111);
-
     CHECK(Collection_readSlot(c, 7) == 777);
-
     CHECK(Collection_readSlot(c, 8) == 0);
-
     CHECK(Collection_readSlot(c, SIZE_MAX) == 0);
-
     Collection_writeSlot(c, 8, 5);
-
     CHECK(Collection_readSlot(c, 0) == 111);
-
     CHECK(Collection_readSlot(nullptr, 0) == 0);
 
-    CHECK(Array_get(nullptr, 0) == 0);
-
+    CHECK(Array_get(nullptr, 0) == nullptr);
     CHECK(Array_slot(nullptr, 0) == nullptr);
-
-    Array_set(nullptr, 0, 1);
-
+    CHECK(!Array_set(nullptr, 0, (u32) 1));
     CHECK(Array_size(nullptr) == 0);
-
     CHECK(Array_isEmpty(nullptr));
-
     Array_free(nullptr);
-
     Array_free(a);
 
-    if (s_array_g_failures == 0) {
+    Array *typed = Array(ListDemoRecord, 4, arena);
+    CHECK(typed != nullptr && Array_stride(typed) == sizeof(ListDemoRecord));
+    CHECK(Array_fill(typed, ListDemoRecord(9u, 2.5f, 42u)));
+    ListDemoRecord gotRec = Array_getAs(typed, 3, ListDemoRecord);
+    CHECK(ListDemoRecord_id(&gotRec) == 9u && ListDemoRecord_tag(&gotRec) == 42u);
+    utf8 textBuf[128];
+    bool trunc = true;
+    Array_toString(typed, textBuf, sizeof(textBuf), &trunc);
+    CHECK(!trunc && textBuf[0] != '\0');
+    Array_toStringStruct(typed, textBuf, sizeof(textBuf), &trunc);
+    CHECK(!trunc && textBuf[0] != '\0');
+    Array_free(typed);
+
+    Array2D *grid = Array2D(u32, 6, 4, arena);
+    CHECK(grid != nullptr);
+    CHECK(Array2D_width(grid) == 6 && Array2D_height(grid) == 4);
+    CHECK(Array2D_count(grid) == 24 && Array2D_stride(grid) == sizeof(u32));
+    CHECK(Array2D_fill(grid, (u32) 7u));
+    CHECK(Array2D_getAs(grid, 0, 0, u32) == 7u);
+    CHECK(Array2D_set(grid, 5, 3, (u32) 99u));
+    u32 *gCell = Array2D_get(grid, 5, 3);
+    CHECK(gCell != nullptr && *gCell == 99u);
+    CHECK(Array2D_get(grid, 6, 0) == nullptr);
+    CHECK(Array2D_get(grid, 0, 4) == nullptr);
+    CHECK(!Array2D_set(grid, 6, 0, (u32) 1u));
+    Array2D_toString(grid, textBuf, sizeof(textBuf), &trunc);
+    CHECK(!trunc && textBuf[0] != '\0');
+    Array2D_toStringStruct(grid, textBuf, sizeof(textBuf), &trunc);
+    CHECK(!trunc && textBuf[0] != '\0');
+    Array2D_free(grid);
+    CHECK(Array2D(u32, 0, 4, arena) == nullptr);
+    CHECK(Array2D(Over64, 2, 2, arena) == nullptr);
+
+    Array3D *vol = Array3D(f32, 4, 3, 2, arena);
+    CHECK(vol != nullptr);
+    CHECK(Array3D_width(vol) == 4 && Array3D_height(vol) == 3 && Array3D_depth(vol) == 2);
+    CHECK(Array3D_count(vol) == 24 && Array3D_stride(vol) == sizeof(f32));
+    CHECK(Array3D_fill(vol, 1.25f));
+    CHECK(Array3D_getAs(vol, 1, 1, 1, f32) == 1.25f);
+    CHECK(Array3D_set(vol, 3, 2, 1, 8.5f));
+    f32 *vCell = Array3D_get(vol, 3, 2, 1);
+    CHECK(vCell != nullptr && *vCell == 8.5f);
+    CHECK(Array3D_get(vol, 4, 0, 0) == nullptr);
+    CHECK(Array3D_get(vol, 0, 3, 0) == nullptr);
+    CHECK(Array3D_get(vol, 0, 0, 2) == nullptr);
+    Array3D_toString(vol, textBuf, sizeof(textBuf), &trunc);
+    CHECK(!trunc && textBuf[0] != '\0');
+    Array3D_toStringStruct(vol, textBuf, sizeof(textBuf), &trunc);
+    CHECK(!trunc && textBuf[0] != '\0');
+    Array3D_free(vol);
+    CHECK(Array3D(f32, 4, 0, 2, arena) == nullptr);
+
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
+
+    if(s_array_g_failures == 0) {
         print("array_test: all assertions held");
 
         return 0;
@@ -5755,7 +5803,7 @@ static fn testSentinels() {
 static fn testGeometry() {
     print("[2] radix geometry: explicit depth, page leaf, pow2 rounding");
 
-    ChunkedList *l3 = ChunkedList(ID_INT, 16u, 4, 4, 4);
+    ChunkedList *l3 = (ChunkedList*) RadixList(Row16, 4, 4, 4);
 
     CHECK(l3 != nullptr);
 
@@ -5773,7 +5821,7 @@ static fn testGeometry() {
         ChunkedList_free(l3);
     }
 
-    ChunkedList *l4 = ChunkedList(ID_INT, 16u, 2, 2, 2, 2);
+    ChunkedList *l4 = (ChunkedList*) RadixList(Row16, 2, 2, 2, 2);
 
     CHECK(l4 != nullptr);
 
@@ -5785,7 +5833,7 @@ static fn testGeometry() {
         ChunkedList_free(l4);
     }
 
-    ChunkedList *round = ChunkedList(ID_INT, 16u, 100, 100, 20);
+    ChunkedList *round = (ChunkedList*) RadixList(Row16, 100, 100, 20);
 
     CHECK(round != nullptr);
 
@@ -5800,7 +5848,7 @@ static fn testGeometry() {
 static fn testLayerDefaults() {
     print("[3] *_LAYER_DEFAULT presets select depth + page leaf");
 
-    ChunkedList *two = ChunkedList(ID_INT, 16u, CHUNKED_LIST_TWO_LAYER_DEFAULT);
+    ChunkedList *two = (ChunkedList*) RadixList(Row16, CHUNKED_LIST_TWO_LAYER_DEFAULT);
 
     CHECK(two != nullptr);
 
@@ -5814,7 +5862,7 @@ static fn testLayerDefaults() {
         ChunkedList_free(two);
     }
 
-    ChunkedList *three = ChunkedList(ID_INT, 16u, CHUNKED_LIST_THREE_LAYER_DEFAULT);
+    ChunkedList *three = (ChunkedList*) RadixList(Row16, CHUNKED_LIST_THREE_LAYER_DEFAULT);
 
     CHECK(three != nullptr);
 
@@ -5826,7 +5874,7 @@ static fn testLayerDefaults() {
         ChunkedList_free(three);
     }
 
-    ChunkedList *ov = ChunkedList(ID_INT, 16u, CHUNKED_LIST_THREE_LAYER_DEFAULT, 8);
+    ChunkedList *ov = (ChunkedList*) RadixList(Row16, CHUNKED_LIST_THREE_LAYER_DEFAULT, 8);
 
     CHECK(ov != nullptr);
 
@@ -5841,7 +5889,7 @@ static fn testLayerDefaults() {
 static fn testDeepGrowth() {
     print("[4] 3-level growth: stable rows across root doubling, leaf boundaries");
 
-    ChunkedList *list = ChunkedList(ID_INT, 16u, 4, 4, 4);
+    ChunkedList *list = (ChunkedList*) RadixList(Row16, 4, 4, 4);
 
     if (!list) {
         CHECK(false);
@@ -5961,7 +6009,7 @@ static fn chainFn(u8 *chunk, u32 index, any userdata) {
 static fn testChain() {
     print("[5] leaf tail-link chain: nextChunk + forEachChunk");
 
-    ChunkedList *list = ChunkedList(ID_INT, 16u, 4, 4, 4);
+    ChunkedList *list = (ChunkedList*) RadixList(Row16, 4, 4, 4);
 
     if (!list) {
         CHECK(false);
@@ -6230,93 +6278,116 @@ static i32 s_deque_g_failures = 0;
         }                                                                  \
     } while (0)
 
-/** Exercises deque construction, both-end operations, large growth, hostile indices, null safety, and cleanup. */
-static i32 suite_deque() {
-    Deque *d = Deque_1(ID_INT);
+/** Exercises ArrayDeque and LinkedDeque both-end ops, ring wraparound, growth, pointer stability, and OOM. */
+static i32 suite_deque()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
 
-    CHECK(d != nullptr);
+    Deque *deques[2];
+    deques[0] = ArrayDeque(u32, 4, arena);
+    deques[1] = LinkedDeque(u32, arena);
 
-    CHECK(Deque_isEmpty(d));
+    for(u32 k = 0; k < 2; k++) {
+        Deque *d = deques[k];
+        CHECK(d != nullptr);
+        CHECK(Deque_isEmpty(d));
+        CHECK(Deque_stride(d) == sizeof(u32));
+        CHECK(Deque_exhaustionCount(d) == 0);
 
-    CHECK(Deque_elementClassId(d) == ID_INT);
+        CHECK(Deque_addLast(d, (u32) 1));
+        CHECK(Deque_addLast(d, (u32) 2));
+        CHECK(Deque_addFirst(d, (u32) 0));
+        CHECK(Deque_size(d) == 3);
+        CHECK(Deque_peekFirstAs(d, u32) == 0);
+        CHECK(Deque_peekLastAs(d, u32) == 2);
+        CHECK(Deque_getAs(d, 0, u32) == 0);
+        CHECK(Deque_getAs(d, 1, u32) == 1);
+        CHECK(Deque_getAs(d, 2, u32) == 2);
 
-    CHECK(Deque_stride(d) == 4);
+        CHECK(Deque_popFirstAs(d, u32) == 0);
+        CHECK(Deque_popLastAs(d, u32) == 2);
+        CHECK(Deque_popFirstAs(d, u32) == 1);
+        CHECK(!Deque_removeFirst(d));
+        CHECK(!Deque_removeLast(d));
+        CHECK(Deque_peekFirst(d) == nullptr);
+        CHECK(Deque_peekLast(d) == nullptr);
 
-    CHECK(Deque_dataBuffer(d) != nullptr);
+        for(u32 i = 0; i < 64; i++) {
+            if((i & 1u) == 0)
+                CHECK(Deque_addFirst(d, i));
+            else
+                CHECK(Deque_addLast(d, i));
+        }
 
-    Deque_addLast(d, 1);
+        CHECK(Deque_size(d) == 64);
 
-    Deque_addLast(d, 2);
+        for(u32 i = 0; i < 32; i++)
+            CHECK(Deque_removeFirst(d));
 
-    Deque_addFirst(d, 0);
+        CHECK(Deque_size(d) == 32);
 
-    CHECK(Deque_size(d) == 3);
-    CHECK(Deque_exhaustionCount(d) == 0);
+        for(u32 i = 0; i < 500; i++)
+            CHECK(Deque_addLast(d, 1000u + i));
 
-    CHECK(Deque_peekFirst(d) == 0);
+        CHECK(Deque_size(d) == 532);
+        CHECK(Deque_peekLastAs(d, u32) == 1499u);
+        CHECK(Deque_get(d, Deque_size(d)) == nullptr);
+        CHECK(Deque_get(d, SIZE_MAX) == nullptr);
 
-    CHECK(Deque_peekLast(d) == 2);
+        u32 *empFirst = Deque_emplaceFirst(d);
+        CHECK(empFirst != nullptr && *empFirst == 0);
+        *empFirst = 777u;
+        CHECK(Deque_peekFirstAs(d, u32) == 777u);
 
-    CHECK(Deque_get(d, 0) == 0);
+        utf8 buf[128];
+        bool trunc = true;
+        Deque_toString(d, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+        Deque_toStringStruct(d, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
 
-    CHECK(Deque_get(d, 1) == 1);
+        Deque_clear(d);
+        CHECK(Deque_isEmpty(d));
+        Deque_free(d);
+    }
 
-    CHECK(Deque_get(d, 2) == 2);
+    Deque *ld = LinkedDeque(u32, arena);
+    CHECK(LinkedDeque_isLinkedDeque(ld));
+    u32 *stableFirst = Deque_emplaceFirst(ld);
+    CHECK(stableFirst != nullptr);
+    *stableFirst = 55u;
 
-    CHECK(Deque_removeFirst(d) == 0);
+    for(u32 i = 0; i < 32; i++)
+        CHECK(Deque_addLast(ld, i));
 
-    CHECK(Deque_removeLast(d) == 2);
+    CHECK(Deque_peekFirst(ld) == stableFirst);
+    CHECK(*stableFirst == 55u);
+    Deque_free(ld);
 
-    CHECK(Deque_removeFirst(d) == 1);
-
-    CHECK(Deque_removeFirst(d) == 0);
-
-    CHECK(Deque_peekFirst(d) == 0);
-
-    for (u64 i = 0; i < 1000000; i++) 
-        Deque_addLast(d, i);
-
-    CHECK(Deque_size(d) == 1000000);
-
-    CHECK(Deque_peekFirst(d) == 0);
-
-    CHECK(Deque_peekLast(d) == 999999);
-
-    CHECK(Deque_get(d, 12345) == 12345);
-
-    CHECK(Deque_get(d, Deque_size(d)) == 0);
-
-    CHECK(Deque_get(d, SIZE_MAX) == 0);
-
-    CHECK(Deque_slot(d, Deque_size(d)) == nullptr);
-
-    CHECK(Deque_slot(d, SIZE_MAX) == nullptr);
-
-    Deque_addFirst(nullptr, 1);
-
-    Deque_addLast(nullptr, 1);
-
-    CHECK(Deque_removeFirst(nullptr) == 0);
-
-    CHECK(Deque_removeLast(nullptr) == 0);
-
-    CHECK(Deque_peekFirst(nullptr) == 0);
-
-    CHECK(Deque_peekLast(nullptr) == 0);
-
-    CHECK(Deque_get(nullptr, 0) == 0);
-
-    CHECK(Deque_slot(nullptr, 0) == nullptr);
-
+    CHECK(!Deque_addFirst(nullptr, (u32) 1));
+    CHECK(!Deque_addLast(nullptr, (u32) 1));
+    CHECK(!Deque_removeFirst(nullptr));
+    CHECK(!Deque_removeLast(nullptr));
+    CHECK(Deque_peekFirst(nullptr) == nullptr);
+    CHECK(Deque_peekLast(nullptr) == nullptr);
+    CHECK(Deque_get(nullptr, 0) == nullptr);
     CHECK(Deque_size(nullptr) == 0);
-
     CHECK(Deque_isEmpty(nullptr));
-
     Deque_free(nullptr);
 
-    Deque_free(d);
+    MemoryArena *oomArena = MemoryArena_pages(2);
+    Deque *oomDeque = ArrayDeque(u32, 4, oomArena);
+    CHECK(oomDeque != nullptr);
+    CHECK(!Deque_reserve(oomDeque, 65536u));
+    CHECK(Deque_exhaustionCount(oomDeque) >= 1u);
+    Deque_free(oomDeque);
+    MemoryArena_destroy(oomArena);
 
-    if (s_deque_g_failures == 0) {
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
+
+    if(s_deque_g_failures == 0) {
         print("deque_test: all assertions held");
 
         return 0;
@@ -6409,19 +6480,23 @@ static i32 suite_exhaustion() {
 
     CHECK(Struct_constructionExhaustionCount() == 0);
 
-    List *tooBig = List_2(ID_INT, 100000000u);
+    MemoryArena *tinyExhaustArena = MemoryArena_pages(1);
+    CHECK(tinyExhaustArena != nullptr);
+
+    List *tooBig = ArrayList(u32, 100000u, tinyExhaustArena);
 
     CHECK(tooBig == nullptr);
 
     CHECK(Struct_constructionExhaustionCount() == 1);
 
-    List *ok = List_1(ID_INT);
+    List *ok = ArrayList(u32);
 
     CHECK(ok != nullptr);
 
     CHECK(Struct_constructionExhaustionCount() == 1);
 
     List_free(ok);
+    MemoryArena_destroy(tinyExhaustArena);
 
     if (s_exhaustion_g_failures == 0) {
         print("exhaustion_test: all assertions held");
@@ -6487,18 +6562,123 @@ static inline u32 AddArg_base(const AddArg *arg)
     return (*arg).base;
 }
 
+;;CONSTRUCTOR
+ListDemoRecord ListDemoRecord_3(u32 id, f32 score, u64 tag)
+{
+    ListDemoRecord rec;
+    memset(&rec, 0, sizeof(rec));
+    rec.id = id;
+    rec.score = score;
+    rec.tag = tag;
+
+    return rec;
+}
+
+;;GETTER
+static inline u32 ListDemoRecord_id(const ListDemoRecord *rec)
+{
+    return (*rec).id;
+}
+
+;;GETTER
+static inline f32 ListDemoRecord_score(const ListDemoRecord *rec)
+{
+    return (*rec).score;
+}
+
+;;GETTER
+static inline u64 ListDemoRecord_tag(const ListDemoRecord *rec)
+{
+    return (*rec).tag;
+}
+
+;;SETTER
+static inline fn ListDemoRecord_setId(ListDemoRecord *rec, u32 id)
+{
+    (*rec).id = id;
+}
+
+;;SETTER
+static inline fn ListDemoRecord_setScore(ListDemoRecord *rec, f32 score)
+{
+    (*rec).score = score;
+}
+
+;;SETTER
+static inline fn ListDemoRecord_setTag(ListDemoRecord *rec, u64 tag)
+{
+    (*rec).tag = tag;
+}
+
+;;GETTER
+static inline bytes ListVisitCtx_visits(const ListVisitCtx *ctx)
+{
+    return (*ctx).visits;
+}
+
+;;GETTER
+static inline u64 ListVisitCtx_sum(const ListVisitCtx *ctx)
+{
+    return (*ctx).sum;
+}
+
+;;SETTER
+static inline fn ListVisitCtx_setVisits(ListVisitCtx *ctx, bytes visits)
+{
+    (*ctx).visits = visits;
+}
+
+;;SETTER
+static inline fn ListVisitCtx_setSum(ListVisitCtx *ctx, u64 sum)
+{
+    (*ctx).sum = sum;
+}
+
+;;SETTER
+static inline fn ListRow16_setA(Row16 *row, u32 a)
+{
+    (*row).a = a;
+}
+
+static fn visitSumU32(any element, bytes index, any userdata)
+{
+    (discard) index;
+    ListVisitCtx *ctx = userdata;
+    u32 *val = element;
+    ListVisitCtx_setVisits(ctx, ListVisitCtx_visits(ctx) + 1u);
+    ListVisitCtx_setSum(ctx, ListVisitCtx_sum(ctx) + (u64) (*val));
+}
+
+static u64 sumPolymorphicU32(const List *list)
+{
+    u64 total = 0;
+    bytes count = List_count(list);
+
+    for(bytes i = 0; i < count; i++) {
+        u32 *slot = List_get(list, i);
+
+        if(slot)
+            total += (u64) (*slot);
+    }
+
+    return total;
+}
+
 /** Appends this worker's assigned value range while holding the shared list mutex. */
-static any adder(any userData) {
+static any adder(any userData)
+{
     AddArg *arg = userData;
 
     u32 count = AddArg_count(arg);
     pthread_mutex_t *lock = AddArg_lock(arg);
     List *list = AddArg_list(arg);
     u32 base = AddArg_base(arg);
-    for (u32 i = 0; i < count; i++) {
+
+    for(u32 i = 0; i < count; i++) {
+        u32 value = base + i;
         pthread_mutex_lock(lock);
 
-        List_add(list, (u64) (base + i));
+        (discard) List_add(list, value);
 
         pthread_mutex_unlock(lock);
     }
@@ -6506,91 +6686,300 @@ static any adder(any userData) {
     return nullptr;
 }
 
-/** Verifies list insertion, indexed access, removal, growth, and empty-state behavior. */
-static i32 suite_list() {
-    List *list = List_2(ID_INT, 4);
+/** Verifies polymorphic List interface across ArrayList, LinkedList, and PagedList. */
+static i32 suite_list()
+{
+    MemoryArena *isoArena = MemoryArena();
+    CHECK(isoArena != nullptr);
+    bytes baselineBytes = MemoryArena_activeBytes(isoArena);
 
+    List *list = ArrayList(u32, 4, isoArena);
     CHECK(list != nullptr);
-
+    CHECK(ArrayList_isArrayList(list));
+    CHECK(!LinkedList_isLinkedList(list));
+    CHECK(!ChunkedList_isChunkedList(list));
+    CHECK(List_kind(list) == LIST_KIND_ARRAY);
     CHECK(List_isEmpty(list));
-
+    CHECK(List_count(list) == 0);
     CHECK(List_size(list) == 0);
+    CHECK(List_length(list) == 0);
+    CHECK(List_capacity(list) == 4);
+    CHECK(List_stride(list) == sizeof(u32));
+    CHECK(List_alignment(list) == alignof(u32));
+    CHECK(List_isType(list, u32));
+    CHECK(!List_isType(list, u64));
     CHECK(List_exhaustionCount(list) == 0);
+    CHECK(ArrayList_data(list) != nullptr);
 
-    CHECK(List_elementClassId(list) == ID_INT);
+    CHECK(List_add(list, (u32) 7));
+    CHECK(List_count(list) == 1);
+    u32 *firstPtr = List_get(list, 0);
+    CHECK(firstPtr != nullptr && *firstPtr == 7u);
+    u32 *fastPtr = ArrayList_get(list, 0);
+    CHECK(fastPtr == firstPtr);
+    CHECK(List_getAs(list, 0, u32) == 7u);
+    CHECK(ArrayList_getAs(list, 0, u32) == 7u);
+    CHECK(!List_add(list, (u64) 999ull));
+    CHECK(List_count(list) == 1);
+    CHECK(List_getAs(list, 0, u64) == 0ull);
 
-    CHECK(List_stride(list) == 4);
+    for(u32 i = 1u; i < 100u; i++)
+        CHECK(List_add(list, i));
 
-    CHECK(List_dataBuffer(list) != nullptr);
+    CHECK(List_count(list) == 100u);
+    CHECK(List_getAs(list, 99u, u32) == 99u);
 
-    List_add(list, 7);
+    for(u32 i = 100u; i < 50000u; i++)
+        CHECK(ArrayList_add(list, i));
 
-    CHECK(List_size(list) == 1);
+    CHECK(List_count(list) == 50000u);
+    CHECK(List_getAs(list, 49999u, u32) == 49999u);
 
-    CHECK(List_get(list, 0) == 7);
+    CHECK(List_set(list, 0u, (u32) 4242u));
+    CHECK(List_getAs(list, 0u, u32) == 4242u);
+    CHECK(ArrayList_set(list, 0u, (u32) 7u));
+    CHECK(List_getAs(list, 0u, u32) == 7u);
+    CHECK(!List_set(list, 0u, (u64) 1ull));
 
-    for (u64 i = 1; i < 100; i++) 
-        List_add(list, i);
+    CHECK(List_insert(list, 0u, (u32) 555u));
+    CHECK(List_count(list) == 50001u);
+    CHECK(List_getAs(list, 0u, u32) == 555u);
+    CHECK(List_getAs(list, 1u, u32) == 7u);
+    CHECK(List_remove(list, 0u));
+    CHECK(List_count(list) == 50000u);
+    CHECK(List_getAs(list, 0u, u32) == 7u);
 
-    CHECK(List_size(list) == 100);
+    CHECK(ArrayList_swapRemove(list, 0u));
+    CHECK(List_count(list) == 49999u);
+    CHECK(List_getAs(list, 0u, u32) == 49999u);
+    CHECK(List_set(list, 0u, (u32) 0u));
 
-    CHECK(List_get(list, 99) == 99);
+    CHECK(List_indexOf(list, (u32) 12345u) == 12345);
+    CHECK(List_contains(list, (u32) 12345u));
+    CHECK(!List_contains(list, (u32) 999999u));
 
-    for (u64 i = 100; i < 100000; i++) 
-        List_add(list, i);
+    CHECK(ArrayList_shrinkToFit(list));
+    CHECK(List_capacity(list) == List_count(list));
 
-    CHECK(List_size(list) == 100000);
+    bytes n = List_count(list);
+    CHECK(List_get(list, n) == nullptr);
+    CHECK(List_get(list, SIZE_MAX) == nullptr);
+    CHECK(List_getAs(list, n, u32) == 0u);
+    CHECK(List_getAs(list, SIZE_MAX, u32) == 0u);
+    CHECK(!List_set(list, n, (u32) 1u));
+    CHECK(!List_remove(list, n));
+    CHECK(!List_insert(list, n + 1u, (u32) 1u));
 
-    CHECK(List_get(list, 99999) == 99999);
-
-    List_set(list, 0, 4242);
-
-    CHECK(List_get(list, 0) == 4242);
-
-    CHECK(List_slot(list, 0) != nullptr);
-
-    bytes before = List_size(list);
-
-    List_remove(list, 0);
-
-    CHECK(List_size(list) == before - 1);
-
-    CHECK(List_get(list, 0) == 1);
-
-    List *copy = List_2(ID_INT, 4);
-
-    for (bytes i = 0; i < List_size(list); i++) 
-        List_add(copy, List_get(list, i));
-
-    CHECK(List_compare(list, copy));
-
-    List_add(copy, 9);
-
-    CHECK(!List_compare(list, copy));
-
-    List_free(copy);
-
-    bytes n = List_size(list);
-
-    CHECK(List_get(list, n) == 0);
-
-    CHECK(List_get(list, SIZE_MAX) == 0);
-
-    CHECK(List_slot(list, n) == nullptr);
-
-    List_set(list, n, 1);
-
-    List_remove(list, n);
-
-    CHECK(List_size(list) == n);
+    List_clear(list);
+    CHECK(List_isEmpty(list));
+    CHECK(ArrayList_shrinkToFit(list));
+    CHECK(List_capacity(list) == 0);
+    CHECK(ArrayList_data(list) == nullptr);
+    CHECK(List_add(list, (u32) 88u));
+    CHECK(List_getAs(list, 0u, u32) == 88u);
 
     List_free(list);
+    CHECK(MemoryArena_activeBytes(isoArena) == baselineBytes);
 
+    List *lazy = ArrayList(u32, 0, isoArena);
+    CHECK(lazy != nullptr);
+    CHECK(List_capacity(lazy) == 0);
+    CHECK(ArrayList_data(lazy) == nullptr);
+    CHECK(List_add(lazy, (u32) 10u));
+    CHECK(List_capacity(lazy) >= 16u);
+    CHECK(List_getAs(lazy, 0u, u32) == 10u);
+    List_free(lazy);
+    CHECK(MemoryArena_activeBytes(isoArena) == baselineBytes);
+
+    List *strings = ArrayList(string, 4, isoArena);
+    CHECK(strings != nullptr);
+    CHECK(List_stride(strings) == sizeof(string));
+    CHECK(List_add(strings, "alpha"));
+    CHECK(List_add(strings, "beta"));
+    string s0 = List_getAs(strings, 0u, string);
+    string s1 = List_getAs(strings, 1u, string);
+    CHECK(s0 != nullptr && memcmp(s0, "alpha", 6) == 0);
+    CHECK(s1 != nullptr && memcmp(s1, "beta", 5) == 0);
+    List_free(strings);
+
+    List *records = ArrayList(ListDemoRecord, 4, isoArena);
+    CHECK(records != nullptr);
+    CHECK(List_stride(records) == sizeof(ListDemoRecord));
+    CHECK(List_alignment(records) == alignof(ListDemoRecord));
+    ListDemoRecord *emplaced = List_emplace(records);
+    CHECK(emplaced != nullptr);
+    CHECK(ListDemoRecord_id(emplaced) == 0u);
+    ListDemoRecord_setId(emplaced, 1u);
+    ListDemoRecord_setScore(emplaced, 2.5f);
+    ListDemoRecord_setTag(emplaced, 0xCAFEBABEull);
+
+    ListDemoRecord secondRec = ListDemoRecord(2u, 9.75f, 0xDEADBEEFull);
+    CHECK(List_add(records, secondRec));
+
+    ListDemoRecord *r0 = List_get(records, 0u);
+    ListDemoRecord *r1 = ArrayList_get(records, 1u);
+    CHECK(r0 != nullptr && ListDemoRecord_id(r0) == 1u && ListDemoRecord_tag(r0) == 0xCAFEBABEull);
+    CHECK(r1 != nullptr && ListDemoRecord_id(r1) == 2u && ListDemoRecord_score(r1) == 9.75f);
+
+    ListDemoRecord copied = List_getAs(records, 1u, ListDemoRecord);
+    CHECK(ListDemoRecord_tag(&copied) == 0xDEADBEEFull);
+
+    utf8 fmtBuf[256];
+    bool truncated = false;
+    List_toString(records, fmtBuf, sizeof(fmtBuf), &truncated);
+    CHECK(!truncated && memcmp(fmtBuf, "ArrayList<ListDemoRecord>", 25) == 0);
+    List_toStringStruct(records, fmtBuf, sizeof(fmtBuf), &truncated);
+    CHECK(!truncated && memcmp(fmtBuf, "List{kind=ArrayList", 19) == 0);
+    List_free(records);
+    CHECK(MemoryArena_activeBytes(isoArena) == baselineBytes);
+
+    List *linked = LinkedList(ListDemoRecord, isoArena);
+    CHECK(linked != nullptr);
+    CHECK(LinkedList_isLinkedList(linked));
+    CHECK(!ArrayList_isArrayList(linked));
+    CHECK(ArrayList_get(linked, 0u) == nullptr);
+    CHECK(List_kind(linked) == LIST_KIND_LINKED);
+    CHECK(List_isEmpty(linked));
+
+    ListDemoRecord *lAnchor = LinkedList_emplaceLast(linked);
+    CHECK(lAnchor != nullptr);
+    ListDemoRecord_setId(lAnchor, 100u);
+    ListDemoRecord_setScore(lAnchor, 1.0f);
+    ListDemoRecord_setTag(lAnchor, 1000ull);
+
+    CHECK(LinkedList_addFirst(linked, ListDemoRecord(50u, 0.5f, 500ull)));
+    CHECK(LinkedList_addLast(linked, ListDemoRecord(200u, 2.0f, 2000ull)));
+    CHECK(List_insert(linked, 1u, ListDemoRecord(75u, 0.75f, 750ull)));
+    CHECK(List_count(linked) == 4u);
+    CHECK(List_get(linked, 2u) == lAnchor);
+    CHECK(ListDemoRecord_id((ListDemoRecord*) List_first(linked)) == 50u);
+    CHECK(ListDemoRecord_id((ListDemoRecord*) List_last(linked)) == 200u);
+
+    CHECK(LinkedList_removeFirst(linked));
+    CHECK(LinkedList_removeLast(linked));
+    CHECK(List_count(linked) == 2u);
+    CHECK(List_get(linked, 1u) == lAnchor);
+    CHECK(List_remove(linked, 0u));
+    CHECK(List_count(linked) == 1u);
+    CHECK(List_get(linked, 0u) == lAnchor);
+
+    List_clear(linked);
+    CHECK(List_isEmpty(linked));
+    CHECK(List_first(linked) == nullptr);
+    CHECK(List_last(linked) == nullptr);
+    List_free(linked);
+    CHECK(MemoryArena_activeBytes(isoArena) == baselineBytes);
+
+    List *chunked = ChunkedList(ListDemoRecord, 256u, isoArena);
+    CHECK(chunked != nullptr);
+    CHECK(ChunkedList_isChunkedList(chunked));
+    CHECK(List_kind(chunked) == LIST_KIND_CHUNKED);
+    CHECK(List_reserve(chunked, 64u));
+
+    ListDemoRecord *pFirst = List_emplace(chunked);
+    CHECK(pFirst != nullptr);
+    ListDemoRecord_setId(pFirst, 1u);
+    ListDemoRecord_setTag(pFirst, 0x1111ull);
+
+    for(u32 i = 1u; i < 4000u; i++)
+        CHECK(List_add(chunked, ListDemoRecord(i + 1u, (f32) i, (u64) i * 10ull)));
+
+    CHECK(List_count(chunked) == 4000u);
+    CHECK(List_get(chunked, 0u) == pFirst);
+    CHECK(ChunkedList_get(chunked, 0u) == pFirst);
+    CHECK(ListDemoRecord_id((ListDemoRecord*) List_get(chunked, 3999u)) == 4000u);
+    CHECK(!List_remove(chunked, 0u));
+    CHECK(!List_insert(chunked, 0u, ListDemoRecord(0u, 0.0f, 0ull)));
+    CHECK(List_insert(chunked, 4000u, ListDemoRecord(4001u, 1.0f, 1ull)));
+    CHECK(List_count(chunked) == 4001u);
+    List_free(chunked);
+    CHECK(MemoryArena_activeBytes(isoArena) == baselineBytes);
+
+    List *radixList = RadixList(Row16, 4, 4, 4);
+    CHECK(radixList != nullptr);
+    CHECK(ChunkedList_isChunkedList(radixList));
+    CHECK(ChunkedList_getLevels((ChunkedList*) radixList) == 3u);
+    Row16 *wSlot = List_emplace(radixList);
+    CHECK(wSlot != nullptr);
+    ListRow16_setA(wSlot, 42u);
+    CHECK(Row16_a((Row16*) List_get(radixList, 0u)) == 42u);
+    CHECK(ChunkedList_size((ChunkedList*) radixList) == 1u);
+    CHECK(List_count(radixList) == 1u);
+    List_free(radixList);
+
+    List *polyArr = ArrayList(u32, 8, isoArena);
+    List *polyLink = LinkedList(u32, isoArena);
+    List *polyChunk = ChunkedList(u32, 128u, isoArena);
+    CHECK(polyArr != nullptr && polyLink != nullptr && polyChunk != nullptr);
+
+    for(u32 i = 1u; i <= 25u; i++) {
+        CHECK(List_add(polyArr, i));
+        CHECK(List_add(polyLink, i));
+        CHECK(List_add(polyChunk, i));
+    }
+
+    CHECK(List_compare(polyArr, polyLink));
+    CHECK(List_compare(polyArr, polyChunk));
+    CHECK(List_compare(polyLink, polyChunk));
+    CHECK(sumPolymorphicU32(polyArr) == 325ull);
+    CHECK(sumPolymorphicU32(polyLink) == 325ull);
+    CHECK(sumPolymorphicU32(polyChunk) == 325ull);
+
+    ListVisitCtx visitCtx;
+    memset(&visitCtx, 0, sizeof(visitCtx));
+    List_forEach(polyLink, visitSumU32, &visitCtx);
+    CHECK(ListVisitCtx_visits(&visitCtx) == 25u);
+    CHECK(ListVisitCtx_sum(&visitCtx) == 325ull);
+
+    CHECK(List_add(polyLink, (u32) 999u));
+    CHECK(!List_compare(polyArr, polyLink));
+
+    List_free(polyArr);
+    List_free(polyLink);
+    List_free(polyChunk);
+    CHECK(MemoryArena_activeBytes(isoArena) == baselineBytes);
+
+    CHECK(ArrayList(Over64) == nullptr);
+    CHECK(LinkedList(Over64) == nullptr);
+    CHECK(ChunkedList(Over64) == nullptr);
+
+    MemoryArena *oomArena = MemoryArena_pages(2);
+    CHECK(oomArena != nullptr);
+    List *oomList = ArrayList(u64, 4, oomArena);
+    CHECK(oomList != nullptr);
+    CHECK(List_add(oomList, (u64) 111ull));
+    CHECK(List_add(oomList, (u64) 222ull));
+    CHECK(!List_reserve(oomList, 65536u));
+    CHECK(List_exhaustionCount(oomList) >= 1u);
+    CHECK(List_count(oomList) == 2u);
+    CHECK(List_getAs(oomList, 0u, u64) == 111ull);
+    CHECK(List_getAs(oomList, 1u, u64) == 222ull);
+    List_free(oomList);
+    MemoryArena_destroy(oomArena);
+
+    CHECK(List_get(nullptr, 0u) == nullptr);
+    CHECK(List_first(nullptr) == nullptr);
+    CHECK(List_last(nullptr) == nullptr);
+    CHECK(List_emplace(nullptr) == nullptr);
+    CHECK(!List_add(nullptr, (u32) 1u));
+    CHECK(!List_set(nullptr, 0u, (u32) 1u));
+    CHECK(!List_insert(nullptr, 0u, (u32) 1u));
+    CHECK(!List_remove(nullptr, 0u));
+    CHECK(!List_reserve(nullptr, 4u));
+    CHECK(List_count(nullptr) == 0u);
+    CHECK(List_isEmpty(nullptr));
+    CHECK(List_indexOf(nullptr, (u32) 1u) == -1);
+    List_clear(nullptr);
     List_free(nullptr);
+    ArrayList_free(nullptr);
+    LinkedList_free(nullptr);
+    ChunkedList_free(nullptr);
+
+    MemoryArena_destroy(isoArena);
 
     enum { THREADS = 4, PER_THREAD = 250000 };
 
-    List *big = List_2(ID_INT, 4);
+    List *big = ArrayList(u32, 4);
 
     pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -6598,36 +6987,38 @@ static i32 suite_list() {
 
     AddArg args[THREADS];
 
-    for (i32 t = 0; t < THREADS; t++) {
-        args[t] = (AddArg){ .list = big, .lock = &lock,
-                            .base = (u32) t * PER_THREAD, .count = PER_THREAD };
+    for(i32 t = 0; t < THREADS; t++) {
+        args[t].list = big;
+        args[t].lock = &lock;
+        args[t].base = (u32) t * PER_THREAD;
+        args[t].count = PER_THREAD;
         CHECK(pthread_create(&tids[t], nullptr, adder, &args[t]) == 0);
     }
 
-    for (i32 t = 0; t < THREADS; t++) 
+    for(i32 t = 0; t < THREADS; t++)
         CHECK(pthread_join(tids[t], nullptr) == 0);
 
     pthread_mutex_destroy(&lock);
 
-    CHECK(List_size(big) == (bytes) THREADS * PER_THREAD);
+    CHECK(List_count(big) == (bytes) THREADS * PER_THREAD);
 
     u64 sum = 0;
 
-    bytes count = List_size(big);
+    bytes count = List_count(big);
 
-    for (bytes i = 0; i < count; i++) 
-        sum += List_get(big, i);
+    for(bytes i = 0; i < count; i++)
+        sum += (u64) List_getAs(big, i, u32);
 
-    u64 expected = (u64) (count - 1) * count / 2;
+    u64 expected = (u64) (count - 1u) * count / 2u;
 
     CHECK(sum == expected);
 
-    CHECK(List_get(big, SIZE_MAX) == 0);
+    CHECK(List_get(big, SIZE_MAX) == nullptr);
 
     List_free(big);
 
-    if (s_list_g_failures == 0) {
-        print("list_test: all assertions held (1,000,000 elements / 4 threads)");
+    if(s_list_g_failures == 0) {
+        print("list_test: all assertions held (ArrayList + LinkedList + ChunkedList + 1,000,000 / 4 threads)");
 
         return 0;
     }
@@ -6659,81 +7050,198 @@ static i32 s_map_g_failures = 0;
         }                                                                  \
     } while (0)
 
-/** Checks map insertion, lookup, replacement, missing keys, and cleanup. */
-static i32 suite_map() {
-    Map *m = Map_2(ID_INT, ID_INT);
+;;GETTER
+static inline bytes MapVisitCtx_visits(const MapVisitCtx *ctx)
+{
+    return (*ctx).visits;
+}
 
-    CHECK(m != nullptr);
+;;GETTER
+static inline u64 MapVisitCtx_keySum(const MapVisitCtx *ctx)
+{
+    return (*ctx).keySum;
+}
 
-    CHECK(Map_isEmpty(m));
+;;GETTER
+static inline u64 MapVisitCtx_valSum(const MapVisitCtx *ctx)
+{
+    return (*ctx).valSum;
+}
 
-    CHECK(Map_size(m) == 0);
-    CHECK(Map_exhaustionCount(m) == 0);
+;;GETTER
+static inline u32 MapVisitCtx_orderAt(const MapVisitCtx *ctx, bytes idx)
+{
+    return (*ctx).order[idx];
+}
 
-    CHECK(Map_keyClassId(m) == ID_INT);
+;;SETTER
+static inline fn MapVisitCtx_record(MapVisitCtx *ctx, u32 key, u64 val)
+{
+    if((*ctx).visits < 8u)
+        (*ctx).order[(*ctx).visits] = key;
 
-    CHECK(Map_dataBuffer(m) != nullptr);
+    (*ctx).visits++;
+    (*ctx).keySum += key;
+    (*ctx).valSum += val;
+}
 
-    Map_put(m, 1, 100);
+static fn visitMapU32U64(const_any key, any value, bytes index, any userdata)
+{
+    (discard) index;
+    MapVisitCtx *ctx = (MapVisitCtx*) userdata;
+    u32 k = 0;
+    u64 v = 0;
+    memcpy(&k, key, sizeof(u32));
+    memcpy(&v, value, sizeof(u64));
+    MapVisitCtx_record(ctx, k, v);
+}
 
-    Map_put(m, 2, 200);
+/** Checks HashMap and LinkedHashMap: content-hashed strings, insertion order, pointer stability, churn, OOM. */
+static i32 suite_map()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
 
-    Map_put(m, 2, 222);
+    Map *maps[2];
+    maps[0] = HashMap(u32, u64, 8, arena);
+    maps[1] = LinkedHashMap(u32, u64, 8, arena);
 
-    CHECK(Map_size(m) == 2);
+    for(u32 k = 0; k < 2; k++) {
+        Map *m = maps[k];
+        CHECK(m != nullptr);
+        CHECK(Map_isEmpty(m));
+        CHECK(Map_size(m) == 0);
+        CHECK(Map_exhaustionCount(m) == 0);
+        CHECK(Map_keyStride(m) == sizeof(u32));
+        CHECK(Map_valStride(m) == sizeof(u64));
 
-    CHECK(Map_containsKey(m, 1));
+        CHECK(Map_put(m, (u32) 10, (u64) 100));
+        CHECK(Map_put(m, (u32) 20, (u64) 200));
+        CHECK(Map_put(m, (u32) 30, (u64) 300));
+        CHECK(Map_put(m, (u32) 20, (u64) 222));
+        CHECK(Map_size(m) == 3);
+        CHECK(Map_containsKey(m, (u32) 10));
+        CHECK(Map_getAs(m, (u32) 10, u64) == 100);
+        CHECK(Map_getAs(m, (u32) 20, u64) == 222);
+        CHECK(Map_get(m, (u32) 99) == nullptr);
+        CHECK(!Map_containsKey(m, (u32) 99));
 
-    CHECK(Map_get(m, 1) == 100);
+        u64 *emp = Map_emplace(m, (u32) 40);
+        CHECK(emp != nullptr && *emp == 0);
+        *emp = 400u;
+        CHECK(Map_getAs(m, (u32) 40, u64) == 400u);
 
-    CHECK(Map_get(m, 2) == 222);
+        CHECK(Map_remove(m, (u32) 10));
+        CHECK(!Map_containsKey(m, (u32) 10));
+        CHECK(!Map_remove(m, (u32) 10));
+        CHECK(Map_size(m) == 3);
 
-    CHECK(Map_get(m, 3) == 0);
+        MapVisitCtx vctx;
+        memset(&vctx, 0, sizeof(vctx));
+        Map_forEach(m, visitMapU32U64, &vctx);
+        CHECK(MapVisitCtx_visits(&vctx) == 3);
+        CHECK(MapVisitCtx_keySum(&vctx) == 90u);
+        CHECK(MapVisitCtx_valSum(&vctx) == 922u);
 
-    CHECK(!Map_containsKey(m, 3));
+        if(LinkedHashMap_isLinkedHashMap(m)) {
+            CHECK(MapVisitCtx_orderAt(&vctx, 0) == 20u);
+            CHECK(MapVisitCtx_orderAt(&vctx, 1) == 30u);
+            CHECK(MapVisitCtx_orderAt(&vctx, 2) == 40u);
+            u32 *fk = LinkedHashMap_firstKey(m);
+            u32 *lk = LinkedHashMap_lastKey(m);
+            u64 *fv = LinkedHashMap_firstValue(m);
+            u64 *lv = LinkedHashMap_lastValue(m);
+            CHECK(fk != nullptr && *fk == 20u);
+            CHECK(lk != nullptr && *lk == 40u);
+            CHECK(fv != nullptr && *fv == 222u);
+            CHECK(lv != nullptr && *lv == 400u);
+        }
 
-    CHECK(Map_remove(m, 1) == 100);
+        List *keys = Map_keys(m);
+        List *vals = Map_values(m);
+        CHECK(keys != nullptr && List_count(keys) == 3);
+        CHECK(vals != nullptr && List_count(vals) == 3);
 
-    CHECK(!Map_containsKey(m, 1));
+        if(LinkedHashMap_isLinkedHashMap(m)) {
+            CHECK(List_getAs(keys, 0, u32) == 20u);
+            CHECK(List_getAs(keys, 1, u32) == 30u);
+            CHECK(List_getAs(keys, 2, u32) == 40u);
+            CHECK(List_getAs(vals, 0, u64) == 222u);
+        }
 
-    CHECK(Map_size(m) == 1);
+        List_free(keys);
+        List_free(vals);
 
-    Array *keys = Map_keys(m);
+        u64 *stableBefore = Map_get(m, (u32) 20);
 
-    CHECK(keys != nullptr);
+        for(u32 i = 0; i < 1000; i++)
+            CHECK(Map_put(m, 1000u + i, (u64) i * 10u));
 
-    CHECK(Array_size(keys) == 1);
+        CHECK(Map_size(m) == 1003);
+        CHECK(Map_getAs(m, (u32) 1000, u64) == 0);
+        CHECK(Map_getAs(m, (u32) 1999, u64) == 9990u);
 
-    Array_free(keys);
+        if(LinkedHashMap_isLinkedHashMap(m)) {
+            CHECK(Map_get(m, (u32) 20) == stableBefore);
+            CHECK(*stableBefore == 222u);
+        }
 
-    for (u64 i = 0; i < 100000; i++) 
-        Map_put(m, 1000 + i, i);
+        for(u32 i = 0; i < 800; i++)
+            CHECK(Map_remove(m, 1000u + i));
 
-    CHECK(Map_size(m) == 100001);
+        CHECK(Map_size(m) == 203);
 
-    CHECK(Map_get(m, 1000) == 0);
+        for(u32 i = 0; i < 400; i++)
+            CHECK(Map_put(m, 5000u + i, (u64) i));
 
-    CHECK(Map_get(m, 100999) == 99999);
+        CHECK(Map_size(m) == 603);
+        utf8 buf[128];
+        bool trunc = true;
+        Map_toString(m, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+        Map_toStringStruct(m, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
 
-    Map_put(nullptr, 1, 1);
+        Map_clear(m);
+        CHECK(Map_isEmpty(m));
+        Map_free(m);
+    }
 
-    CHECK(Map_get(nullptr, 1) == 0);
+    Map *strMap = HashMap(string, ListDemoRecord, 8, arena);
+    CHECK(strMap != nullptr);
+    utf8 k1[16];
+    utf8 k2[16];
+    memcpy(k1, "hero_slot", 10);
+    memcpy(k2, "hero_slot", 10);
+    string s1 = k1;
+    string s2 = k2;
+    CHECK(Map_put(strMap, s1, ListDemoRecord(5u, 3.0f, 88u)));
+    CHECK(Map_containsKey(strMap, s2));
+    ListDemoRecord *got = Map_get(strMap, s2);
+    CHECK(got != nullptr && ListDemoRecord_id(got) == 5u);
+    Map_free(strMap);
 
-    CHECK(!Map_containsKey(nullptr, 1));
-
-    CHECK(Map_remove(nullptr, 1) == 0);
-
+    CHECK(!Map_put(nullptr, (u32) 1, (u64) 1));
+    CHECK(Map_get(nullptr, (u32) 1) == nullptr);
+    CHECK(!Map_containsKey(nullptr, (u32) 1));
+    CHECK(!Map_remove(nullptr, (u32) 1));
     CHECK(Map_size(nullptr) == 0);
-
     CHECK(Map_isEmpty(nullptr));
-
     CHECK(Map_keys(nullptr) == nullptr);
-
     Map_free(nullptr);
 
-    Map_free(m);
+    MemoryArena *oomArena = MemoryArena_pages(2);
+    Map *oomMap = HashMap(u32, u64, 4, oomArena);
+    CHECK(oomMap != nullptr);
+    CHECK(!Map_reserve(oomMap, 65536u));
+    CHECK(Map_exhaustionCount(oomMap) >= 1u);
+    Map_free(oomMap);
+    MemoryArena_destroy(oomArena);
 
-    if (s_map_g_failures == 0) {
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
+
+    if(s_map_g_failures == 0) {
         print("map_test: all assertions held");
 
         return 0;
@@ -6766,77 +7274,104 @@ static i32 s_queue_g_failures = 0;
         }                                                                  \
     } while (0)
 
-/** Verifies FIFO insertion/removal, empty behavior, bounds, and safe cleanup. */
-static i32 suite_queue() {
-    Queue *q = Queue_1(ID_INT);
+/** Verifies ArrayQueue and LinkedQueue FIFO ordering, ring wraparound, pointer stability, bounds, and OOM. */
+static i32 suite_queue()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
 
-    CHECK(q != nullptr);
+    Queue *queues[2];
+    queues[0] = ArrayQueue(u32, 4, arena);
+    queues[1] = LinkedQueue(u32, arena);
 
-    CHECK(Queue_isEmpty(q));
+    for(u32 k = 0; k < 2; k++) {
+        Queue *q = queues[k];
+        CHECK(q != nullptr);
+        CHECK(Queue_isEmpty(q));
+        CHECK(Queue_stride(q) == sizeof(u32));
+        CHECK(Queue_exhaustionCount(q) == 0);
 
-    CHECK(Queue_elementClassId(q) == ID_INT);
+        CHECK(Queue_push(q, (u32) 10));
+        CHECK(Queue_push(q, (u32) 20));
+        CHECK(Queue_push(q, (u32) 30));
+        CHECK(Queue_size(q) == 3);
+        CHECK(Queue_peekAs(q, u32) == 10);
+        CHECK(Queue_getAs(q, 1, u32) == 20);
+        CHECK(Queue_popAs(q, u32) == 10);
+        CHECK(Queue_popAs(q, u32) == 20);
+        CHECK(Queue_popAs(q, u32) == 30);
+        CHECK(!Queue_pop(q));
+        CHECK(Queue_peek(q) == nullptr);
 
-    CHECK(Queue_stride(q) == 4);
+        for(u32 round = 0; round < 5; round++) {
+            for(u32 i = 0; i < 6; i++)
+                CHECK(Queue_push(q, round * 100u + i));
 
-    CHECK(Queue_dataBuffer(q) != nullptr);
+            for(u32 i = 0; i < 4; i++)
+                CHECK(Queue_pop(q));
+        }
 
-    Queue_push(q, 10);
+        CHECK(Queue_size(q) == 10);
+        Queue_clear(q);
+        CHECK(Queue_isEmpty(q));
 
-    Queue_push(q, 20);
+        u32 *emp = Queue_emplace(q);
+        CHECK(emp != nullptr && *emp == 0);
+        *emp = 42u;
+        CHECK(Queue_peekAs(q, u32) == 42u);
 
-    Queue_push(q, 30);
+        for(u32 i = 0; i < 2000; i++)
+            CHECK(Queue_push(q, i));
 
-    CHECK(Queue_size(q) == 3);
-    CHECK(Queue_exhaustionCount(q) == 0);
+        CHECK(Queue_size(q) == 2001);
+        CHECK(Queue_popAs(q, u32) == 42u);
+        CHECK(Queue_popAs(q, u32) == 0);
+        CHECK(Queue_popAs(q, u32) == 1);
+        CHECK(Queue_get(q, Queue_size(q)) == nullptr);
+        CHECK(Queue_get(q, SIZE_MAX) == nullptr);
 
-    CHECK(Queue_peek(q) == 10);
+        utf8 buf[128];
+        bool trunc = true;
+        Queue_toString(q, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+        Queue_toStringStruct(q, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
 
-    CHECK(Queue_pop(q) == 10);
+        Queue_free(q);
+    }
 
-    CHECK(Queue_pop(q) == 20);
+    Queue *lq = LinkedQueue(u32, arena);
+    CHECK(LinkedQueue_isLinkedQueue(lq));
+    u32 *stable = Queue_emplace(lq);
+    CHECK(stable != nullptr);
+    *stable = 88u;
 
-    CHECK(Queue_pop(q) == 30);
+    for(u32 i = 0; i < 32; i++)
+        CHECK(Queue_push(lq, i));
 
-    CHECK(Queue_pop(q) == 0);
+    CHECK(Queue_peek(lq) == stable && *stable == 88u);
+    Queue_free(lq);
 
-    CHECK(Queue_peek(q) == 0);
-
-    for (u64 i = 0; i < 1000000; i++) 
-        Queue_push(q, i);
-
-    CHECK(Queue_size(q) == 1000000);
-
-    CHECK(Queue_peek(q) == 0);
-
-    CHECK(Queue_pop(q) == 0);
-
-    CHECK(Queue_pop(q) == 1);
-
-    CHECK(Queue_pop(q) == 2);
-
-    CHECK(Queue_slot(q, Queue_size(q)) == nullptr);
-
-    CHECK(Queue_slot(q, SIZE_MAX) == nullptr);
-
-    Queue_push(nullptr, 1);
-
-    CHECK(Queue_pop(nullptr) == 0);
-
-    CHECK(Queue_peek(nullptr) == 0);
-
-    CHECK(Queue_slot(nullptr, 0) == nullptr);
-
+    CHECK(!Queue_push(nullptr, (u32) 1));
+    CHECK(!Queue_pop(nullptr));
+    CHECK(Queue_peek(nullptr) == nullptr);
+    CHECK(Queue_get(nullptr, 0) == nullptr);
     CHECK(Queue_size(nullptr) == 0);
-
-    CHECK(Queue_head(nullptr) == 0);
-
     CHECK(Queue_isEmpty(nullptr));
-
     Queue_free(nullptr);
 
-    Queue_free(q);
+    MemoryArena *oomArena = MemoryArena_pages(2);
+    Queue *oomQ = ArrayQueue(u32, 4, oomArena);
+    CHECK(oomQ != nullptr);
+    CHECK(!Queue_reserve(oomQ, 65536u));
+    CHECK(Queue_exhaustionCount(oomQ) >= 1u);
+    Queue_free(oomQ);
+    MemoryArena_destroy(oomArena);
 
-    if (s_queue_g_failures == 0) {
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
+
+    if(s_queue_g_failures == 0) {
         print("queue_test: all assertions held");
 
         return 0;
@@ -7237,79 +7772,159 @@ static i32 s_set_g_failures = 0;
         }                                                                  \
     } while (0)
 
-/** Exercises set membership, duplicate handling, insertion, and removal. */
-static i32 suite_set() {
-    Set *s = Set_1(ID_INT);
+;;GETTER
+static inline bytes SetVisitCtx_visits(const SetVisitCtx *ctx)
+{
+    return (*ctx).visits;
+}
 
-    CHECK(s != nullptr);
+;;GETTER
+static inline u64 SetVisitCtx_sum(const SetVisitCtx *ctx)
+{
+    return (*ctx).sum;
+}
 
-    CHECK(Set_isEmpty(s));
+;;GETTER
+static inline u32 SetVisitCtx_orderAt(const SetVisitCtx *ctx, bytes idx)
+{
+    return (*ctx).order[idx];
+}
 
-    CHECK(Set_size(s) == 0);
-    CHECK(Set_exhaustionCount(s) == 0);
+;;SETTER
+static inline fn SetVisitCtx_record(SetVisitCtx *ctx, u32 val)
+{
+    if((*ctx).visits < 8u)
+        (*ctx).order[(*ctx).visits] = val;
 
-    CHECK(Set_elementClassId(s) == ID_INT);
+    (*ctx).visits++;
+    (*ctx).sum += val;
+}
 
-    CHECK(Set_dataBuffer(s) != nullptr);
+static fn visitSetU32(const_any elem, bytes index, any userdata)
+{
+    (discard) index;
+    SetVisitCtx *ctx = (SetVisitCtx*) userdata;
+    u32 v = 0;
+    memcpy(&v, elem, sizeof(u32));
+    SetVisitCtx_record(ctx, v);
+}
 
-    CHECK(Set_add(s, 10) == 1);
+/** Exercises HashSet and LinkedHashSet membership, dedup, insertion order, string keys, churn, and OOM. */
+static i32 suite_set()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
 
-    CHECK(Set_add(s, 10) == 0);
+    Set *sets[2];
+    sets[0] = HashSet(u32, 8, arena);
+    sets[1] = LinkedHashSet(u32, 8, arena);
 
-    CHECK(Set_contains(s, 10));
+    for(u32 k = 0; k < 2; k++) {
+        Set *s = sets[k];
+        CHECK(s != nullptr);
+        CHECK(Set_isEmpty(s));
+        CHECK(Set_size(s) == 0);
+        CHECK(Set_exhaustionCount(s) == 0);
+        CHECK(Set_stride(s) == sizeof(u32));
 
-    CHECK(Set_size(s) == 1);
+        CHECK(Set_add(s, (u32) 10));
+        CHECK(!Set_add(s, (u32) 10));
+        CHECK(Set_add(s, (u32) 20));
+        CHECK(Set_add(s, (u32) 30));
+        CHECK(Set_contains(s, (u32) 10));
+        CHECK(Set_size(s) == 3);
 
-    CHECK(Set_remove(s, 10) == 1);
+        CHECK(Set_remove(s, (u32) 10));
+        CHECK(!Set_contains(s, (u32) 10));
+        CHECK(!Set_remove(s, (u32) 10));
+        CHECK(Set_size(s) == 2);
 
-    CHECK(!Set_contains(s, 10));
+        SetVisitCtx vctx;
+        memset(&vctx, 0, sizeof(vctx));
+        Set_forEach(s, visitSetU32, &vctx);
+        CHECK(SetVisitCtx_visits(&vctx) == 2);
+        CHECK(SetVisitCtx_sum(&vctx) == 50u);
 
-    CHECK(Set_remove(s, 10) == 0);
+        if(LinkedHashSet_isLinkedHashSet(s)) {
+            CHECK(SetVisitCtx_orderAt(&vctx, 0) == 20u);
+            CHECK(SetVisitCtx_orderAt(&vctx, 1) == 30u);
+            u32 *first = LinkedHashSet_first(s);
+            u32 *last = LinkedHashSet_last(s);
+            CHECK(first != nullptr && *first == 20u);
+            CHECK(last != nullptr && *last == 30u);
+        }
 
-    for (u64 i = 0; i < 100000; i++) 
-        Set_add(s, i);
+        u32 *stableBefore = Set_get(s, (u32) 20);
 
-    CHECK(Set_size(s) == 100000);
+        for(u32 i = 0; i < 1000; i++)
+            CHECK(Set_add(s, 1000u + i));
 
-    CHECK(Set_contains(s, 0));
+        CHECK(Set_size(s) == 1002);
+        CHECK(Set_contains(s, (u32) 1000));
+        CHECK(Set_contains(s, (u32) 1999));
+        CHECK(!Set_contains(s, (u32) 9999));
 
-    CHECK(Set_contains(s, 99999));
+        if(LinkedHashSet_isLinkedHashSet(s))
+            CHECK(Set_get(s, (u32) 20) == stableBefore);
 
-    CHECK(!Set_contains(s, 100000));
+        List *asList = Set_toList(s);
+        CHECK(asList != nullptr && List_size(asList) == 1002);
 
-    List *asList = Set_toList(s);
+        if(LinkedHashSet_isLinkedHashSet(s)) {
+            CHECK(List_getAs(asList, 0, u32) == 20u);
+            CHECK(List_getAs(asList, 1, u32) == 30u);
+            CHECK(List_getAs(asList, 2, u32) == 1000u);
+        }
 
-    CHECK(asList != nullptr);
+        List_free(asList);
 
-    CHECK(List_size(asList) == 100000);
+        utf8 buf[128];
+        bool trunc = true;
+        Set_toString(s, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+        Set_toStringStruct(s, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
 
-    List_free(asList);
+        Set_clear(s);
+        CHECK(Set_isEmpty(s));
+        Set_free(s);
+    }
 
-    List *sorted = Set_toSortedList(s);
+    Set *strSet = HashSet(string, 8, arena);
+    CHECK(strSet != nullptr);
+    utf8 aBuf[16];
+    utf8 bBuf[16];
+    memcpy(aBuf, "token_x", 8);
+    memcpy(bBuf, "token_x", 8);
+    string sA = aBuf;
+    string sB = bBuf;
+    CHECK(Set_add(strSet, sA));
+    CHECK(!Set_add(strSet, sB));
+    CHECK(Set_contains(strSet, sB));
+    CHECK(Set_remove(strSet, sB));
+    CHECK(!Set_contains(strSet, sA));
+    Set_free(strSet);
 
-    CHECK(sorted != nullptr);
-
-    CHECK(List_size(sorted) == 100000);
-
-    List_free(sorted);
-
-    CHECK(Set_add(nullptr, 1) == 0);
-
-    CHECK(!Set_contains(nullptr, 1));
-
-    CHECK(Set_remove(nullptr, 1) == 0);
-
+    CHECK(!Set_add(nullptr, (u32) 1));
+    CHECK(!Set_contains(nullptr, (u32) 1));
+    CHECK(!Set_remove(nullptr, (u32) 1));
     CHECK(Set_size(nullptr) == 0);
-
     CHECK(Set_isEmpty(nullptr));
-
     CHECK(Set_toList(nullptr) == nullptr);
-
     Set_free(nullptr);
 
-    Set_free(s);
+    MemoryArena *oomArena = MemoryArena_pages(2);
+    Set *oomSet = HashSet(u32, 4, oomArena);
+    CHECK(oomSet != nullptr);
+    CHECK(!Set_reserve(oomSet, 65536u));
+    CHECK(Set_exhaustionCount(oomSet) >= 1u);
+    Set_free(oomSet);
+    MemoryArena_destroy(oomArena);
 
-    if (s_set_g_failures == 0) {
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
+
+    if(s_set_g_failures == 0) {
         print("set_test: all assertions held");
 
         return 0;
@@ -7355,91 +7970,65 @@ static i32 s_stack_observability_g_failures = 0;
 #define ARENA_BYTES (32u * 1024u * 1024u)
 #define PUSH_LIMIT  9000000u /** exceeds the 64MB default arena's reachable capacity */
 
-static i32 suite_stack_observability() {
+static i32 suite_stack_observability()
+{
     print("=== Stack explicit-fault owner suite ===");
-    CHECK("small arena initialized", Memory_init(ARENA_BYTES));
-
     CHECK("TRY_NO_MEMORY has a name", string_equals(TryCode_name(TRY_NO_MEMORY), "TRY_NO_MEMORY"));
-
     CHECK("TRY_NO_MEMORY has a message", TryCode_message(TRY_NO_MEMORY)[0] != '\0');
-
     CHECK("TRY_NO_MEMORY is not ok", !TryCode_isOk(TRY_NO_MEMORY));
 
-    Stack *s = Stack_1(ID_INT);
+    MemoryArena *smallArena = MemoryArena_pages(4);
+    CHECK("small arena initialized", smallArena != nullptr);
 
-    CHECK("stack constructed", s != nullptr && Stack_stride(s) == 4);
+    Stack *s = ArrayStack(u32, 16, smallArena);
+    CHECK("stack constructed", s != nullptr && Stack_stride(s) == sizeof(u32));
 
-    TryValue nullTry = Stack_pushTry(nullptr, 1);
-
+    TryValue nullTry = Stack_pushTry(nullptr, (u32) 1);
     CHECK("null stack -> TRY_NULL_ARG", TryValue_getCode(&nullTry) == TRY_NULL_ARG);
 
-    CHECK("buffer carries the array type", Memory_type(Stack_dataBuffer(s)) == TYPE_INT_ARRAY);
+    TryValue badWidth = Stack_pushTry(s, (u64) 1);
+    CHECK("stride mismatch -> TRY_FORMAT", TryValue_getCode(&badWidth) == TRY_FORMAT);
 
-    CHECK("buffer length == capacity * stride",
-          Memory_length(Stack_dataBuffer(s)) == (bytes) Stack_capacity(s) * Stack_stride(s));
-
-    for (u64 i = 0; i < 4000u; ++i) {
-        TryValue r = Stack_pushTry(s, i);
-
-        if (!TryValue_isOk(&r)) { CHECK("4000 pushes admitted", false); break; }
-    }
-
-    CHECK("size advanced after pushes", Stack_size(s) == 4000);
-
-    TryValue okPush = Stack_pushTry(s, 12345);
-
+    TryValue okPush = Stack_pushTry(s, (u32) 12345);
     CHECK("ok push is TRY_OK", TryValue_isOk(&okPush));
-
     CHECK("ok push returns the value", TryValue_getValue(&okPush) == 12345);
 
-    CHECK("buffer descriptor tracked growth",
-          Memory_length(Stack_dataBuffer(s)) == (bytes) Stack_capacity(s) * Stack_stride(s));
-
-    bytes beforeExhaust = Stack_size(s);
-
     TryCode fault = TRY_OK;
-
     u64 attempted = 0;
+    u32 lastGood = 12345u;
 
-    u64 lastGood = 12345;
-
-    for (u64 i = 4000u; i < PUSH_LIMIT; ++i) {
+    for(u32 i = 0; i < 65536u; i++) {
         TryValue r = Stack_pushTry(s, i);
-
         attempted++;
 
-        if (!TryValue_isOk(&r)) { fault = TryValue_getCode(&r); break; }
+        if(!TryValue_isOk(&r)) {
+            fault = TryValue_getCode(&r);
+            break;
+        }
+
         lastGood = i;
     }
 
     CHECK("growth failure was reached", fault != TRY_OK);
-
-    CHECK("fault is TRY_NO_MEMORY (the arena, not bounds)", fault == TRY_NO_MEMORY);
-
+    CHECK("fault is TRY_NO_MEMORY", fault == TRY_NO_MEMORY);
     CHECK("fault names the cause", string_equals(TryCode_name(fault), "TRY_NO_MEMORY"));
+    CHECK("exhaustion counter incremented", Stack_exhaustionCount(s) >= 1u);
+    CHECK("top element intact", Stack_peekAs(s, u32) == lastGood);
 
-    CHECK("rejected push left size unchanged", Stack_size(s) == beforeExhaust + attempted - 1);
+    bytes beforePop = Stack_size(s);
+    CHECK("pop returns the top", Stack_popAs(s, u32) == lastGood);
+    CHECK("size decrements on pop", Stack_size(s) == beforePop - 1u);
 
-    CHECK("capacity descriptor still consistent",
-          Memory_length(Stack_dataBuffer(s)) == (bytes) Stack_capacity(s) * Stack_stride(s));
-
-    bytes top = Stack_size(s);
-
-    CHECK("top element intact", Stack_peek(s) == lastGood);
-
-    CHECK("pop returns the top", Stack_pop(s) == lastGood);
-
-    CHECK("size decrements on pop", Stack_size(s) == top - 1);
-
-    TryValue afterPop = Stack_pushTry(s, 7);
-
+    TryValue afterPop = Stack_pushTry(s, (u32) 7);
     CHECK("pop then push succeeds again", TryValue_isOk(&afterPop));
 
     Stack_free(s);
+    CHECK("small arena zero leak", MemoryArena_activeBytes(smallArena) == 0);
+    MemoryArena_destroy(smallArena);
 
     print("[stackobs] attempted ", (u64) attempted, " pushes before TRY_NO_MEMORY");
 
-    if (s_stack_observability_g_failures != 0) {
+    if(s_stack_observability_g_failures != 0) {
         print("=== ", s_stack_observability_g_failures, " FAILURES ===");
 
         return 1;
@@ -7474,88 +8063,90 @@ static i32 s_stack_g_failures = 0;
         }                                                                  \
     } while (0)
 
-/** Verifies LIFO push/pop behavior, empty defaults, and stack cleanup. */
-static i32 suite_stack() {
-    Stack *s = Stack_1(ID_INT);
+/** Verifies ArrayStack and LinkedStack LIFO ops, pointer stability, TryValue push, and cleanup. */
+static i32 suite_stack()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
 
-    CHECK(Stack_exhaustionCount(s) == 0);
+    Stack *stacks[2];
+    stacks[0] = ArrayStack(u32, 4, arena);
+    stacks[1] = LinkedStack(u32, arena);
 
-    CHECK(s != nullptr);
+    for(u32 k = 0; k < 2; k++) {
+        Stack *s = stacks[k];
+        CHECK(s != nullptr);
+        CHECK(Stack_exhaustionCount(s) == 0);
+        CHECK(Stack_isEmpty(s));
+        CHECK(Stack_size(s) == 0);
+        CHECK(Stack_stride(s) == sizeof(u32));
 
-    CHECK(Stack_isEmpty(s));
+        CHECK(Stack_push(s, (u32) 10));
+        CHECK(Stack_push(s, (u32) 20));
+        CHECK(Stack_size(s) == 2);
+        CHECK(Stack_peekAs(s, u32) == 20);
+        CHECK(Stack_getAs(s, 0, u32) == 10);
+        CHECK(Stack_getAs(s, 1, u32) == 20);
+        CHECK(Stack_popAs(s, u32) == 20);
+        CHECK(Stack_popAs(s, u32) == 10);
+        CHECK(!Stack_pop(s));
+        CHECK(Stack_peek(s) == nullptr);
 
-    CHECK(Stack_size(s) == 0);
+        for(u32 i = 0; i < 2000; i++)
+            CHECK(Stack_push(s, i));
 
-    CHECK(Stack_elementClassId(s) == ID_INT);
+        CHECK(Stack_size(s) == 2000);
+        CHECK(Stack_peekAs(s, u32) == 1999);
+        CHECK(Stack_popAs(s, u32) == 1999);
+        CHECK(Stack_popAs(s, u32) == 1998);
+        CHECK(Stack_size(s) == 1998);
+        CHECK(Stack_get(s, Stack_size(s)) == nullptr);
+        CHECK(Stack_get(s, SIZE_MAX) == nullptr);
 
-    CHECK(Stack_stride(s) == 4);
+        TryValue okPush = Stack_pushTry(s, (u32) 7);
+        CHECK(TryValue_isOk(&okPush));
+        CHECK(TryValue_getValue(&okPush) == 7);
+        CHECK(Stack_size(s) == 1999);
+        CHECK(Stack_popAs(s, u32) == 7);
 
-    CHECK(Stack_dataBuffer(s) != nullptr);
+        utf8 buf[128];
+        bool trunc = true;
+        Stack_toString(s, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+        Stack_toStringStruct(s, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
 
-    Stack_push(s, 10);
+        Stack_clear(s);
+        CHECK(Stack_isEmpty(s));
+        Stack_free(s);
+    }
 
-    Stack_push(s, 20);
+    Stack *ls = LinkedStack(u32, arena);
+    CHECK(LinkedStack_isLinkedStack(ls));
+    u32 *stableBottom = Stack_emplace(ls);
+    CHECK(stableBottom != nullptr);
+    *stableBottom = 333u;
 
-    CHECK(Stack_size(s) == 2);
+    for(u32 i = 0; i < 32; i++)
+        CHECK(Stack_push(ls, i));
 
-    CHECK(Stack_peek(s) == 20);
+    CHECK(Stack_get(ls, 0) == stableBottom && *stableBottom == 333u);
+    Stack_free(ls);
 
-    CHECK(Stack_pop(s) == 20);
-
-    CHECK(Stack_pop(s) == 10);
-
-    CHECK(Stack_pop(s) == 0);
-
-    CHECK(Stack_peek(s) == 0);
-
-    for (u64 i = 0; i < 1000000; i++) 
-        Stack_push(s, i);
-
-    CHECK(Stack_size(s) == 1000000);
-
-    CHECK(Stack_peek(s) == 999999);
-
-    CHECK(Stack_pop(s) == 999999);
-
-    CHECK(Stack_pop(s) == 999998);
-
-    CHECK(Stack_size(s) == 999998);
-
-    CHECK(Stack_slot(s, Stack_size(s)) == nullptr);
-
-    CHECK(Stack_slot(s, SIZE_MAX) == nullptr);
-
-    TryValue okPush = Stack_pushTry(s, 7);
-
-    CHECK(TryValue_isOk(&okPush));
-
-    CHECK(TryValue_getValue(&okPush) == 7);
-
-    CHECK(Stack_size(s) == 999999);
-
-    CHECK(Stack_pop(s) == 7);
-
-    TryValue nullPush = Stack_pushTry(nullptr, 7);
-
+    TryValue nullPush = Stack_pushTry(nullptr, (u32) 7);
     CHECK(TryValue_getCode(&nullPush) == TRY_NULL_ARG);
-
-    Stack_push(nullptr, 1);
-
-    CHECK(Stack_pop(nullptr) == 0);
-
-    CHECK(Stack_peek(nullptr) == 0);
-
-    CHECK(Stack_slot(nullptr, 0) == nullptr);
-
+    CHECK(!Stack_push(nullptr, (u32) 1));
+    CHECK(!Stack_pop(nullptr));
+    CHECK(Stack_peek(nullptr) == nullptr);
+    CHECK(Stack_get(nullptr, 0) == nullptr);
     CHECK(Stack_size(nullptr) == 0);
-
     CHECK(Stack_isEmpty(nullptr));
-
     Stack_free(nullptr);
 
-    Stack_free(s);
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
 
-    if (s_stack_g_failures == 0) {
+    if(s_stack_g_failures == 0) {
         print("stack_test: all assertions held");
 
         return 0;
@@ -7672,15 +8263,15 @@ static i32 suite_stride() {
 
     CHECK(Memory_init(0));
 
-    List *verts = List_2((u32) customType, 4u);
+    List *verts = ArrayList(TestCustomVertex, 4u);
 
-    Array *arr = Array(0x4200u, 2u);
+    Array *arr = Array_2(0x4200u, 2u);
 
     CHECK(verts != nullptr && List_stride(verts) == sizeof(TestCustomVertex));
 
     CHECK(arr != nullptr && Array_stride(arr) == sizeof(TestCustomVertex));
 
-    TestCustomVertex *vslot = (TestCustomVertex*) List_addSlot(verts);
+    TestCustomVertex *vslot = List_emplace(verts);
 
     CHECK(vslot != nullptr && ((pointer) vslot & 15u) == 0u);
 
@@ -8653,6 +9244,240 @@ static i32 suite_try_value() {
 }
 #undef CHECK
 
+/** Suite: graph (ArrayGraph + LinkedGraph polymorphic verification). */
+static i32 s_graph_g_failures = 0;
+
+#define CHECK(cond)                                                        \
+    do {                                                                   \
+        if(!(cond)) {                                                      \
+            print("FAIL ", __FILE__, ":", __LINE__, " ", #cond);           \
+            s_graph_g_failures++;                                          \
+        }                                                                  \
+    } while(0)
+
+;;GETTER
+static inline u32 GraphCity_code(const GraphCity *c)
+{
+    return (*c).code;
+}
+
+;;GETTER
+static inline string GraphCity_name(const GraphCity *c)
+{
+    return (*c).name;
+}
+
+;;SETTER
+static inline fn GraphCity_set(GraphCity *c, u32 code, string name)
+{
+    (*c).code = code;
+    (*c).name = name;
+}
+
+;;GETTER
+static inline f32 GraphRoad_distance(const GraphRoad *r)
+{
+    return (*r).distance;
+}
+
+;;GETTER
+static inline u32 GraphRoad_lanes(const GraphRoad *r)
+{
+    return (*r).lanes;
+}
+
+;;SETTER
+static inline fn GraphRoad_set(GraphRoad *r, f32 distance, u32 lanes)
+{
+    (*r).distance = distance;
+    (*r).lanes = lanes;
+}
+
+;;GETTER
+static inline bytes GraphVisitCtx_visits(const GraphVisitCtx *ctx)
+{
+    return (*ctx).visits;
+}
+
+;;GETTER
+static inline f32 GraphVisitCtx_totalDistance(const GraphVisitCtx *ctx)
+{
+    return (*ctx).totalDistance;
+}
+
+;;SETTER
+static inline fn GraphVisitCtx_record(GraphVisitCtx *ctx, u32 to, f32 dist)
+{
+    if((*ctx).visits < 8u)
+        (*ctx).targets[(*ctx).visits] = to;
+
+    (*ctx).visits++;
+    (*ctx).totalDistance += dist;
+}
+
+static fn visitGraphRoad(u32 from, u32 to, any edgePayload, bytes index, any userdata)
+{
+    (discard) from;
+    (discard) index;
+    GraphVisitCtx *ctx = (GraphVisitCtx*) userdata;
+    const GraphRoad *road = (const GraphRoad*) edgePayload;
+    GraphVisitCtx_record(ctx, to, GraphRoad_distance(road));
+}
+
+/** Verifies ArrayGraph and LinkedGraph vertices, directed/bidirectional edges, updates, removals, stability, OOM. */
+static i32 suite_graph()
+{
+    MemoryArena *arena = MemoryArena();
+    CHECK(arena != nullptr);
+
+    Graph *graphs[2];
+    graphs[0] = ArrayGraph(GraphCity, GraphRoad, arena);
+    graphs[1] = LinkedGraph(GraphCity, GraphRoad, arena);
+
+    for(u32 k = 0; k < 2; k++) {
+        Graph *g = graphs[k];
+        CHECK(g != nullptr);
+        CHECK(Graph_isEmpty(g));
+        CHECK(Graph_vertexCount(g) == 0);
+        CHECK(Graph_edgeCount(g) == 0);
+        CHECK(Graph_vertexStride(g) == sizeof(GraphCity));
+        CHECK(Graph_edgeStride(g) == sizeof(GraphRoad));
+
+        GraphCity c0;
+        GraphCity_set(&c0, 1u, "Manila");
+        GraphCity c1;
+        GraphCity_set(&c1, 2u, "Cebu");
+        GraphCity c2;
+        GraphCity_set(&c2, 3u, "Davao");
+
+        u32 v0 = Graph_addVertex(g, c0);
+        u32 v1 = Graph_addVertex(g, c1);
+        u32 v2 = Graph_addVertex(g, c2);
+        CHECK(v0 == 0 && v1 == 1 && v2 == 2);
+        CHECK(Graph_vertexCount(g) == 3);
+
+        u32 v3 = GRAPH_INVALID_VERTEX;
+        GraphCity *empCity = Graph_emplaceVertex(g, &v3);
+        CHECK(empCity != nullptr && v3 == 3u);
+        GraphCity_set(empCity, 4u, "Baguio");
+        GraphCity *read3 = Graph_vertex(g, v3);
+        CHECK(read3 != nullptr && GraphCity_code(read3) == 4u);
+
+        GraphCity c0Updated;
+        GraphCity_set(&c0Updated, 10u, "MetroManila");
+        CHECK(Graph_setVertex(g, v0, c0Updated));
+        GraphCity copied0 = Graph_vertexAs(g, v0, GraphCity);
+        CHECK(GraphCity_code(&copied0) == 10u && string_equals(GraphCity_name(&copied0), "MetroManila"));
+
+        GraphRoad r01;
+        GraphRoad_set(&r01, 570.0f, 4u);
+        GraphRoad r02;
+        GraphRoad_set(&r02, 960.0f, 2u);
+        GraphRoad r12;
+        GraphRoad_set(&r12, 400.0f, 3u);
+
+        CHECK(Graph_addEdge(g, v0, v1, r01));
+        CHECK(Graph_addEdge(g, v0, v2, r02));
+        CHECK(Graph_addBiEdge(g, v1, v2, r12));
+        CHECK(Graph_edgeCount(g) == 4);
+        CHECK(Graph_outDegree(g, v0) == 2);
+        CHECK(Graph_hasEdge(g, v1, v2));
+        CHECK(Graph_hasEdge(g, v2, v1));
+        CHECK(!Graph_hasEdge(g, v2, v0));
+
+        GraphRoad r01Fast;
+        GraphRoad_set(&r01Fast, 550.0f, 6u);
+        CHECK(Graph_addEdge(g, v0, v1, r01Fast));
+        CHECK(Graph_edgeCount(g) == 4);
+        GraphRoad got01 = Graph_edgeAs(g, v0, v1, GraphRoad);
+        CHECK(GraphRoad_distance(&got01) == 550.0f && GraphRoad_lanes(&got01) == 6u);
+
+        GraphVisitCtx vctx;
+        memset(&vctx, 0, sizeof(vctx));
+        Graph_forEachEdge(g, v0, visitGraphRoad, &vctx);
+        CHECK(GraphVisitCtx_visits(&vctx) == 2);
+        CHECK(GraphVisitCtx_totalDistance(&vctx) == 1510.0f);
+
+        List *nbrs = Graph_neighbors(g, v0);
+        CHECK(nbrs != nullptr && List_count(nbrs) == 2);
+        List_free(nbrs);
+
+        CHECK(Graph_removeEdge(g, v0, v1));
+        CHECK(!Graph_hasEdge(g, v0, v1));
+        CHECK(!Graph_removeEdge(g, v0, v1));
+        CHECK(Graph_edgeCount(g) == 3);
+        CHECK(Graph_outDegree(g, v0) == 1);
+
+        CHECK(!Graph_addEdge(g, 99u, v0, r01));
+        CHECK(Graph_vertex(g, 99u) == nullptr);
+        CHECK(Graph_edge(g, v0, 99u) == nullptr);
+
+        GraphCity *stableV0 = Graph_vertex(g, v0);
+        GraphRoad *stableE02 = Graph_edge(g, v0, v2);
+
+        for(u32 i = 0; i < 64; i++) {
+            GraphCity extra;
+            GraphCity_set(&extra, 100u + i, "Node");
+            u32 vid = Graph_addVertex(g, extra);
+            CHECK(vid != GRAPH_INVALID_VERTEX);
+        }
+
+        if(LinkedGraph_isLinkedGraph(g)) {
+            CHECK(Graph_vertex(g, v0) == stableV0);
+            CHECK(Graph_edge(g, v0, v2) == stableE02);
+        }
+
+        utf8 buf[128];
+        bool trunc = true;
+        Graph_toString(g, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+        Graph_toStringStruct(g, buf, sizeof(buf), &trunc);
+        CHECK(!trunc && buf[0] != '\0');
+
+        Graph_clear(g);
+        CHECK(Graph_isEmpty(g) && Graph_edgeCount(g) == 0);
+        Graph_free(g);
+    }
+
+    Graph *weightedA = ArrayGraph(u32);
+    Graph *weightedL = LinkedGraph(u32);
+    CHECK(weightedA != nullptr && Graph_edgeStride(weightedA) == sizeof(f32));
+    CHECK(weightedL != nullptr && Graph_edgeStride(weightedL) == sizeof(f32));
+    u32 a0 = Graph_addVertex(weightedA, (u32) 10);
+    u32 a1 = Graph_addVertex(weightedA, (u32) 20);
+    CHECK(Graph_addEdge(weightedA, a0, a1, 3.5f));
+    CHECK(Graph_edgeAs(weightedA, a0, a1, f32) == 3.5f);
+    Graph_free(weightedA);
+    Graph_free(weightedL);
+
+    CHECK(Graph_addVertex(nullptr, (u32) 1) == GRAPH_INVALID_VERTEX);
+    CHECK(Graph_vertex(nullptr, 0) == nullptr);
+    CHECK(!Graph_hasEdge(nullptr, 0, 1));
+    CHECK(Graph_neighbors(nullptr, 0) == nullptr);
+    Graph_free(nullptr);
+
+    CHECK(MemoryArena_activeBytes(arena) == 0);
+    MemoryArena_destroy(arena);
+
+    if(s_graph_g_failures == 0) {
+        print("graph_test: all assertions held");
+
+        return 0;
+    }
+
+    print("graph_test: ", s_graph_g_failures, " FAILURES");
+
+    return 1;
+}
+#undef CHECK
+
+/** Void adapter for graph suite. */
+static fn suite_graph_wrap()
+{
+    if(suite_graph() != 0)
+        g_failures++;
+}
+
 /** Void adapter for try_value suite. */
 static fn suite_try_value_wrap() {
     if (suite_try_value() != 0)
@@ -8700,6 +9525,7 @@ i32 main(i32 argc, utf8 **argv) {
         { "set", suite_set_wrap },
         { "stack_observability", suite_stack_observability_wrap },
         { "stack", suite_stack_wrap },
+        { "graph", suite_graph_wrap },
         { "stride", suite_stride_wrap },
         { "type_algebra", suite_type_algebra_wrap },
         { "registry", suite_registry_wrap },
