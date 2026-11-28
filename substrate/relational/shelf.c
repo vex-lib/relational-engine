@@ -168,7 +168,7 @@ bool Shelf_init(Shelf *shelf) {
     if (!shelf) 
         return false;
 
-    ChunkedList *nodes = ChunkedList(ID_SHELF_NODE, (u32) sizeof(ShelfNode), VEX_CHUNKED_BYTES_DEFAULT);
+    ChunkedList *nodes = (ChunkedList*) RadixList(ShelfNode, VEX_CHUNKED_BYTES_DEFAULT);
 
     if (!nodes) 
         return false;
