@@ -127,7 +127,7 @@ static ChunkedList *ensureBucket(VariableMiniMap *map, u32 bucket) {
     if (list) 
         return list;
 
-    list = ChunkedList(ID_VARIABLE_SLOT, VARIABLE_SLOT_SIZE, VARIABLE_MINI_ROOT_INIT, VARIABLE_MINI_LEAF_ROWS);
+    list = (ChunkedList*) RadixList(VariableSlot, VARIABLE_MINI_ROOT_INIT, VARIABLE_MINI_LEAF_ROWS);
 
     if (!list) 
         return nullptr;

@@ -168,7 +168,7 @@ static ChunkedList *ensureSlot(ChunkedList **band, u32 slot) {
     if (list) 
         return list;
 
-    list = ChunkedList(ID_VARIABLE_SLOT, VARIABLE_SLOT_SIZE, VARIABLE_HASH_SLOT_ROOT, VARIABLE_HASH_SLOT_LEAF);
+    list = (ChunkedList*) RadixList(VariableSlot, VARIABLE_HASH_SLOT_ROOT, VARIABLE_HASH_SLOT_LEAF);
 
     if (!list) 
         return nullptr;
