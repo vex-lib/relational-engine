@@ -4,7 +4,7 @@
 #include "vex.h"
 #include "atomic/atomic.h"
 
-#include "struct/collection.h"
+#include "struct/list.h"
 
 /**
  * struct/chunked_list.h, the ChunkedList class: a never-moved radix-paged list.
@@ -117,6 +117,8 @@
  */
 #define CHUNKED_LIST_TWO_LAYER_DEFAULT ((i32) 0xD4574F21) /** "ÔWO!" */
 #define CHUNKED_LIST_THREE_LAYER_DEFAULT ((i32) 0xD4485245) /** "ÔHRE" */
+#define RADIX_LIST_TWO_LAYER_DEFAULT CHUNKED_LIST_TWO_LAYER_DEFAULT
+#define RADIX_LIST_THREE_LAYER_DEFAULT CHUNKED_LIST_THREE_LAYER_DEFAULT
 
 /**
  * One root generation (copy-on-write snapshot unit) of a ChunkedList.
@@ -134,9 +136,10 @@ typedef struct ChunkDir {
 } ChunkDir;
 
 /**
- * Never-moved radix-paged list (embed-first: a ChunkedList* is a Collection*).
+ * Never-moved radix-paged list implementing the polymorphic List interface
+ * (embed-first: a ChunkedList* is both a List* and a Collection*).
  *
- * Collection collection   - gate-maintained mirror; quiesced reads only under concurrency
+ * List base               - polymorphic List header + Collection mirror at offset 0
  * _Atomic(any) directory  - current root generation (COW; generations never freed mid-run)
  * _Atomic u32 chunkCount  - published leaves (lock-free reader bound)
  * _Atomic u32 committed   - published rows (lock-free reader bound)
@@ -150,8 +153,9 @@ typedef struct ChunkDir {
  * u32 *masks              - [levels] radix-1 per depth ([0] unused: the root is growable)
  * SpinLock lock           - claim + growth + commit; try-locked, 100ms bounded
  */
+;;CLASSNAME("ChunkedList")
 typedef struct ChunkedList {
-    Collection collection;
+    List base;
     _Atomic(any) directory;
     _Atomic u32 chunkCount;
     _Atomic u32 committed;
@@ -166,35 +170,59 @@ typedef struct ChunkedList {
     SpinLock lock;
 } ChunkedList;
 
-/** Constructors (byte-budget form: a 2-level table) */
+/**
+ * Polymorphic List constructors taking any C type directly via ElementLayout_of(T):
+ *   List *x = ChunkedList(Class);
+ *   List *y = ChunkedList(Class, 256);
+ *   List *z = ChunkedList(Class, 256, myArena);
+ *   List *r = RadixList(Class, 64, 512, 256);
+ */
+typedef ChunkedList RadixList;
+
+List *ChunkedList_newLayout(ElementLayout layout, u32 chunkBytes, MemoryArena *arena);
+List *ChunkedList_newRadix(ElementLayout layout, const i32 *radices, bytes count, MemoryArena *arena);
+
+#define ChunkedList_ctor_1(T)                    ChunkedList_newLayout(ElementLayout_of(T), VEX_CHUNKED_PAGE_BYTES, Re_arena())
+#define ChunkedList_ctor_2(T, chunkBytes)        ChunkedList_newLayout(ElementLayout_of(T), (chunkBytes), Re_arena())
+#define ChunkedList_ctor_3(T, chunkBytes, arena) ChunkedList_newLayout(ElementLayout_of(T), (chunkBytes), (arena))
+#define ChunkedList(...)                         CONSTRUCTOR_DISPATCH(ChunkedList_ctor, __VA_ARGS__)
+
+#define RadixList(T, ...)                                                        \
+    ChunkedList_newRadix(ElementLayout_of(T),                                    \
+        (const i32[]){ __VA_ARGS__ },                                            \
+        sizeof((const i32[]){ __VA_ARGS__ }) / sizeof(i32),                      \
+        Re_arena())
+
+/** Legacy numeric-class constructors (all returned instances also implement List). */
 ChunkedList *ChunkedList_1(u32 elementClass);
 ChunkedList *ChunkedList_2(u32 elementClass, u32 chunkBytes);
-/**
- * Explicit stride for row layouts the Struct registry does not know
- * (e.g. a graphvex-side row struct holding its own atomics).
- */
 ChunkedList *ChunkedList_3(u32 elementClass, u32 stride, u32 chunkBytes);
-
-/**
- * Radix form: build a table of `count` levels from `radices[]` (outer to leaf).
- * radices[0] is the initial root slot count (the root still grows); the LAST
- * radix is the leaf row count. A negative sentinel anywhere selects a preset:
- * CHUNKED_LIST_TWO_LAYER_DEFAULT    to  { rootInit, pageLeaf }
- * CHUNKED_LIST_THREE_LAYER_DEFAULT  to  { rootInit, internal, pageLeaf }
- * Non-power-of-two radices are rounded DOWN to a power of two (min 1). `stride`
- * 0 falls back to Stride_get(elementClass), then sizeof(any). Page leaf =
- * largest power of two <= VEX_CHUNKED_PAGE_BYTES / stride.
- */
 ChunkedList *ChunkedList_paged(u32 elementClass, u32 stride, const i32 *radices, bytes count);
 
-/**
- * Variadic convenience: ChunkedList(elementClass, stride, r0, ..., leafRows).
- * At least one radix/sentinel is required.
- */
-#define ChunkedList(elementClass, stride, ...)                                   \
-    ChunkedList_paged((elementClass), (stride),                                  \
-        (const i32[]){ __VA_ARGS__ },                                        \
-        sizeof((const i32[]){ __VA_ARGS__ }) / sizeof(i32))
+/** Direct List-typed fast-path operations on any ChunkedList-backed List*. */
+bool ChunkedList_isChunkedList(const List *self);
+any ChunkedList_get(const List *self, bytes index);
+any ChunkedList_emplace(List *self);
+bool ChunkedList_addBytes(List *self, const_any src, bytes elemBytes);
+bool ChunkedList_setBytes(List *self, bytes index, const_any src, bytes elemBytes);
+fn ChunkedList_toString(const List *self, utf8 *dest, bytes cap, bool *outTruncated);
+fn ChunkedList_toStringStruct(const List *self, utf8 *dest, bytes cap, bool *outTruncated);
+
+#define ChunkedList_add(list, value)                                             \
+    ({                                                                           \
+        auto _vex_clist_add_val = (value);                                       \
+        ChunkedList_addBytes((list), &_vex_clist_add_val,                        \
+                             sizeof(_vex_clist_add_val));                        \
+    })
+
+#define ChunkedList_set(list, index, value)                                      \
+    ({                                                                           \
+        auto _vex_clist_set_val = (value);                                       \
+        ChunkedList_setBytes((list), (index), &_vex_clist_set_val,               \
+                             sizeof(_vex_clist_set_val));                        \
+    })
+
+#define ChunkedList_getAs(list, index, T) List_getAs((list), (index), T)
 
 /**
  * Core functions

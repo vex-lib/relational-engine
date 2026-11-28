@@ -1,23 +1,18 @@
 #include "vex.h"
 #include "nio/mem.h"
-
 #include "struct/map.h"
-#include "type/re_type.h"
-#include "struct/exhaustion.h"
-#include "hash/hash.h"
 
 ;;DEFINITION
 /**
  * ============================================================================
  * DEFINITION: Map
  * ============================================================================
- * The Map class, ported from struct/Map.java: an open-addressing hash map
- * over 32-byte slots (key, value, hash, state) under a Collection header.
- * Capacity rounds up to a power of two and rehashes at a 0.75 load factor,
- * doubling the slot array; deleted slots are tombstones reused by later
- * inserts. Reference-class keys (strings and lists) hash and compare by
- * content through the memory type/length introspection; scalar keys use a
- * murmur3 mix. Map_keys materializes the live keys as an Array.
+ * Polymorphic key-value Map interface owned by Relational Engine (lifetime
+ * tier). Concrete implementations (HashMap, LinkedHashMap) embed Map at offset
+ * zero, register a MapOps vtable, and carry ElementLayout metadata for both
+ * key and value types. String keys are automatically hashed and compared by
+ * UTF-8 content via ElementLayout_of(string); scalars, structs, and pointers
+ * hash and compare by exact byte representation.
  * ============================================================================
  */
 
@@ -26,536 +21,830 @@
  * ============================================================================
  * CLASS: Map (struct/map.c)
  * ============================================================================
- * the Map class, ported from struct/Map.java.
+ * Polymorphic Map interface over Collection + MapOps vtable + key/val layouts.
  *
- * STRUCT FIELDS (Mirroring struct/map.h):
- * ----------------------------------------------------------------------------
- *   Map {
- *     Collection collection; // instance state
- *   }
+ * --FIELDS-------------------------------
+ * public   Collection    collection        embedded Collection header, 1:1
+ * public   const MapOps *ops               borrows MapOps vtable, 1:1
+ * public   MemoryArena  *arena             borrows owning MemoryArena, 1:1
+ * public   ElementLayout keyLayout         key type layout
+ * public   ElementLayout valLayout         value type layout
  *
- * FUNCTION REGISTRY:
- * ----------------------------------------------------------------------------
- * Constructors:
- *   - Map_3(key_class, val_class, capacity)
- *   - Map_2(key_class, val_class)
+ * --CONSTRUCTORS-------------------------
+ * public   Map_initBase(...)               initializes embedded Map header
  *
- * Core Functions:
- *   - Map_free(map)
- *   - Map_put(map, key, value)
- *   - Map_containsKey(map, key)
- *   - Map_remove(map, key)
- *   - Map_keys(map)
- *   - Map_size(map)
- *   - Map_capacity(map)
- *   - Map_keyClassId(map)
- *   - Map_valClassId(map)
- *   - Map_dataBuffer(map)
+ * --FUNCTIONS----------------------------
+ * public   Map_putBytes(...)               stride-checked insert/update
+ * public   Map_emplaceBytes(...)           stride-checked get-or-insert slot
+ * public   Map_getBytes(...)               stride-checked lookup returning value*
+ * public   Map_copyOut(...)                stride-checked copy out for Map_getAs
+ * public   Map_containsKeyBytes(...)       stride-checked key presence check
+ * public   Map_removeBytes(...)            stride-checked key removal
+ * public   Map_clear(...)                  clears all entries
+ * public   Map_reserve(...)                reserves slot capacity
+ * public   Map_keys(...)                   exports keys as ArrayList
+ * public   Map_values(...)                 exports values as ArrayList
+ * public   Map_forEach(...)                visits all entries
+ * public   Map_free(...)                   dispatches concrete destructor
+ * public   Map_toString(...)               cold value projection
+ * public   Map_toStringStruct(...)         cold structure projection
+ * private  formatWrite(...)                bounded snprintf helper
  *
- * Getters:
- *   - Map_get(map, key)
- *   - Map_isEmpty(map)
+ * --GETTERS------------------------------
+ * public   Map_count(...)                  active entry count
+ * public   Map_size(...)                   alias for Map_count
+ * public   Map_capacity(...)               table capacity
+ * public   Map_isEmpty(...)                true when count == 0
+ * public   Map_keyStride(...)              key byte width
+ * public   Map_valStride(...)              value byte width
+ * public   Map_keyTypeName(...)            key type name
+ * public   Map_valTypeName(...)            value type name
+ * public   Map_kind(...)                   concrete MapKind
+ * public   Map_kindName(...)               concrete backing name
+ * public   Map_arena(...)                  borrowed MemoryArena
+ * public   Map_ops(...)                    borrowed MapOps vtable
+ * public   Map_keyLayout(...)              key ElementLayout
+ * public   Map_valLayout(...)              value ElementLayout
+ * public   Map_exhaustionCount(...)        refused-grow count
+ *
+ * --SETTERS------------------------------
+ * public   MapOps_set*(...)                vtable population setters
+ * private  Map_set*(...)                   internal field setters
  * ============================================================================
  */
 
+;;GETTER
+static inline MapKind MapOps_kind(const MapOps *ops)
+{
+    if(!ops)
+        return MAP_KIND_UNKNOWN;
 
-/** map.c, Map port (Legacy: struct/Map.java). */
+    return (*ops).kind;
+}
 
-static const bytes SLOT_SIZE = 32;
-static const bytes DEFAULT_CAPACITY = 16;
-static const bytes LOAD_DIVISOR = 4; /** 0.75 load factor = capacity - capacity/4 */
-static const u64 STATE_EMPTY = 0;
-static const u64 STATE_OCCUPIED = 1;
-static const u64 STATE_DELETED = 2;
+;;GETTER
+static inline string MapOps_kindName(const MapOps *ops)
+{
+    if(!ops || !(*ops).kindName)
+        return "UnknownMap";
 
-static Collection *asCollection(Map *map) {
-    return (Collection*) map;
+    return (*ops).kindName;
+}
+
+;;GETTER
+static inline MapPutBytesFn MapOps_putBytes(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).putBytes;
+}
+
+;;GETTER
+static inline MapEmplaceBytesFn MapOps_emplaceBytes(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).emplaceBytes;
+}
+
+;;GETTER
+static inline MapGetBytesFn MapOps_getBytes(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).getBytes;
+}
+
+;;GETTER
+static inline MapContainsBytesFn MapOps_containsBytes(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).containsBytes;
+}
+
+;;GETTER
+static inline MapRemoveBytesFn MapOps_removeBytes(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).removeBytes;
+}
+
+;;GETTER
+static inline MapClearFn MapOps_clear(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).clear;
+}
+
+;;GETTER
+static inline MapReserveFn MapOps_reserve(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).reserve;
+}
+
+;;GETTER
+static inline MapKeysFn MapOps_keys(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).keys;
+}
+
+;;GETTER
+static inline MapValuesFn MapOps_values(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).values;
+}
+
+;;GETTER
+static inline MapForEachFn MapOps_forEach(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).forEach;
+}
+
+;;GETTER
+static inline MapCountFn MapOps_count(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).count;
+}
+
+;;GETTER
+static inline MapCapacityFn MapOps_capacity(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).capacity;
+}
+
+;;GETTER
+static inline MapDestroyFn MapOps_destroy(const MapOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).destroy;
 }
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+fn MapOps_setKind(MapOps *ops, MapKind kind)
+{
+    if(!ops)
+        return;
+
+    (*ops).kind = kind;
+}
+
+;;SETTER
+fn MapOps_setKindName(MapOps *ops, string kindName)
+{
+    if(!ops)
+        return;
+
+    (*ops).kindName = kindName;
+}
+
+;;SETTER
+fn MapOps_setPutBytes(MapOps *ops, MapPutBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).putBytes = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setEmplaceBytes(MapOps *ops, MapEmplaceBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).emplaceBytes = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setGetBytes(MapOps *ops, MapGetBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).getBytes = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setContainsBytes(MapOps *ops, MapContainsBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).containsBytes = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setRemoveBytes(MapOps *ops, MapRemoveBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).removeBytes = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setClear(MapOps *ops, MapClearFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).clear = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setReserve(MapOps *ops, MapReserveFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).reserve = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setKeys(MapOps *ops, MapKeysFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).keys = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setValues(MapOps *ops, MapValuesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).values = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setForEach(MapOps *ops, MapForEachFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).forEach = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setCount(MapOps *ops, MapCountFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).count = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setCapacity(MapOps *ops, MapCapacityFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).capacity = fnPtr;
+}
+
+;;SETTER
+fn MapOps_setDestroy(MapOps *ops, MapDestroyFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).destroy = fnPtr;
+}
+
+;;SETTER
+static inline fn Map_setOps(Map *self, const MapOps *ops)
+{
+    (*self).ops = ops;
+}
+
+;;SETTER
+static inline fn Map_setArena(Map *self, MemoryArena *arena)
+{
+    (*self).arena = arena;
+}
+
+;;SETTER
+static inline fn Map_setKeyLayout(Map *self, ElementLayout layout)
+{
+    (*self).keyLayout = layout;
+}
+
+;;SETTER
+static inline fn Map_setValLayout(Map *self, ElementLayout layout)
+{
+    (*self).valLayout = layout;
+}
+
+;;SETTER
+static inline fn MapColl_setTypeId(Collection *c, u64 typeId)
 {
     (*c).typeId = typeId;
 }
-;;GETTER
-static inline u32 Collection_activeCount(const Collection *c)
-{
-    return (*c).activeCount;
-}
+
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count)
+static inline fn MapColl_setActiveCount(Collection *c, u32 count)
 {
     (*c).activeCount = count;
 }
-;;GETTER
-static inline u32 Collection_elementClass(const Collection *c)
-{
-    return (*c).elementClass;
-}
+
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls)
+static inline fn MapColl_setElementClass(Collection *c, u32 cls)
 {
     (*c).elementClass = cls;
 }
+
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride)
+static inline fn MapColl_setStride(Collection *c, u32 stride)
 {
     (*c).stride = stride;
 }
-;;GETTER
-static inline u32 Collection_capacityField(const Collection *c)
-{
-    return (*c).capacity;
-}
+
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap)
+static inline fn MapColl_setCapacity(Collection *c, u32 cap)
 {
     (*c).capacity = cap;
 }
+
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head)
+static inline fn MapColl_setHead(Collection *c, u32 head)
 {
     (*c).head = head;
 }
+
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
-{
-    (*c).exhaustionCount = count;
-}
-;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
-{
-    (*c).exhaustionReported = rep;
-}
-;;GETTER
-static inline u8 *Collection_data(const Collection *c)
-{
-    return (*c).data;
-}
-;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data)
+static inline fn MapColl_setData(Collection *c, u8 *data)
 {
     (*c).data = data;
 }
 
-static i32 isReferenceClass(u32 classId) {
-    return classId == ID_STRING || classId >= ID_LIST;
+;;SETTER
+static inline fn MapColl_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
 }
 
-static u64 computeHash(u32 keyClass, u64 key) {
-    if (key == 0) 
-       return 0;
+;;SETTER
+static inline fn MapColl_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 
-    if (isReferenceClass(keyClass) && key >= 4096u) {
-        u64 inspected = Memory_type((any) (pointer)key);
+;;GETTER
+const MapOps *Map_ops(const Map *self)
+{
+    if(!self)
+        return nullptr;
 
-        if (inspected != 0) {
-            bytes len = Memory_length((any) (pointer)key);
+    return (*self).ops;
+}
 
-            if (len > 0) 
-                return Hash_fnv1a64((const u8*) (pointer)key, len);
-        }
+;;GETTER
+MemoryArena *Map_arena(const Map *self)
+{
+    if(!self)
+        return nullptr;
+
+    return (*self).arena;
+}
+
+;;GETTER
+ElementLayout Map_keyLayout(const Map *self)
+{
+    if(!self)
+        return ElementLayout_make(0, 0, nullptr);
+
+    return (*self).keyLayout;
+}
+
+;;GETTER
+ElementLayout Map_valLayout(const Map *self)
+{
+    if(!self)
+        return ElementLayout_make(0, 0, nullptr);
+
+    return (*self).valLayout;
+}
+
+static fn formatWrite(utf8 *dest, bytes cap, bool *outTruncated, i32 needed)
+{
+    if(outTruncated)
+        *outTruncated = needed < 0 || (bytes) needed >= cap;
+
+    if(cap > 0 && needed < 0)
+        dest[0] = '\0';
+}
+
+;;CONSTRUCTOR
+bool Map_initBase(Map *self, u64 typeId, const MapOps *ops,
+                  ElementLayout keyLayout, ElementLayout valLayout, MemoryArena *arena)
+{
+    if(!self || !ops)
+        return false;
+
+    if(!ElementLayout_isValid(keyLayout) || !ElementLayout_isValid(valLayout)) {
+        THROW("Map_initBase: invalid layout for <%s, %s>",
+              ElementLayout_typeName(keyLayout),
+              ElementLayout_typeName(valLayout));
+
+        return false;
     }
 
-    return Hash_murmur3Mix64(key);
+    MemoryArena *targetArena = arena ? arena : Re_arena();
+
+    if(!targetArena)
+        return false;
+
+    Collection *c = (Collection*) self;
+    MapColl_setTypeId(c, typeId);
+    MapColl_setActiveCount(c, 0);
+    MapColl_setElementClass(c, 0);
+    MapColl_setStride(c, (u32) ElementLayout_stride(valLayout));
+    MapColl_setCapacity(c, 0);
+    MapColl_setHead(c, 0);
+    MapColl_setData(c, nullptr);
+    MapColl_setExhaustionCount(c, 0);
+    MapColl_setExhaustionReported(c, false);
+
+    Map_setOps(self, ops);
+    Map_setArena(self, targetArena);
+    Map_setKeyLayout(self, keyLayout);
+    Map_setValLayout(self, valLayout);
+
+    return true;
 }
 
-static i32 keysEqual(u32 keyClass, u64 k1, u64 k2) {
-    if (k1 == k2) 
-       return 1;
+bool Map_putBytes(Map *self, const_any key, bytes keyBytes, const_any val, bytes valBytes)
+{
+    if(!self || !key || !val)
+        return false;
 
-    if (k1 == 0 || k2 == 0) 
-       return 0;
+    if(keyBytes != Map_keyStride(self)) {
+        THROW("Map_put: key width %zu does not match key '%s' stride %zu",
+              keyBytes, Map_keyTypeName(self), Map_keyStride(self));
 
-    if (isReferenceClass(keyClass) && k1 >= 4096u && k2 >= 4096u) {
-        any p1 = (any) (pointer)k1;
-
-        any p2 = (any) (pointer)k2;
-
-        u64 t1 = Memory_type(p1);
-
-        u64 t2 = Memory_type(p2);
-
-        if (t1 != 0 && t1 == t2) {
-            bytes len1 = Memory_length(p1);
-
-            bytes len2 = Memory_length(p2);
-
-            if (len1 != len2) 
-               return 0;
-
-            return memcmp(p1, p2, len1) == 0;
-        }
+        return false;
     }
 
-    return 0;
+    if(valBytes != Map_valStride(self)) {
+        THROW("Map_put: value width %zu does not match value '%s' stride %zu",
+              valBytes, Map_valTypeName(self), Map_valStride(self));
+
+        return false;
+    }
+
+    MapPutBytesFn putFn = MapOps_putBytes(Map_ops(self));
+
+    if(!putFn)
+        return false;
+
+    return putFn(self, key, keyBytes, val, valBytes);
 }
 
-static bytes highestOneBit(bytes n) {
-    if (n <= 1) 
-       return 1;
+any Map_emplaceBytes(Map *self, const_any key, bytes keyBytes, bool *outInserted)
+{
+    if(outInserted)
+        *outInserted = false;
 
-    bytes v = n - 1;
+    if(!self || !key)
+        return nullptr;
 
-    v |= v >> 1;
+    if(keyBytes != Map_keyStride(self)) {
+        THROW("Map_emplace: key width %zu does not match key '%s' stride %zu",
+              keyBytes, Map_keyTypeName(self), Map_keyStride(self));
 
-    v |= v >> 2;
+        return nullptr;
+    }
 
-    v |= v >> 4;
+    MapEmplaceBytesFn emplaceFn = MapOps_emplaceBytes(Map_ops(self));
 
-    v |= v >> 8;
+    if(!emplaceFn)
+        return nullptr;
 
-    v |= v >> 16;
-
-    v |= v >> 32;
-
-    return v + 1;
+    return emplaceFn(self, key, keyBytes, outInserted);
 }
 
-static u8 *slotAt(Collection *c, bytes index) {
-    return Collection_data(c) + index * SLOT_SIZE;
+;;HOTCODE
+any Map_getBytes(const Map *self, const_any key, bytes keyBytes)
+{
+    if(!self || !key)
+        return nullptr;
+
+    if(keyBytes != Map_keyStride(self)) {
+        THROW("Map_get: key width %zu does not match key '%s' stride %zu",
+              keyBytes, Map_keyTypeName(self), Map_keyStride(self));
+
+        return nullptr;
+    }
+
+    MapGetBytesFn getFn = MapOps_getBytes(Map_ops(self));
+
+    if(!getFn)
+        return nullptr;
+
+    return getFn(self, key, keyBytes);
 }
 
-static u64 slotState(const u8 *slot) {
-    return *(u64*) (slot + 24);
+bool Map_copyOut(const Map *self, const_any key, bytes keyBytes,
+                 any dest, bytes valBytes, string valTypeName)
+{
+    if(!self || !key || !dest)
+        return false;
+
+    if(valBytes != Map_valStride(self)) {
+        THROW("Map_getAs: value width %zu for '%s' does not match map value '%s' stride %zu",
+              valBytes,
+              valTypeName ? valTypeName : "unknown",
+              Map_valTypeName(self),
+              Map_valStride(self));
+
+        return false;
+    }
+
+    any slot = Map_getBytes(self, key, keyBytes);
+
+    if(!slot)
+        return false;
+
+    memcpy(dest, slot, valBytes);
+
+    return true;
 }
 
-static fn rehash(Collection *c, bytes newCap) {
-    bytes oldCap = Collection_capacityField(c);
+bool Map_containsKeyBytes(const Map *self, const_any key, bytes keyBytes)
+{
+    if(!self || !key)
+        return false;
 
-    u8 *oldData = Collection_data(c);
+    if(keyBytes != Map_keyStride(self)) {
+        THROW("Map_containsKey: key width %zu does not match key '%s' stride %zu",
+              keyBytes, Map_keyTypeName(self), Map_keyStride(self));
 
-    bytes Bytes = newCap * SLOT_SIZE;
+        return false;
+    }
 
-    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_MAP);
+    MapContainsBytesFn containsFn = MapOps_containsBytes(Map_ops(self));
 
-    u8 *newData = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
+    if(!containsFn)
+        return false;
 
-    if (!newData) {
-        Collection_reportExhaustion(c, Bytes);
+    return containsFn(self, key, keyBytes);
+}
+
+bool Map_removeBytes(Map *self, const_any key, bytes keyBytes)
+{
+    if(!self || !key)
+        return false;
+
+    if(keyBytes != Map_keyStride(self)) {
+        THROW("Map_remove: key width %zu does not match key '%s' stride %zu",
+              keyBytes, Map_keyTypeName(self), Map_keyStride(self));
+
+        return false;
+    }
+
+    MapRemoveBytesFn removeFn = MapOps_removeBytes(Map_ops(self));
+
+    if(!removeFn)
+        return false;
+
+    return removeFn(self, key, keyBytes);
+}
+
+fn Map_clear(Map *self)
+{
+    if(!self)
+        return;
+
+    MapClearFn clearFn = MapOps_clear(Map_ops(self));
+
+    if(clearFn)
+        clearFn(self);
+}
+
+bool Map_reserve(Map *self, bytes minCapacity)
+{
+    if(!self)
+        return false;
+
+    MapReserveFn reserveFn = MapOps_reserve(Map_ops(self));
+
+    if(!reserveFn)
+        return false;
+
+    return reserveFn(self, minCapacity);
+}
+
+List *Map_keys(const Map *self)
+{
+    if(!self)
+        return nullptr;
+
+    MapKeysFn keysFn = MapOps_keys(Map_ops(self));
+
+    if(!keysFn)
+        return nullptr;
+
+    return keysFn(self);
+}
+
+List *Map_values(const Map *self)
+{
+    if(!self)
+        return nullptr;
+
+    MapValuesFn valuesFn = MapOps_values(Map_ops(self));
+
+    if(!valuesFn)
+        return nullptr;
+
+    return valuesFn(self);
+}
+
+fn Map_forEach(Map *self, MapVisitFn visit, any userdata)
+{
+    if(!self || !visit)
+        return;
+
+    MapForEachFn forEachFn = MapOps_forEach(Map_ops(self));
+
+    if(forEachFn)
+        forEachFn(self, visit, userdata);
+}
+
+;;DECONSTRUCT
+fn Map_free(Map *self)
+{
+    if(!self)
+        return;
+
+    MapDestroyFn destroyFn = MapOps_destroy(Map_ops(self));
+
+    if(destroyFn)
+        destroyFn(self);
+}
+
+bytes Map_count(const Map *self)
+{
+    if(!self)
+        return 0;
+
+    MapCountFn countFn = MapOps_count(Map_ops(self));
+
+    if(!countFn)
+        return 0;
+
+    return countFn(self);
+}
+
+bytes Map_size(const Map *self)
+{
+    return Map_count(self);
+}
+
+bytes Map_capacity(const Map *self)
+{
+    if(!self)
+        return 0;
+
+    MapCapacityFn capFn = MapOps_capacity(Map_ops(self));
+
+    if(!capFn)
+        return 0;
+
+    return capFn(self);
+}
+
+bool Map_isEmpty(const Map *self)
+{
+    return Map_count(self) == 0;
+}
+
+bytes Map_keyStride(const Map *self)
+{
+    if(!self)
+        return 0;
+
+    return ElementLayout_stride(Map_keyLayout(self));
+}
+
+bytes Map_valStride(const Map *self)
+{
+    if(!self)
+        return 0;
+
+    return ElementLayout_stride(Map_valLayout(self));
+}
+
+string Map_keyTypeName(const Map *self)
+{
+    if(!self)
+        return "nullptr";
+
+    return ElementLayout_typeName(Map_keyLayout(self));
+}
+
+string Map_valTypeName(const Map *self)
+{
+    if(!self)
+        return "nullptr";
+
+    return ElementLayout_typeName(Map_valLayout(self));
+}
+
+MapKind Map_kind(const Map *self)
+{
+    if(!self)
+        return MAP_KIND_UNKNOWN;
+
+    return MapOps_kind(Map_ops(self));
+}
+
+string Map_kindName(const Map *self)
+{
+    if(!self)
+        return "nullptr";
+
+    return MapOps_kindName(Map_ops(self));
+}
+
+;;TEST
+u64 Map_exhaustionCount(const Map *self)
+{
+    return Collection_exhaustionCount((const Collection*) self);
+}
+
+fn Map_toString(const Map *self, utf8 *dest, bytes cap, bool *outTruncated)
+{
+    if(!dest || cap == 0) {
+        if(outTruncated)
+            *outTruncated = true;
 
         return;
     }
 
-    memset(newData, 0, Bytes);
+    if(!self) {
+        formatWrite(dest, cap, outTruncated, snprintf(dest, cap, "Map(nullptr)"));
 
-    bytes mask = newCap - 1;
-
-    for (bytes i = 0; i < oldCap; i++) {
-        u8 *slot = slotAt(c, i);
-
-        if (slotState(slot) == STATE_OCCUPIED) {
-            u64 key = *(u64*) slot;
-
-            u64 val = *(u64*) (slot + 8);
-
-            u64 hash = *(u64*) (slot + 16);
-
-            bytes idx = (bytes)(hash & mask);
-
-            while (slotState(newData + idx * SLOT_SIZE) == STATE_OCCUPIED) 
-                idx = (idx + 1) & mask;
-
-            u8 *target = newData + idx * SLOT_SIZE;
-            *(u64*) target = key;
-            *(u64*) (target + 8) = val;
-            *(u64*) (target + 16) = hash;
-            *(u64*) (target + 24) = STATE_OCCUPIED;
-        }
+        return;
     }
 
-    Memory_free(oldData);
-
-    Collection_setData(c, newData);
-
-    Collection_setCapacity(c, (u32)newCap);
+    formatWrite(dest, cap, outTruncated,
+                snprintf(dest, cap, "%s<%s, %s>(count=%zu, capacity=%zu)",
+                         Map_kindName(self), Map_keyTypeName(self),
+                         Map_valTypeName(self), Map_count(self), Map_capacity(self)));
 }
 
-Map *Map_3(u32 keyClass, u32 valClass, bytes capacity) {
-    bytes cap = capacity == 0 ? DEFAULT_CAPACITY : highestOneBit(capacity);
+fn Map_toStringStruct(const Map *self, utf8 *dest, bytes cap, bool *outTruncated)
+{
+    if(!dest || cap == 0) {
+        if(outTruncated)
+            *outTruncated = true;
 
-    if (cap < 4) 
-       cap = 4;
-
-    Map *map = (Map*) Memory_alloc(TYPE_MAP, Re_arena(), sizeof(Map));
-
-    if (!map) {
-        (discard) Struct_reportConstructionExhaustion("map", sizeof(Map));
-
-        return nullptr;
+        return;
     }
 
-    Collection *c = asCollection(map);
+    if(!self) {
+        formatWrite(dest, cap, outTruncated, snprintf(dest, cap, "Map{nullptr}"));
 
-    Collection_setTypeId(c, TYPE_MAP);
-
-    Collection_setActiveCount(c, 0);
-
-    Collection_setElementClass(c, keyClass);
-
-    Collection_setStride(c, valClass);
-
-    Collection_setCapacity(c, (u32)cap);
-
-    Collection_setHead(c, 0);
-
-    Collection_setExhaustionCount(c, 0);
-
-    Collection_setExhaustionReported(c, false);
-
-    bytes Bytes = cap * SLOT_SIZE;
-
-    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_MAP);
-
-    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
-    Collection_setData(c, data);
-
-    if (!data) {
-        (discard) Struct_reportConstructionExhaustion("map", Bytes);
-
-        Memory_free(map);
-
-        return nullptr;
+        return;
     }
 
-    memset(data, 0, Bytes);
-
-    return map;
-}
-
-fn Map_free(Map *map) {
-    if (!map) 
-       return;
-
-    Collection *c = asCollection(map);
-    u8 *data = Collection_data(c);
-    if (data) 
-        Memory_free(data);
-
-    Memory_free(map);
-}
-
-fn Map_put(Map *map, u64 key, u64 value) {
-    if (!map) 
-       return;
-
-    Collection *c = asCollection(map);
-    u32 cap = Collection_capacityField(c);
-    u32 activeCount = Collection_activeCount(c);
-    bytes load = cap - cap / LOAD_DIVISOR;
-
-    if (activeCount >= load) {
-        rehash(c, cap * 2);
-        cap = Collection_capacityField(c);
-    }
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, key);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    bytes firstDeleted = SIZE_MAX;
-
-    while (true) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) {
-            bytes target = firstDeleted != SIZE_MAX ? firstDeleted : idx;
-
-            u8 *tslot = slotAt(c, target);
-            *(u64*) tslot = key;
-            *(u64*) (tslot + 8) = value;
-            *(u64*) (tslot + 16) = hash;
-            *(u64*) (tslot + 24) = STATE_OCCUPIED;
-
-            Collection_setActiveCount(c, activeCount + 1u);
-
-            return;
-        } else if (st == STATE_DELETED) {
-            if (firstDeleted == SIZE_MAX) 
-                firstDeleted = idx;
-        } else if (st == STATE_OCCUPIED) {
-            if (*(u64*) (slot + 16) == hash
-                && keysEqual(elemClass, *(u64*) slot, key)) {
-                *(u64*) (slot + 8) = value;
-
-                return;
-            }
-        }
-
-        idx = (idx + 1) & mask;
-    }
-}
-
-u64 Map_get(Map *map, u64 key) {
-    if (!map) 
-       return 0;
-
-    Collection *c = asCollection(map);
-    u32 cap = Collection_capacityField(c);
-
-    if (cap == 0) 
-       return 0;
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, key);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) 
-           return 0;
-
-        if (st == STATE_OCCUPIED
-            && *(u64*) (slot + 16) == hash
-            && keysEqual(elemClass, *(u64*) slot, key))
-            return *(u64*) (slot + 8);
-        idx = (idx + 1) & mask;
-    }
-
-    return 0;
-}
-
-bool Map_containsKey(Map *map, u64 key) {
-    if (!map) 
-       return false;
-
-    Collection *c = asCollection(map);
-    u32 cap = Collection_capacityField(c);
-
-    if (cap == 0) 
-       return false;
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, key);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) 
-           return false;
-
-        if (st == STATE_OCCUPIED
-            && *(u64*) (slot + 16) == hash
-            && keysEqual(elemClass, *(u64*) slot, key))
-            return true;
-        idx = (idx + 1) & mask;
-    }
-
-    return false;
-}
-
-u64 Map_remove(Map *map, u64 key) {
-    if (!map) 
-       return 0;
-
-    Collection *c = asCollection(map);
-    u32 cap = Collection_capacityField(c);
-
-    if (cap == 0) 
-       return 0;
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, key);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) 
-           return 0;
-
-        if (st == STATE_OCCUPIED
-            && *(u64*) (slot + 16) == hash
-            && keysEqual(elemClass, *(u64*) slot, key)) {
-            u64 oldVal = *(u64*) (slot + 8);
-            *(u64*) (slot + 24) = STATE_DELETED;
-
-            Collection_setActiveCount(c, Collection_activeCount(c) - 1u);
-
-            return oldVal;
-        }
-
-        idx = (idx + 1) & mask;
-    }
-
-    return 0;
-}
-
-Array *Map_keys(Map *map) {
-    if (!map) 
-       return nullptr;
-
-    Collection *c = asCollection(map);
-
-    Array *keys = Array(Collection_elementClass(c), Collection_activeCount(c));
-
-    if (!keys) 
-       return nullptr;
-
-    bytes out = 0;
-    u32 cap = Collection_capacityField(c);
-
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, i);
-
-        if (slotState(slot) == STATE_OCCUPIED) 
-            Array_set(keys, out++, *(u64*) slot);
-    }
-
-    return keys;
-}
-
-bool Map_isEmpty(Map *map) {
-    return Collection_isEmpty(asCollection(map));
-}
-
-bytes Map_size(Map *map) {
-    return Collection_size(asCollection(map));
-}
-
-;;TEST
-u64 Map_exhaustionCount(const Map *map) {
-    return Collection_exhaustionCount((const Collection*) map);
-}
-
-bytes Map_capacity(Map *map) {
-    return Collection_capacity(asCollection(map));
-}
-
-u32 Map_keyClassId(Map *map) {
-    return Collection_keyClassId(asCollection(map));
-}
-
-u32 Map_valClassId(Map *map) {
-    return Collection_valClassId(asCollection(map));
-}
-
-u8 *Map_dataBuffer(Map *map) {
-    return Collection_dataBuffer(asCollection(map));
-}
-
-Map *Map_2(u32 key_class, u32 val_class) {
-    return Map_3(key_class, val_class, 16);
+    formatWrite(dest, cap, outTruncated,
+                snprintf(dest, cap, "Map{kind=%s, key=%s(%zu), val=%s(%zu), count=%zu, capacity=%zu}",
+                         Map_kindName(self),
+                         Map_keyTypeName(self), Map_keyStride(self),
+                         Map_valTypeName(self), Map_valStride(self),
+                         Map_count(self), Map_capacity(self)));
 }

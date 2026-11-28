@@ -1,23 +1,18 @@
 #include "vex.h"
 #include "nio/mem.h"
-
 #include "struct/set.h"
-#include "type/re_type.h"
-#include "struct/exhaustion.h"
-#include "hash/hash.h"
 
 ;;DEFINITION
 /**
  * ============================================================================
  * DEFINITION: Set
  * ============================================================================
- * Hash set over a flat open-addressing slot table, ported from struct/Set.java.
- * Each 24-byte slot holds key, hash, and state (empty/occupied/deleted);
- * reference-class elements (strings, lists) are hashed and compared through
- * their memory payloads while scalars use Murmur3 mixing. The table rehashes
- * into a f64d arena buffer past the 0.75 load factor, so capacity grows
- * with no artificial ceiling. The Collection base record is embedded at
- * offset zero, shared with Deque.
+ * Polymorphic unique-element Set interface owned by Relational Engine
+ * (lifetime tier). Concrete implementations (HashSet, LinkedHashSet) embed Set
+ * at offset zero, register a SetOps vtable, and carry ElementLayout metadata.
+ * String elements automatically hash and compare by UTF-8 content via
+ * ElementLayout_of(string); scalars, structs, and pointers hash and compare by
+ * exact byte representation.
  * ============================================================================
  */
 
@@ -26,556 +21,697 @@
  * ============================================================================
  * CLASS: Set (struct/set.c)
  * ============================================================================
- * the Set class, ported from struct/Set.java.
+ * Polymorphic Set interface over Collection + SetOps vtable + ElementLayout.
  *
- * STRUCT FIELDS (Mirroring struct/set.h):
- * ----------------------------------------------------------------------------
- *   Set {
- *     Collection collection; // instance state
- *   }
+ * --FIELDS-------------------------------
+ * public   Collection    collection        embedded Collection header, 1:1
+ * public   const SetOps *ops               borrows SetOps vtable, 1:1
+ * public   MemoryArena  *arena             borrows owning MemoryArena, 1:1
+ * public   ElementLayout layout            element type layout
  *
- * FUNCTION REGISTRY:
- * ----------------------------------------------------------------------------
- * Constructors:
- *   - Set_2(element_class, capacity)
- *   - Set_1(element_class)
+ * --CONSTRUCTORS-------------------------
+ * public   Set_initBase(...)               initializes embedded Set header
  *
- * Setters:
- *   - Set_free(set)
- *   - Set_add(set, element)
- *   - Set_contains(set, element)
- *   - Set_remove(set, element)
- *   - Set_toList(set)
- *   - Set_toSortedList(set)
- *   - Set_isEmpty(set)
- *   - Set_size(set)
- *   - Set_capacity(set)
- *   - Set_elementClassId(set)
- *   - Set_dataBuffer(set)
+ * --FUNCTIONS----------------------------
+ * public   Set_addBytes(...)               stride-checked unique insert
+ * public   Set_containsBytes(...)          stride-checked membership predicate
+ * public   Set_getBytes(...)               stride-checked lookup returning slot*
+ * public   Set_removeBytes(...)            stride-checked removal
+ * public   Set_clear(...)                  clears all elements
+ * public   Set_reserve(...)                reserves slot capacity
+ * public   Set_toList(...)                 exports elements as ArrayList
+ * public   Set_forEach(...)                visits all elements
+ * public   Set_free(...)                   dispatches concrete destructor
+ * public   Set_toString(...)               cold value projection
+ * public   Set_toStringStruct(...)         cold structure projection
+ * private  formatWrite(...)                bounded snprintf helper
+ *
+ * --GETTERS------------------------------
+ * public   Set_count(...)                  active element count
+ * public   Set_size(...)                   alias for Set_count
+ * public   Set_capacity(...)               table capacity
+ * public   Set_isEmpty(...)                true when count == 0
+ * public   Set_stride(...)                 element byte width
+ * public   Set_typeName(...)               element type name
+ * public   Set_kind(...)                   concrete SetKind
+ * public   Set_kindName(...)               concrete backing name
+ * public   Set_arena(...)                  borrowed MemoryArena
+ * public   Set_ops(...)                    borrowed SetOps vtable
+ * public   Set_layout(...)                 element ElementLayout
+ * public   Set_exhaustionCount(...)        refused-grow count
+ *
+ * --SETTERS------------------------------
+ * public   SetOps_set*(...)                vtable population setters
+ * private  Set_set*(...)                   internal field setters
+ * private  SetColl_set*(...)               embedded Collection setters
  * ============================================================================
  */
 
+;;GETTER
+static inline SetKind SetOps_kind(const SetOps *ops)
+{
+    if(!ops)
+        return SET_KIND_UNKNOWN;
 
-/** set.c, Set port (Legacy: struct/Set.java). */
+    return (*ops).kind;
+}
 
-static const bytes SLOT_SIZE = 24;
-static const bytes DEFAULT_CAPACITY = 16;
-static const bytes LOAD_DIVISOR = 4; /** 0.75 load factor */
-static const u64 STATE_EMPTY = 0;
-static const u64 STATE_OCCUPIED = 1;
-static const u64 STATE_DELETED = 2;
+;;GETTER
+static inline string SetOps_kindName(const SetOps *ops)
+{
+    if(!ops || !(*ops).kindName)
+        return "UnknownSet";
 
-static Collection *asCollection(Set *set) {
-    return (Collection*) set;
+    return (*ops).kindName;
+}
+
+;;GETTER
+static inline SetAddBytesFn SetOps_addBytes(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).addBytes;
+}
+
+;;GETTER
+static inline SetContainsBytesFn SetOps_containsBytes(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).containsBytes;
+}
+
+;;GETTER
+static inline SetGetBytesFn SetOps_getBytes(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).getBytes;
+}
+
+;;GETTER
+static inline SetRemoveBytesFn SetOps_removeBytes(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).removeBytes;
+}
+
+;;GETTER
+static inline SetClearFn SetOps_clear(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).clear;
+}
+
+;;GETTER
+static inline SetReserveFn SetOps_reserve(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).reserve;
+}
+
+;;GETTER
+static inline SetToListFn SetOps_toList(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).toList;
+}
+
+;;GETTER
+static inline SetForEachFn SetOps_forEach(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).forEach;
+}
+
+;;GETTER
+static inline SetCountFn SetOps_count(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).count;
+}
+
+;;GETTER
+static inline SetCapacityFn SetOps_capacity(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).capacity;
+}
+
+;;GETTER
+static inline SetDestroyFn SetOps_destroy(const SetOps *ops)
+{
+    if(!ops)
+        return nullptr;
+
+    return (*ops).destroy;
 }
 
 ;;SETTER
-static inline fn Collection_setTypeId(Collection *c, u64 typeId)
+fn SetOps_setKind(SetOps *ops, SetKind kind)
+{
+    if(!ops)
+        return;
+
+    (*ops).kind = kind;
+}
+
+;;SETTER
+fn SetOps_setKindName(SetOps *ops, string kindName)
+{
+    if(!ops)
+        return;
+
+    (*ops).kindName = kindName;
+}
+
+;;SETTER
+fn SetOps_setAddBytes(SetOps *ops, SetAddBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).addBytes = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setContainsBytes(SetOps *ops, SetContainsBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).containsBytes = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setGetBytes(SetOps *ops, SetGetBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).getBytes = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setRemoveBytes(SetOps *ops, SetRemoveBytesFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).removeBytes = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setClear(SetOps *ops, SetClearFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).clear = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setReserve(SetOps *ops, SetReserveFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).reserve = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setToList(SetOps *ops, SetToListFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).toList = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setForEach(SetOps *ops, SetForEachFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).forEach = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setCount(SetOps *ops, SetCountFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).count = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setCapacity(SetOps *ops, SetCapacityFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).capacity = fnPtr;
+}
+
+;;SETTER
+fn SetOps_setDestroy(SetOps *ops, SetDestroyFn fnPtr)
+{
+    if(!ops)
+        return;
+
+    (*ops).destroy = fnPtr;
+}
+
+;;SETTER
+static inline fn Set_setOps(Set *self, const SetOps *ops)
+{
+    (*self).ops = ops;
+}
+
+;;SETTER
+static inline fn Set_setArena(Set *self, MemoryArena *arena)
+{
+    (*self).arena = arena;
+}
+
+;;SETTER
+static inline fn Set_setLayout(Set *self, ElementLayout layout)
+{
+    (*self).layout = layout;
+}
+
+;;SETTER
+static inline fn SetColl_setTypeId(Collection *c, u64 typeId)
 {
     (*c).typeId = typeId;
 }
-;;GETTER
-static inline u32 Collection_activeCount(const Collection *c)
-{
-    return (*c).activeCount;
-}
+
 ;;SETTER
-static inline fn Collection_setActiveCount(Collection *c, u32 count)
+static inline fn SetColl_setActiveCount(Collection *c, u32 count)
 {
     (*c).activeCount = count;
 }
-;;GETTER
-static inline u32 Collection_elementClass(const Collection *c)
-{
-    return (*c).elementClass;
-}
+
 ;;SETTER
-static inline fn Collection_setElementClass(Collection *c, u32 cls)
+static inline fn SetColl_setElementClass(Collection *c, u32 cls)
 {
     (*c).elementClass = cls;
 }
+
 ;;SETTER
-static inline fn Collection_setStride(Collection *c, u32 stride)
+static inline fn SetColl_setStride(Collection *c, u32 stride)
 {
     (*c).stride = stride;
 }
-;;GETTER
-static inline u32 Collection_capacityField(const Collection *c)
-{
-    return (*c).capacity;
-}
+
 ;;SETTER
-static inline fn Collection_setCapacity(Collection *c, u32 cap)
+static inline fn SetColl_setCapacity(Collection *c, u32 cap)
 {
     (*c).capacity = cap;
 }
+
 ;;SETTER
-static inline fn Collection_setHead(Collection *c, u32 head)
+static inline fn SetColl_setHead(Collection *c, u32 head)
 {
     (*c).head = head;
 }
+
 ;;SETTER
-static inline fn Collection_setExhaustionCount(Collection *c, u64 count)
-{
-    (*c).exhaustionCount = count;
-}
-;;SETTER
-static inline fn Collection_setExhaustionReported(Collection *c, bool rep)
-{
-    (*c).exhaustionReported = rep;
-}
-;;GETTER
-static inline u8 *Collection_data(const Collection *c)
-{
-    return (*c).data;
-}
-;;SETTER
-static inline fn Collection_setData(Collection *c, u8 *data)
+static inline fn SetColl_setData(Collection *c, u8 *data)
 {
     (*c).data = data;
 }
 
-static i32 isReferenceClass(u32 classId) {
-    return classId == ID_STRING || classId >= ID_LIST;
+;;SETTER
+static inline fn SetColl_setExhaustionCount(Collection *c, u64 count)
+{
+    (*c).exhaustionCount = count;
 }
 
-static u64 computeHash(u32 elementClass, u64 element) {
-    if (element == 0) 
-       return 0;
+;;SETTER
+static inline fn SetColl_setExhaustionReported(Collection *c, bool rep)
+{
+    (*c).exhaustionReported = rep;
+}
 
-    if (isReferenceClass(elementClass) && element >= 4096u) {
-        u64 inspected = Memory_type((any) (pointer)element);
+;;GETTER
+const SetOps *Set_ops(const Set *self)
+{
+    if(!self)
+        return nullptr;
 
-        if (inspected != 0) {
-            bytes len = Memory_length((any) (pointer)element);
+    return (*self).ops;
+}
 
-            if (len > 0) 
-                return Hash_fnv1a64((const u8*) (pointer)element, len);
-        }
+;;GETTER
+MemoryArena *Set_arena(const Set *self)
+{
+    if(!self)
+        return nullptr;
+
+    return (*self).arena;
+}
+
+;;GETTER
+ElementLayout Set_layout(const Set *self)
+{
+    if(!self)
+        return ElementLayout_make(0, 0, nullptr);
+
+    return (*self).layout;
+}
+
+static fn formatWrite(utf8 *dest, bytes cap, bool *outTruncated, i32 needed)
+{
+    if(outTruncated)
+        *outTruncated = needed < 0 || (bytes) needed >= cap;
+
+    if(cap > 0 && needed < 0)
+        dest[0] = '\0';
+}
+
+;;CONSTRUCTOR
+bool Set_initBase(Set *self, u64 typeId, const SetOps *ops,
+                  ElementLayout layout, MemoryArena *arena)
+{
+    if(!self || !ops)
+        return false;
+
+    if(!ElementLayout_isValid(layout)) {
+        THROW("Set_initBase: invalid layout for '%s'",
+              ElementLayout_typeName(layout));
+
+        return false;
     }
 
-    return Hash_murmur3Mix64(element);
+    MemoryArena *targetArena = arena ? arena : Re_arena();
+
+    if(!targetArena)
+        return false;
+
+    Collection *c = (Collection*) self;
+    SetColl_setTypeId(c, typeId);
+    SetColl_setActiveCount(c, 0);
+    SetColl_setElementClass(c, 0);
+    SetColl_setStride(c, (u32) ElementLayout_stride(layout));
+    SetColl_setCapacity(c, 0);
+    SetColl_setHead(c, 0);
+    SetColl_setData(c, nullptr);
+    SetColl_setExhaustionCount(c, 0);
+    SetColl_setExhaustionReported(c, false);
+
+    Set_setOps(self, ops);
+    Set_setArena(self, targetArena);
+    Set_setLayout(self, layout);
+
+    return true;
 }
 
-static i32 elementsEqual(u32 elementClass, u64 e1, u64 e2) {
-    if (e1 == e2) 
-       return 1;
+bool Set_addBytes(Set *self, const_any elem, bytes elemBytes)
+{
+    if(!self || !elem)
+        return false;
 
-    if (e1 == 0 || e2 == 0) 
-       return 0;
+    if(elemBytes != Set_stride(self)) {
+        THROW("Set_add: element width %zu does not match '%s' stride %zu",
+              elemBytes, Set_typeName(self), Set_stride(self));
 
-    if (isReferenceClass(elementClass) && e1 >= 4096u && e2 >= 4096u) {
-        any p1 = (any) (pointer)e1;
-
-        any p2 = (any) (pointer)e2;
-
-        u64 t1 = Memory_type(p1);
-
-        u64 t2 = Memory_type(p2);
-
-        if (t1 != 0 && t1 == t2) {
-            bytes len1 = Memory_length(p1);
-
-            bytes len2 = Memory_length(p2);
-
-            if (len1 != len2) 
-               return 0;
-
-            return memcmp(p1, p2, len1) == 0;
-        }
+        return false;
     }
 
-    return 0;
+    SetAddBytesFn addFn = SetOps_addBytes(Set_ops(self));
+
+    if(!addFn)
+        return false;
+
+    return addFn(self, elem, elemBytes);
 }
 
-static bytes highestOneBit(bytes n) {
-    if (n <= 1) 
-       return 1;
+;;HOTCODE
+bool Set_containsBytes(const Set *self, const_any elem, bytes elemBytes)
+{
+    if(!self || !elem)
+        return false;
 
-    bytes v = n - 1;
+    if(elemBytes != Set_stride(self)) {
+        THROW("Set_contains: element width %zu does not match '%s' stride %zu",
+              elemBytes, Set_typeName(self), Set_stride(self));
 
-    v |= v >> 1;
+        return false;
+    }
 
-    v |= v >> 2;
+    SetContainsBytesFn hasFn = SetOps_containsBytes(Set_ops(self));
 
-    v |= v >> 4;
+    if(!hasFn)
+        return false;
 
-    v |= v >> 8;
-
-    v |= v >> 16;
-
-    v |= v >> 32;
-
-    return v + 1;
+    return hasFn(self, elem, elemBytes);
 }
 
-static u8 *slotAt(Collection *c, bytes index) {
-    return Collection_data(c) + index * SLOT_SIZE;
+;;HOTCODE
+any Set_getBytes(const Set *self, const_any elem, bytes elemBytes)
+{
+    if(!self || !elem)
+        return nullptr;
+
+    if(elemBytes != Set_stride(self)) {
+        THROW("Set_get: element width %zu does not match '%s' stride %zu",
+              elemBytes, Set_typeName(self), Set_stride(self));
+
+        return nullptr;
+    }
+
+    SetGetBytesFn getFn = SetOps_getBytes(Set_ops(self));
+
+    if(!getFn)
+        return nullptr;
+
+    return getFn(self, elem, elemBytes);
 }
 
-static u64 slotState(u8 *slot) {
-    return *(u64*) (slot + 16);
+bool Set_removeBytes(Set *self, const_any elem, bytes elemBytes)
+{
+    if(!self || !elem)
+        return false;
+
+    if(elemBytes != Set_stride(self)) {
+        THROW("Set_remove: element width %zu does not match '%s' stride %zu",
+              elemBytes, Set_typeName(self), Set_stride(self));
+
+        return false;
+    }
+
+    SetRemoveBytesFn remFn = SetOps_removeBytes(Set_ops(self));
+
+    if(!remFn)
+        return false;
+
+    return remFn(self, elem, elemBytes);
 }
 
-static fn rehash(Collection *c, bytes newCap) {
-    bytes oldCap = Collection_capacityField(c);
+fn Set_clear(Set *self)
+{
+    if(!self)
+        return;
 
-    u8 *oldData = Collection_data(c);
+    SetClearFn clearFn = SetOps_clear(Set_ops(self));
 
-    bytes Bytes = newCap * SLOT_SIZE;
+    if(clearFn)
+        clearFn(self);
+}
 
-    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_SET);
+bool Set_reserve(Set *self, bytes minCapacity)
+{
+    if(!self)
+        return false;
 
-    u8 *newData = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
+    SetReserveFn resFn = SetOps_reserve(Set_ops(self));
 
-    if (!newData) {
-        Collection_reportExhaustion(c, Bytes);
+    if(!resFn)
+        return false;
+
+    return resFn(self, minCapacity);
+}
+
+List *Set_toList(const Set *self)
+{
+    if(!self)
+        return nullptr;
+
+    SetToListFn listFn = SetOps_toList(Set_ops(self));
+
+    if(!listFn)
+        return nullptr;
+
+    return listFn(self);
+}
+
+fn Set_forEach(Set *self, SetVisitFn visit, any userdata)
+{
+    if(!self || !visit)
+        return;
+
+    SetForEachFn eachFn = SetOps_forEach(Set_ops(self));
+
+    if(eachFn)
+        eachFn(self, visit, userdata);
+}
+
+;;DECONSTRUCT
+fn Set_free(Set *self)
+{
+    if(!self)
+        return;
+
+    SetDestroyFn destroyFn = SetOps_destroy(Set_ops(self));
+
+    if(destroyFn)
+        destroyFn(self);
+}
+
+bytes Set_count(const Set *self)
+{
+    if(!self)
+        return 0;
+
+    SetCountFn countFn = SetOps_count(Set_ops(self));
+
+    if(!countFn)
+        return 0;
+
+    return countFn(self);
+}
+
+bytes Set_size(const Set *self)
+{
+    return Set_count(self);
+}
+
+bytes Set_capacity(const Set *self)
+{
+    if(!self)
+        return 0;
+
+    SetCapacityFn capFn = SetOps_capacity(Set_ops(self));
+
+    if(!capFn)
+        return 0;
+
+    return capFn(self);
+}
+
+bool Set_isEmpty(const Set *self)
+{
+    return Set_count(self) == 0;
+}
+
+bytes Set_stride(const Set *self)
+{
+    if(!self)
+        return 0;
+
+    return ElementLayout_stride(Set_layout(self));
+}
+
+string Set_typeName(const Set *self)
+{
+    if(!self)
+        return "nullptr";
+
+    return ElementLayout_typeName(Set_layout(self));
+}
+
+SetKind Set_kind(const Set *self)
+{
+    if(!self)
+        return SET_KIND_UNKNOWN;
+
+    return SetOps_kind(Set_ops(self));
+}
+
+string Set_kindName(const Set *self)
+{
+    if(!self)
+        return "nullptr";
+
+    return SetOps_kindName(Set_ops(self));
+}
+
+;;TEST
+u64 Set_exhaustionCount(const Set *self)
+{
+    if(!self)
+        return 0;
+
+    return Collection_exhaustionCount((const Collection*) self);
+}
+
+fn Set_toString(const Set *self, utf8 *dest, bytes cap, bool *outTruncated)
+{
+    if(!dest || cap == 0) {
+        if(outTruncated)
+            *outTruncated = true;
 
         return;
     }
 
-    memset(newData, 0, Bytes);
+    if(!self) {
+        i32 needed = snprintf(dest, cap, "Set(nullptr)");
+        formatWrite(dest, cap, outTruncated, needed);
 
-    bytes mask = newCap - 1;
-
-    for (bytes i = 0; i < oldCap; i++) {
-        u8 *slot = slotAt(c, i);
-
-        if (slotState(slot) == STATE_OCCUPIED) {
-            u64 elem = *(u64*) slot;
-
-            u64 hash = *(u64*) (slot + 8);
-
-            bytes idx = (bytes)(hash & mask);
-
-            while (slotState(newData + idx * SLOT_SIZE) == STATE_OCCUPIED) 
-                idx = (idx + 1) & mask;
-
-            u8 *target = newData + idx * SLOT_SIZE;
-            *(u64*) target = elem;
-            *(u64*) (target + 8) = hash;
-            *(u64*) (target + 16) = STATE_OCCUPIED;
-        }
+        return;
     }
 
-    Memory_free(oldData);
-
-    Collection_setData(c, newData);
-
-    Collection_setCapacity(c, (u32)newCap);
+    i32 needed = snprintf(dest, cap, "%s<%s>(count=%zu, capacity=%zu)",
+                          Set_kindName(self),
+                          Set_typeName(self),
+                          Set_count(self),
+                          Set_capacity(self));
+    formatWrite(dest, cap, outTruncated, needed);
 }
 
-Set *Set_2(u32 elementClass, bytes capacity) {
-    bytes cap = capacity == 0 ? DEFAULT_CAPACITY : highestOneBit(capacity);
+fn Set_toStringStruct(const Set *self, utf8 *dest, bytes cap, bool *outTruncated)
+{
+    if(!dest || cap == 0) {
+        if(outTruncated)
+            *outTruncated = true;
 
-    if (cap < 4) 
-       cap = 4;
-
-    Set *set = (Set*) Memory_alloc(TYPE_SET, Re_arena(), sizeof(Set));
-
-    if (!set) {
-        (discard) Struct_reportConstructionExhaustion("set", sizeof(Set));
-
-        return nullptr;
+        return;
     }
 
-    Collection *c = asCollection(set);
+    if(!self) {
+        i32 needed = snprintf(dest, cap, "Set{nullptr}");
+        formatWrite(dest, cap, outTruncated, needed);
 
-    Collection_setTypeId(c, TYPE_SET);
-
-    Collection_setActiveCount(c, 0);
-
-    Collection_setElementClass(c, elementClass);
-
-    Collection_setStride(c, 0);
-
-    Collection_setCapacity(c, (u32)cap);
-
-    Collection_setHead(c, 0);
-
-    Collection_setExhaustionCount(c, 0);
-
-    Collection_setExhaustionReported(c, false);
-
-    bytes Bytes = cap * SLOT_SIZE;
-
-    u64 bufType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ID_SET);
-
-    u8 *data = (u8*) Memory_alloc(bufType, Re_arena(), Bytes);
-    Collection_setData(c, data);
-
-    if (!data) {
-        (discard) Struct_reportConstructionExhaustion("set", Bytes);
-
-        Memory_free(set);
-
-        return nullptr;
+        return;
     }
 
-    memset(data, 0, Bytes);
-
-    return set;
-}
-
-fn Set_free(Set *set) {
-    if (!set) 
-       return;
-
-    Collection *c = asCollection(set);
-    u8 *data = Collection_data(c);
-    if (data) 
-        Memory_free(data);
-
-    Memory_free(set);
-}
-
-i32 Set_add(Set *set, u64 element) {
-    if (!set) 
-       return 0;
-
-    Collection *c = asCollection(set);
-    u32 cap = Collection_capacityField(c);
-    u32 activeCount = Collection_activeCount(c);
-    bytes load = cap - cap / LOAD_DIVISOR;
-
-    if (activeCount >= load) {
-        rehash(c, cap * 2);
-        cap = Collection_capacityField(c);
-    }
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, element);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    bytes firstDeleted = SIZE_MAX;
-
-    while (true) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) {
-            bytes target = firstDeleted != SIZE_MAX ? firstDeleted : idx;
-
-            u8 *tslot = slotAt(c, target);
-            *(u64*) tslot = element;
-            *(u64*) (tslot + 8) = hash;
-            *(u64*) (tslot + 16) = STATE_OCCUPIED;
-
-            Collection_setActiveCount(c, activeCount + 1u);
-
-            return 1;
-        } else if (st == STATE_DELETED) {
-            if (firstDeleted == SIZE_MAX) 
-                firstDeleted = idx;
-        } else if (st == STATE_OCCUPIED) {
-            if (*(u64*) (slot + 8) == hash
-                && elementsEqual(elemClass, *(u64*) slot, element))
-                return 0;
-        }
-
-        idx = (idx + 1) & mask;
-    }
-}
-
-bool Set_contains(Set *set, u64 element) {
-    if (!set) 
-       return false;
-
-    Collection *c = asCollection(set);
-    u32 cap = Collection_capacityField(c);
-
-    if (cap == 0) 
-       return false;
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, element);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) 
-           return false;
-
-        if (st == STATE_OCCUPIED
-            && *(u64*) (slot + 8) == hash
-            && elementsEqual(elemClass, *(u64*) slot, element))
-            return true;
-        idx = (idx + 1) & mask;
-    }
-
-    return false;
-}
-
-i32 Set_remove(Set *set, u64 element) {
-    if (!set) 
-       return 0;
-
-    Collection *c = asCollection(set);
-    u32 cap = Collection_capacityField(c);
-
-    if (cap == 0) 
-       return 0;
-
-    u32 elemClass = Collection_elementClass(c);
-    u64 hash = computeHash(elemClass, element);
-
-    bytes mask = cap - 1;
-
-    bytes idx = (bytes)(hash & mask);
-
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, idx);
-
-        u64 st = slotState(slot);
-
-        if (st == STATE_EMPTY) 
-           return 0;
-
-        if (st == STATE_OCCUPIED
-            && *(u64*) (slot + 8) == hash
-            && elementsEqual(elemClass, *(u64*) slot, element)) {
-            *(u64*) (slot + 16) = STATE_DELETED;
-
-            Collection_setActiveCount(c, Collection_activeCount(c) - 1u);
-
-            return 1;
-        }
-
-        idx = (idx + 1) & mask;
-    }
-
-    return 0;
-}
-
-List *Set_toList(Set *set) {
-    if (!set) 
-       return nullptr;
-
-    Collection *c = asCollection(set);
-
-    List *list = List_2(Collection_elementClass(c), Collection_activeCount(c));
-
-    if (!list) 
-       return nullptr;
-
-    u32 cap = Collection_capacityField(c);
-    for (bytes i = 0; i < cap; i++) {
-        u8 *slot = slotAt(c, i);
-
-        if (slotState(slot) == STATE_OCCUPIED) 
-            List_add(list, *(u64*) slot);
-    }
-
-    return list;
-}
-
-static i64 readSignedElement(const u8 *buf, bytes idx, bool is64) {
-    return is64 ? ((const i64*) buf)[idx] : (i64) ((const i32*) buf)[idx];
-}
-
-static fn writeSignedElement(u8 *buf, bytes idx, i64 val, bool is64) {
-    if (is64) {
-        ((i64*) buf)[idx] = val;
-    } else {
-        ((i32*) buf)[idx] = (i32) val;
-    }
-}
-
-static fn siftDownSigned(u8 *buf, bytes root, bytes count, bool is64) {
-    while (root * 2 + 1 < count) {
-        bytes child = root * 2 + 1;
-
-        if (child + 1 < count
-            && readSignedElement(buf, child, is64) < readSignedElement(buf, child + 1, is64))
-            child++;
-
-        i64 rootVal = readSignedElement(buf, root, is64);
-
-        i64 childVal = readSignedElement(buf, child, is64);
-
-        if (rootVal >= childVal) 
-            return;
-
-        writeSignedElement(buf, root, childVal, is64);
-
-        writeSignedElement(buf, child, rootVal, is64);
-
-        root = child;
-    }
-}
-
-static fn sortSigned(u8 *buf, bytes n, bool is64) {
-    for (bytes start = n / 2; start > 0; start--) 
-        siftDownSigned(buf, start - 1, n, is64);
-
-    for (bytes end = n; end > 1; end--) {
-        i64 top = readSignedElement(buf, 0, is64);
-
-        i64 tail = readSignedElement(buf, end - 1, is64);
-
-        writeSignedElement(buf, 0, tail, is64);
-
-        writeSignedElement(buf, end - 1, top, is64);
-
-        siftDownSigned(buf, 0, end - 1, is64);
-    }
-}
-
-List *Set_toSortedList(Set *set) {
-    List *list = Set_toList(set);
-
-    if (!list) 
-        return nullptr;
-
-    if (List_size(list) > 1) {
-        bytes stride = List_stride(list);
-
-        u8 *buf = List_dataBuffer(list);
-
-        bytes n = List_size(list);
-
-        if (stride == 4 || stride == 8) 
-            sortSigned(buf, n, stride == 8);
-    }
-
-    return list;
-}
-
-bool Set_isEmpty(Set *set) {
-    return Collection_isEmpty(asCollection(set));
-}
-
-bytes Set_size(Set *set) {
-    return Collection_size(asCollection(set));
-}
-
-;;TEST
-u64 Set_exhaustionCount(const Set *set) {
-    return Collection_exhaustionCount((const Collection*) set);
-}
-
-bytes Set_capacity(Set *set) {
-    return Collection_capacity(asCollection(set));
-}
-
-u32 Set_elementClassId(Set *set) {
-    return Collection_elementClassId(asCollection(set));
-}
-
-u8 *Set_dataBuffer(Set *set) {
-    return Collection_dataBuffer(asCollection(set));
-}
-
-Set *Set_1(u32 element_class) {
-    return Set_2(element_class, 16);
+    i32 needed = snprintf(dest, cap,
+                          "Set{kind=%s, type=%s, stride=%zu, count=%zu, capacity=%zu, exhausted=%llu}",
+                          Set_kindName(self),
+                          Set_typeName(self),
+                          Set_stride(self),
+                          Set_count(self),
+                          Set_capacity(self),
+                          (u64) Set_exhaustionCount(self));
+    formatWrite(dest, cap, outTruncated, needed);
 }

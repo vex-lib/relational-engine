@@ -200,13 +200,15 @@ static u32 pageLeafRows(bytes stride) {
 }
 
 ;;GETTER
-static const Collection *ChunkedList_collection(const ChunkedList *self) {
-    return &(*self).collection;
+static const Collection *ChunkedList_collection(const ChunkedList *self)
+{
+    return (const Collection*) self;
 }
 
 ;;GETTER
-static Collection *ChunkedList_collectionMut(ChunkedList *self) {
-    return &(*self).collection;
+static Collection *ChunkedList_collectionMut(ChunkedList *self)
+{
+    return (Collection*) self;
 }
 
 ;;GETTER
@@ -371,48 +373,21 @@ static u32 ClColl_elementClass(const Collection *coll) {
 }
 
 ;;SETTER
-static fn ClColl_setTypeId(Collection *c, u64 typeId) {
-    (*c).typeId = typeId;
-}
-
-;;SETTER
-static fn ClColl_setActiveCount(Collection *c, u32 activeCount) {
+static fn ClColl_setActiveCount(Collection *c, u32 activeCount)
+{
     (*c).activeCount = activeCount;
 }
 
 ;;SETTER
-static fn ClColl_setElementClass(Collection *c, u32 elementClass) {
+static fn ClColl_setElementClass(Collection *c, u32 elementClass)
+{
     (*c).elementClass = elementClass;
 }
 
 ;;SETTER
-static fn ClColl_setStride(Collection *c, u32 stride) {
-    (*c).stride = stride;
-}
-
-;;SETTER
-static fn ClColl_setCapacity(Collection *c, u32 capacity) {
+static fn ClColl_setCapacity(Collection *c, u32 capacity)
+{
     (*c).capacity = capacity;
-}
-
-;;SETTER
-static fn ClColl_setHead(Collection *c, u32 head) {
-    (*c).head = head;
-}
-
-;;SETTER
-static fn ClColl_setExhaustionCount(Collection *c, u64 exhaustionCount) {
-    (*c).exhaustionCount = exhaustionCount;
-}
-
-;;SETTER
-static fn ClColl_setExhaustionReported(Collection *c, bool exhaustionReported) {
-    (*c).exhaustionReported = exhaustionReported;
-}
-
-;;SETTER
-static fn ClColl_setData(Collection *c, any data) {
-    (*c).data = data;
 }
 
 static ChunkDir *directoryOf(const ChunkedList *self) {
@@ -494,29 +469,27 @@ static bytes leafLinkOffset(const ChunkedList *self) {
  * Allocate + zero one node at `depth`: an internal pointer array, or a leaf of
  * rows at the deepest depth (plus the tail link).
  */
-static u8 *nodeAlloc(const ChunkedList *self, u32 depth) {
+static u8 *nodeAlloc(const ChunkedList *self, u32 depth)
+{
     u32 radix = ChunkedList_radices(self)[depth];
+    MemoryArena *arena = List_arena((const List*) self);
 
-    if (depth == ChunkedList_levels(self) - 1u) {
-        bytes Bytes = leafLinkOffset(self) + (bytes)VEX_CHUNKED_LINK_BYTES;
-
+    if(depth == ChunkedList_levels(self) - 1u) {
+        bytes Bytes = leafLinkOffset(self) + (bytes) VEX_CHUNKED_LINK_BYTES;
         const Collection *coll = ChunkedList_collection(self);
-
         u64 chunkType = Type_make(PROJ_VEXSPOKE, FORM_ARRAY, ClColl_elementClass(coll));
+        u8 *leaf = (u8*) MemoryArena_alloc(arena, chunkType, Bytes);
 
-        u8 *leaf = (u8*) Memory_alloc(chunkType, Re_arena(), Bytes);
-
-        if (leaf) 
+        if(leaf)
             memset(leaf, 0, Bytes);
 
         return leaf;
     }
 
-    bytes Bytes = (bytes)radix * sizeof(_Atomic(u8*));
+    bytes Bytes = (bytes) radix * sizeof(_Atomic(u8*));
+    u8 *node = (u8*) MemoryArena_alloc(arena, TYPE_CHUNKED_LIST, Bytes);
 
-    u8 *node = (u8*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), Bytes);
-
-    if (node) 
+    if(node)
         memset(node, 0, Bytes);
 
     return node;
@@ -527,41 +500,36 @@ static u8 *nodeAlloc(const ChunkedList *self, u32 depth) {
  * valid forever (the arraycopy of the cold path, node pointers only). Gate
  * held by the caller: exactly one grower, so chunkCount only moves here.
  */
-static bool dirGrow(ChunkedList *self) {
+static bool dirGrow(ChunkedList *self)
+{
     ChunkDir *old = directoryOf(self);
-
     u32 oldCap = old ? ChunkDir_capacity(old) : 0u;
 
-    if (oldCap > (UINT32_MAX / 2u)) 
+    if(oldCap > (UINT32_MAX / 2u))
         return false;
 
     u32 newCap = oldCap == 0u ? VEX_CHUNKED_DIR_INIT : oldCap * 2u;
+    bytes Bytes = sizeof(ChunkDir) + (bytes) newCap * sizeof(_Atomic(u8*));
+    MemoryArena *arena = List_arena((const List*) self);
+    ChunkDir *next = (ChunkDir*) MemoryArena_alloc(arena, TYPE_CHUNKED_LIST, Bytes);
 
-    bytes Bytes = sizeof(ChunkDir) + (bytes)newCap * sizeof(_Atomic(u8*));
-
-    ChunkDir *next = (ChunkDir*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), Bytes);
-
-    if (!next) {
-        Collection_reportExhaustion(ChunkedList_collectionMut(self), Bytes);
+    if(!next) {
+        (discard) Collection_reportExhaustion(ChunkedList_collectionMut(self), Bytes);
 
         return false;
     }
 
     ChunkDir_setPrev(next, old);
-
     ChunkDir_setCapacity(next, newCap);
-
     ChunkDir_setPad(next, 0u);
 
     _Atomic(u8*) *nextSlots = ChunkDir_slotsMut(next);
-
-    memset(&nextSlots[0], 0, (bytes)newCap * sizeof(_Atomic(u8*)));
+    memset(&nextSlots[0], 0, (bytes) newCap * sizeof(_Atomic(u8*)));
 
     u32 have = old ? ChunkDir_capacity(old) : 0u;
-
     _Atomic(u8*) *oldSlots = old ? ChunkDir_slotsMut(old) : nullptr;
 
-    for (u32 i = 0; i < have; i++) 
+    for(u32 i = 0; i < have; i++)
         atomic_store_explicit(&nextSlots[i], atomic_load_explicit(&oldSlots[i], memory_order_relaxed), memory_order_relaxed);
 
     atomic_store_explicit(ChunkedList_directoryMut(self), next, memory_order_release);
@@ -721,26 +689,141 @@ static fn recomputeGeometry(ChunkedList *self) {
     }
 }
 
+static ListOps s_chunkedListOps;
+static SpinLock s_chunkedListOpsLock = SPIN_LOCK_INIT;
+static atomic_bool s_chunkedListOpsReady = false;
+
+static bool chunkedListInsertBytes(List *self, bytes index, const_any src, bytes elemBytes)
+{
+    if(!ChunkedList_isChunkedList(self) || !src)
+        return false;
+
+    if(index == (bytes) ChunkedList_size((const ChunkedList*) self))
+        return ChunkedList_addBytes(self, src, elemBytes);
+
+    THROW("ChunkedList: mid-list insert at index %zu is unsupported on never-moved paged storage",
+          index);
+
+    return false;
+}
+
+static bool chunkedListRemoveAt(List *self, bytes index)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return false;
+
+    THROW("ChunkedList: remove at index %zu is unsupported on never-moved paged storage",
+          index);
+
+    return false;
+}
+
+static fn chunkedListClear(List *self)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return;
+
+    THROW("ChunkedList: clear is unsupported on never-moved paged storage; free and recreate instead");
+}
+
+static bool chunkedListReserveList(List *self, bytes minCapacity)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return false;
+
+    if(minCapacity > (bytes) UINT32_MAX) {
+        (discard) Collection_reportExhaustion((Collection*) self, minCapacity);
+
+        return false;
+    }
+
+    return ChunkedList_reserve((ChunkedList*) self, (u32) minCapacity);
+}
+
+static bytes chunkedListCountList(const List *self)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return 0;
+
+    return (bytes) ChunkedList_size((const ChunkedList*) self);
+}
+
+static bytes chunkedListCapacityList(const List *self)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return 0;
+
+    return (bytes) ChunkedList_capacity((const ChunkedList*) self);
+}
+
+static fn chunkedListDestroyList(List *self)
+{
+    if(!self)
+        return;
+
+    ChunkedList_free((ChunkedList*) self);
+}
+
+static const ListOps *chunkedListOps()
+{
+    if(atomic_load_explicit(&s_chunkedListOpsReady, memory_order_acquire))
+        return &s_chunkedListOps;
+
+    SpinLock_lock(&s_chunkedListOpsLock);
+
+    if(!atomic_load_explicit(&s_chunkedListOpsReady, memory_order_relaxed)) {
+        ListOps_setKind(&s_chunkedListOps, LIST_KIND_CHUNKED);
+        ListOps_setKindName(&s_chunkedListOps, "ChunkedList");
+        ListOps_setGet(&s_chunkedListOps, ChunkedList_get);
+        ListOps_setSetBytes(&s_chunkedListOps, ChunkedList_setBytes);
+        ListOps_setEmplace(&s_chunkedListOps, ChunkedList_emplace);
+        ListOps_setAddBytes(&s_chunkedListOps, ChunkedList_addBytes);
+        ListOps_setInsertBytes(&s_chunkedListOps, chunkedListInsertBytes);
+        ListOps_setRemoveAt(&s_chunkedListOps, chunkedListRemoveAt);
+        ListOps_setClear(&s_chunkedListOps, chunkedListClear);
+        ListOps_setReserve(&s_chunkedListOps, chunkedListReserveList);
+        ListOps_setCount(&s_chunkedListOps, chunkedListCountList);
+        ListOps_setCapacity(&s_chunkedListOps, chunkedListCapacityList);
+        ListOps_setDestroy(&s_chunkedListOps, chunkedListDestroyList);
+        atomic_store_explicit(&s_chunkedListOpsReady, true, memory_order_release);
+    }
+
+    SpinLock_unlock(&s_chunkedListOpsLock);
+
+    return &s_chunkedListOps;
+}
+
 /**
- * Shared builder: allocate the struct + geometry tables, zero the counters.
- * `chunkBytes` 0 derives the leaf byte size from rows*stride.
+ * Shared builder: allocate the struct + geometry tables in targetArena and bind
+ * the polymorphic List header. `chunkBytes` 0 derives the leaf byte size from rows*stride.
  */
-static ChunkedList *buildPaged(u32 elementClass, bytes stride, const u32 *radixIn, u32 levels, u32 chunkBytes) {
-    if (levels < 2u) 
+static ChunkedList *buildPagedLayout(u32 elementClass, ElementLayout layout, const u32 *radixIn, u32 levels, u32 chunkBytes, MemoryArena *arena)
+{
+    if(!ElementLayout_isValid(layout)) {
+        THROW("ChunkedList: invalid layout for '%s' (stride=%zu, align=%zu)",
+              ElementLayout_typeName(layout),
+              ElementLayout_stride(layout),
+              ElementLayout_alignment(layout));
+
+        return nullptr;
+    }
+
+    if(levels < 2u)
         levels = 2u;
 
-    if (stride == 0u) 
-        stride = Stride_get(elementClass);
+    bytes stride = ElementLayout_stride(layout);
 
-    if (stride == 0u) 
-        stride = sizeof(any);
-
-    if (stride > (bytes)UINT32_MAX) 
+    if(stride > (bytes) UINT32_MAX)
         return nullptr;
 
-    ChunkedList *self = (ChunkedList*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), sizeof(ChunkedList));
+    MemoryArena *targetArena = arena ? arena : Re_arena();
 
-    if (!self) {
+    if(!targetArena)
+        return nullptr;
+
+    ChunkedList *self = (ChunkedList*) MemoryArena_alloc(targetArena, TYPE_CHUNKED_LIST, sizeof(ChunkedList));
+
+    if(!self) {
         (discard) Struct_reportConstructionExhaustion("chunked_list", sizeof(ChunkedList));
 
         return nullptr;
@@ -748,235 +831,358 @@ static ChunkedList *buildPaged(u32 elementClass, bytes stride, const u32 *radixI
 
     memset(self, 0, sizeof(*self));
 
-    u32 *radices = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), (bytes)levels * sizeof(u32));
-
-    u32 *shifts = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), (bytes)levels * sizeof(u32));
-
-    u32 *masks = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), (bytes)levels * sizeof(u32));
-
-    if (!radices || !shifts || !masks) {
-        (discard) Struct_reportConstructionExhaustion("chunked_list", (bytes)levels * sizeof(u32) * 3u);
-
-        Memory_free(radices);
-
-        Memory_free(shifts);
-
-        Memory_free(masks);
-
-        Memory_free(self);
+    if(!List_initBase((List*) self, TYPE_CHUNKED_LIST, chunkedListOps(), layout, targetArena)) {
+        (discard) MemoryArena_free(targetArena, self);
 
         return nullptr;
     }
 
-    for (u32 d = 0u; d < levels; d++) {
-        u32 r = radixIn[d];
+    ClColl_setElementClass((Collection*) self, elementClass);
 
+    u32 *radices = (u32*) MemoryArena_alloc(targetArena, TYPE_CHUNKED_LIST, (bytes) levels * sizeof(u32));
+    u32 *shifts = (u32*) MemoryArena_alloc(targetArena, TYPE_CHUNKED_LIST, (bytes) levels * sizeof(u32));
+    u32 *masks = (u32*) MemoryArena_alloc(targetArena, TYPE_CHUNKED_LIST, (bytes) levels * sizeof(u32));
+
+    if(!radices || !shifts || !masks) {
+        (discard) Struct_reportConstructionExhaustion("chunked_list", (bytes) levels * sizeof(u32) * 3u);
+
+        if(radices)
+            (discard) MemoryArena_free(targetArena, radices);
+
+        if(shifts)
+            (discard) MemoryArena_free(targetArena, shifts);
+
+        if(masks)
+            (discard) MemoryArena_free(targetArena, masks);
+
+        (discard) MemoryArena_free(targetArena, self);
+
+        return nullptr;
+    }
+
+    for(u32 d = 0u; d < levels; d++) {
+        u32 r = radixIn[d];
         radices[d] = r == 0u ? 1u : pow2Floor(r);
     }
 
     ChunkedList_setLevels(self, levels);
-
     ChunkedList_setRadices(self, radices);
-
     ChunkedList_setShifts(self, shifts);
-
     ChunkedList_setMasks(self, masks);
 
     recomputeGeometry(self);
 
-    if (chunkBytes == 0u) {
-        u64 b = (u64)radices[levels - 1u] * (u64)stride;
-
-        chunkBytes = b > (u64)UINT32_MAX ? UINT32_MAX : (u32)b;
+    if(chunkBytes == 0u) {
+        u64 b = (u64) radices[levels - 1u] * (u64) stride;
+        chunkBytes = b > (u64) UINT32_MAX ? UINT32_MAX : (u32) b;
     }
 
-    if (chunkBytes < 16u) 
+    if(chunkBytes < 16u)
         chunkBytes = 16u;
 
     ChunkedList_setChunkBytesRaw(self, chunkBytes);
 
-    Collection *c = (Collection*) self;
-
-    ClColl_setTypeId(c, TYPE_CHUNKED_LIST);
-
-    ClColl_setActiveCount(c, 0);
-
-    ClColl_setElementClass(c, elementClass);
-
-    ClColl_setStride(c, (u32)stride);
-
-    ClColl_setCapacity(c, 0);
-
-    ClColl_setHead(c, 0);
-
-    ClColl_setExhaustionCount(c, 0);
-
-    ClColl_setExhaustionReported(c, false);
-
-    ClColl_setData(c, nullptr);
-
     atomic_store_explicit(ChunkedList_directoryMut(self), nullptr, memory_order_relaxed);
-
     atomic_store(ChunkedList_chunkCountMut(self), 0u);
-
     atomic_store(ChunkedList_committedMut(self), 0u);
-
     ChunkedList_setLock(self, SPIN_LOCK_INIT);
 
     return self;
 }
 
-/** The 2-level byte-budget form (the historical shape). */
-ChunkedList *ChunkedList_3(u32 elementClass, u32 stride, u32 chunkBytes) {
-    if (stride == 0u) 
-        stride = Stride_get(elementClass);
+static ChunkedList *buildRadixLayout(u32 elementClass, ElementLayout layout, const i32 *radices, bytes count, MemoryArena *arena)
+{
+    if(!ElementLayout_isValid(layout)) {
+        THROW("ChunkedList: invalid layout for '%s' (stride=%zu, align=%zu)",
+              ElementLayout_typeName(layout),
+              ElementLayout_stride(layout),
+              ElementLayout_alignment(layout));
 
-    if (stride == 0u) 
-        stride = sizeof(any);
-
-    if (stride > (bytes)UINT32_MAX) 
         return nullptr;
-
-    if (chunkBytes < 16u) 
-        chunkBytes = 16u;
-
-    u32 rows = pow2Rows(stride, chunkBytes);
-
-    u32 radixIn[2] = { VEX_CHUNKED_DIR_INIT, rows };
-
-    return buildPaged(elementClass, stride, radixIn, 2u, chunkBytes);
-}
-
-/** Recursive teardown: free a depth-`depth` object and everything under it. */
-static fn freeSubtree(u8 *node, const ChunkedList *self, u32 depth) {
-    if (!node) 
-        return;
-
-    if (depth == ChunkedList_levels(self) - 1u) {
-        Memory_free(node);
-
-        return;
     }
 
-    _Atomic(u8*) *children = (_Atomic(u8*) *) node;
+    MemoryArena *targetArena = arena ? arena : Re_arena();
 
-    u32 radix = ChunkedList_radices(self)[depth];
+    if(!targetArena)
+        return nullptr;
 
-    for (u32 i = 0u; i < radix; i++) 
-        freeSubtree(atomic_load_explicit(&children[i], memory_order_relaxed), self, depth + 1u);
-
-    Memory_free(node);
-}
-
-/** CONSTRUCTORS */
-
-ChunkedList *ChunkedList_1(u32 elementClass) {
-    return ChunkedList_3(elementClass, Stride_get(elementClass), VEX_CHUNKED_BYTES_DEFAULT);
-}
-
-ChunkedList *ChunkedList_2(u32 elementClass, u32 chunkBytes) {
-    return ChunkedList_3(elementClass, Stride_get(elementClass), chunkBytes);
-}
-
-ChunkedList *ChunkedList_paged(u32 elementClass, u32 stride, const i32 *radices, bytes count) {
-    if (stride == 0u) 
-        stride = (u32) Stride_get(elementClass);
-
-    if (stride == 0u) 
-        stride = (u32) sizeof(any);
-
+    bytes stride = ElementLayout_stride(layout);
     bytes cap = count > 3u ? count : 3u;
+    u32 *shape = (u32*) MemoryArena_alloc(targetArena, TYPE_CHUNKED_LIST, cap * sizeof(u32));
 
-    u32 *shape = (u32*) Memory_alloc(TYPE_CHUNKED_LIST, Re_arena(), cap * sizeof(u32));
-
-    if (!shape) 
+    if(!shape)
         return nullptr;
 
     u32 levels = 2u;
+    bool preset = count >= 1u && radices && radices[0] < 0;
 
-    bool preset = count >= 1u && radices[0] < 0;
-
-    if (preset) {
-        if (radices[0] == CHUNKED_LIST_THREE_LAYER_DEFAULT) 
+    if(preset) {
+        if(radices[0] == CHUNKED_LIST_THREE_LAYER_DEFAULT) {
             levels = 3u;
-        else 
+        } else {
             levels = 2u;
+        }
 
-        if (levels > cap) {
-            Memory_free(shape);
+        if(levels > cap) {
+            (discard) MemoryArena_free(targetArena, shape);
 
             return nullptr;
         }
 
         shape[0] = VEX_CHUNKED_DIR_INIT;
 
-        for (u32 d = 1u; d + 1u < levels; d++) 
+        for(u32 d = 1u; d + 1u < levels; d++)
             shape[d] = VEX_CHUNKED_INTERNAL_RADIX_DEFAULT;
 
         shape[levels - 1u] = pageLeafRows(stride);
 
-        for (bytes k = 1u; k < count; k++) {
-            if (radices[k] > 0 && k < (bytes)levels) 
+        for(bytes k = 1u; k < count; k++) {
+            if(radices[k] > 0 && k < (bytes) levels)
                 shape[k] = (u32) radices[k];
         }
     } else {
         levels = count < 2u ? 2u : (u32) count;
 
-        if (levels > cap) {
-            Memory_free(shape);
+        if(levels > cap) {
+            (discard) MemoryArena_free(targetArena, shape);
 
             return nullptr;
         }
 
-        for (u32 d = 0u; d < levels; d++) {
-            i32 v = d < (u32) count ? radices[d] : 0;
+        for(u32 d = 0u; d < levels; d++) {
+            i32 v = (radices && d < (u32) count) ? radices[d] : 0;
 
-            if (v > 0) 
+            if(v > 0) {
                 shape[d] = (u32) v;
-            else 
+            } else {
                 shape[d] = d == 0u ? VEX_CHUNKED_DIR_INIT : 1u;
+            }
         }
     }
 
-    ChunkedList *self = buildPaged(elementClass, stride, shape, levels, 0u);
-
-    Memory_free(shape);
+    ChunkedList *self = buildPagedLayout(elementClass, layout, shape, levels, 0u, targetArena);
+    (discard) MemoryArena_free(targetArena, shape);
 
     return self;
 }
 
-/** CORE FUNCTIONS */
+;;CONSTRUCTOR
+List *ChunkedList_newLayout(ElementLayout layout, u32 chunkBytes, MemoryArena *arena)
+{
+    if(!ElementLayout_isValid(layout)) {
+        THROW("ChunkedList: invalid layout for '%s' (stride=%zu, align=%zu)",
+              ElementLayout_typeName(layout),
+              ElementLayout_stride(layout),
+              ElementLayout_alignment(layout));
 
-fn ChunkedList_free(ChunkedList *self) {
-    if (!self) 
-        return;
-
-    ChunkDir *dir = directoryOf(self);
-
-    if (dir) {
-        _Atomic(u8*) *slots = ChunkDir_slotsMut(dir);
-
-        u32 cap = ChunkDir_capacity(dir);
-
-        for (u32 i = 0u; i < cap; i++) 
-            freeSubtree(atomic_load_explicit(&slots[i], memory_order_relaxed), self, 1u);
+        return nullptr;
     }
 
-    while (dir) {
+    u32 resolvedChunkBytes = chunkBytes == 0u ? VEX_CHUNKED_PAGE_BYTES : chunkBytes;
+
+    if(resolvedChunkBytes < 16u)
+        resolvedChunkBytes = 16u;
+
+    u32 rows = pow2Rows(ElementLayout_stride(layout), resolvedChunkBytes);
+    u32 radixIn[2] = { VEX_CHUNKED_DIR_INIT, rows };
+
+    return (List*) buildPagedLayout(ID_CHUNKED_LIST, layout, radixIn, 2u, resolvedChunkBytes, arena);
+}
+
+;;CONSTRUCTOR
+List *ChunkedList_newRadix(ElementLayout layout, const i32 *radices, bytes count, MemoryArena *arena)
+{
+    return (List*) buildRadixLayout(ID_CHUNKED_LIST, layout, radices, count, arena);
+}
+
+/** The 2-level byte-budget form (the historical shape). */
+;;CONSTRUCTOR
+ChunkedList *ChunkedList_3(u32 elementClass, u32 stride, u32 chunkBytes)
+{
+    if(stride == 0u)
+        stride = (u32) Stride_get(elementClass);
+
+    if(stride == 0u)
+        stride = (u32) sizeof(any);
+
+    if(chunkBytes < 16u)
+        chunkBytes = 16u;
+
+    u32 rows = pow2Rows((bytes) stride, chunkBytes);
+    u32 radixIn[2] = { VEX_CHUNKED_DIR_INIT, rows };
+    ElementLayout layout = ElementLayout_make((bytes) stride, 0, "ChunkedRow");
+
+    return buildPagedLayout(elementClass, layout, radixIn, 2u, chunkBytes, Re_arena());
+}
+
+/** Recursive teardown: free a depth-`depth` object and everything under it. */
+static fn freeSubtree(u8 *node, const ChunkedList *self, MemoryArena *arena, u32 depth)
+{
+    if(!node)
+        return;
+
+    if(depth == ChunkedList_levels(self) - 1u) {
+        (discard) MemoryArena_free(arena, node);
+
+        return;
+    }
+
+    _Atomic(u8*) *children = (_Atomic(u8*) *) node;
+    u32 radix = ChunkedList_radices(self)[depth];
+
+    for(u32 i = 0u; i < radix; i++)
+        freeSubtree(atomic_load_explicit(&children[i], memory_order_relaxed), self, arena, depth + 1u);
+
+    (discard) MemoryArena_free(arena, node);
+}
+
+/** CONSTRUCTORS */
+
+;;CONSTRUCTOR
+ChunkedList *ChunkedList_1(u32 elementClass)
+{
+    return ChunkedList_3(elementClass, (u32) Stride_get(elementClass), VEX_CHUNKED_BYTES_DEFAULT);
+}
+
+;;CONSTRUCTOR
+ChunkedList *ChunkedList_2(u32 elementClass, u32 chunkBytes)
+{
+    return ChunkedList_3(elementClass, (u32) Stride_get(elementClass), chunkBytes);
+}
+
+;;CONSTRUCTOR
+ChunkedList *ChunkedList_paged(u32 elementClass, u32 stride, const i32 *radices, bytes count)
+{
+    if(stride == 0u)
+        stride = (u32) Stride_get(elementClass);
+
+    if(stride == 0u)
+        stride = (u32) sizeof(any);
+
+    ElementLayout layout = ElementLayout_make((bytes) stride, 0, "ChunkedRow");
+
+    return buildRadixLayout(elementClass, layout, radices, count, Re_arena());
+}
+
+bool ChunkedList_isChunkedList(const List *self)
+{
+    if(!self)
+        return false;
+
+    return List_kind(self) == LIST_KIND_CHUNKED;
+}
+
+;;HOTCODE
+any ChunkedList_get(const List *self, bytes index)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return nullptr;
+
+    if(index > (bytes) UINT32_MAX)
+        return nullptr;
+
+    return ChunkedList_slot((const ChunkedList*) self, (u32) index);
+}
+
+any ChunkedList_emplace(List *self)
+{
+    if(!ChunkedList_isChunkedList(self))
+        return nullptr;
+
+    return ChunkedList_addSlot((ChunkedList*) self);
+}
+
+bool ChunkedList_addBytes(List *self, const_any src, bytes elemBytes)
+{
+    if(!ChunkedList_isChunkedList(self) || !src)
+        return false;
+
+    bytes stride = List_stride(self);
+
+    if(elemBytes != stride) {
+        THROW("ChunkedList_add: value width %zu does not match '%s' stride %zu",
+              elemBytes,
+              List_typeName(self),
+              stride);
+
+        return false;
+    }
+
+    any slot = ChunkedList_addSlot((ChunkedList*) self);
+
+    if(!slot)
+        return false;
+
+    memcpy(slot, src, stride);
+
+    return true;
+}
+
+bool ChunkedList_setBytes(List *self, bytes index, const_any src, bytes elemBytes)
+{
+    if(!ChunkedList_isChunkedList(self) || !src)
+        return false;
+
+    bytes stride = List_stride(self);
+
+    if(elemBytes != stride) {
+        THROW("ChunkedList_set: value width %zu does not match '%s' stride %zu",
+              elemBytes,
+              List_typeName(self),
+              stride);
+
+        return false;
+    }
+
+    any slot = ChunkedList_get(self, index);
+
+    if(!slot)
+        return false;
+
+    memcpy(slot, src, stride);
+
+    return true;
+}
+
+fn ChunkedList_toString(const List *self, utf8 *dest, bytes cap, bool *outTruncated)
+{
+    List_toString(self, dest, cap, outTruncated);
+}
+
+fn ChunkedList_toStringStruct(const List *self, utf8 *dest, bytes cap, bool *outTruncated)
+{
+    List_toStringStruct(self, dest, cap, outTruncated);
+}
+
+/** CORE FUNCTIONS */
+
+;;DECONSTRUCT
+fn ChunkedList_free(ChunkedList *self)
+{
+    if(!self)
+        return;
+
+    MemoryArena *arena = List_arena((const List*) self);
+    ChunkDir *dir = directoryOf(self);
+
+    if(dir) {
+        _Atomic(u8*) *slots = ChunkDir_slotsMut(dir);
+        u32 cap = ChunkDir_capacity(dir);
+
+        for(u32 i = 0u; i < cap; i++)
+            freeSubtree(atomic_load_explicit(&slots[i], memory_order_relaxed), self, arena, 1u);
+    }
+
+    while(dir) {
         ChunkDir *prev = ChunkDir_prev(dir);
-
-        Memory_free(dir);
-
+        (discard) MemoryArena_free(arena, dir);
         dir = prev;
     }
 
-    Memory_free(ChunkedList_radices(self));
-
-    Memory_free(ChunkedList_shifts(self));
-
-    Memory_free(ChunkedList_masks(self));
-
-    Memory_free(self);
+    (discard) MemoryArena_free(arena, ChunkedList_radices(self));
+    (discard) MemoryArena_free(arena, ChunkedList_shifts(self));
+    (discard) MemoryArena_free(arena, ChunkedList_masks(self));
+    (discard) MemoryArena_free(arena, self);
 }
 
 u8 *ChunkedList_addSlot(ChunkedList *self) {
